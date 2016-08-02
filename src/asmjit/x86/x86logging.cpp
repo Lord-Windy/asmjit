@@ -1,0 +1,282 @@
+// [AsmJit]
+// Complete x86/x64 JIT and Remote Assembler for C++.
+//
+// [License]
+// Zlib - See LICENSE.md file in the package.
+
+// [Export]
+#define ASMJIT_EXPORTS
+
+// [Guard]
+#include "../build.h"
+#if !defined(ASMJIT_DISABLE_LOGGING)
+
+// [Dependencies]
+#include "../x86/x86logging.h"
+#include "../x86/x86inst.h"
+#include "../x86/x86operand.h"
+
+// [Api-Begin]
+#include "../apibegin.h"
+
+namespace asmjit {
+
+// ============================================================================
+// [asmjit::X86Formatter]
+// ============================================================================
+
+struct X86FormatterRegData {
+  char format[6];
+  uint8_t valid;
+  uint8_t special;
+};
+
+static const X86FormatterRegData x86FormatterRegData[] = {
+  { ""     , false, 0 }, // #00 None.
+  { ""     , false, 0 }, // #01 Reserved.
+  { "rip%u", true , 1 }, // #02 RIP.
+  { "seg%u", true , 7 }, // #03 SEG.
+  { "r%ub" , true , 8 }, // #04 GPB-LO.
+  { "r%uh" , true , 4 }, // #05 GPB-HI.
+  { "r%uw" , true , 8 }, // #06 GPW.
+  { "r%ud" , true , 8 }, // #07 GPD.
+  { "r%u"  , true , 8 }, // #08 GPQ.
+  { "fp%u" , true , 0 }, // #09 FP.
+  { "mm%u" , true , 0 }, // #10 MM.
+  { "k%u"  , true , 0 }, // #11 K.
+  { "xmm%u", true , 0 }, // #12 XMM.
+  { "ymm%u", true , 0 }, // #13 YMM.
+  { "zmm%u", true , 0 }, // #14 ZMM.
+  { ""     , false, 0 }, // #15 FUTURE.
+  { "bnd%u", true , 0 }, // #16 BND.
+  { "cr%u" , true , 0 }, // #17 CR.
+  { "dr%u" , true , 0 }  // #18 DR.
+};
+static const char x86FormatterSegmentNames[] =
+  "\0\0\0\0es:\0cs:\0ss:\0ds:\0fs:\0gs:\0\0\0\0\0";
+
+static const char* x86GetAddressSizeString(uint32_t size) noexcept {
+  switch (size) {
+    case 1 : return "byte ptr ";
+    case 2 : return "word ptr ";
+    case 4 : return "dword ptr ";
+    case 8 : return "qword ptr ";
+    case 10: return "tword ptr ";
+    case 16: return "oword ptr ";
+    case 32: return "yword ptr ";
+    case 64: return "zword ptr ";
+    default: return "";
+  }
+}
+
+X86Formatter::X86Formatter() noexcept {}
+X86Formatter::~X86Formatter() noexcept {}
+
+Error X86Formatter::formatRegister(StringBuilder& out, uint32_t logOptions, uint32_t regType, uint32_t regId) const noexcept {
+  static const char reg8l[] = "al\0\0" "cl\0\0" "dl\0\0" "bl\0\0" "spl\0"  "bpl\0"  "sil\0"  "dil\0" ;
+  static const char reg8h[] = "ah\0\0" "ch\0\0" "dh\0\0" "bh\0\0" "--\0\0" "--\0\0" "--\0\0" "--\0\0";
+  static const char reg32[] = "eax\0"  "ecx\0"  "edx\0"  "ebx\0"  "esp\0"  "ebp\0"  "esi\0"  "edi\0" ;
+  static const char reg64[] = "rax\0"  "rcx\0"  "rdx\0"  "rbx\0"  "rsp\0"  "rbp\0"  "rsi\0"  "rdi\0" ;
+
+  if (regType < ASMJIT_ARRAY_SIZE(x86FormatterRegData)) {
+    const X86FormatterRegData& rfd = x86FormatterRegData[regType];
+    if (rfd.valid) {
+      if (regId < rfd.special) {
+        const char prefix = '\0';
+        const char* s = nullptr;
+        size_t len = kInvalidIndex;
+
+        if (regType == X86Reg::kRegGpbLo) {
+          s = reg8l;
+        }
+        else if (regType == X86Reg::kRegGpbHi) {
+          s = reg8h;
+        }
+        else if (regType == X86Reg::kRegGpw) {
+          s = reg32 + 1;
+        }
+        else if (regType == X86Reg::kRegGpd) {
+          s = reg32;
+        }
+        else if (regType == X86Reg::kRegGpq) {
+          s = reg64;
+        }
+        else if (regType == X86Reg::kRegRip) {
+          s = "rip";
+        }
+        else {
+          if (regId == 0) goto Invalid;
+          s = x86FormatterSegmentNames;
+          len = 2;
+        }
+
+        out.appendString(s + regId * 4, len);
+        return kErrorOk;
+      }
+
+      out.appendFormat(rfd.format, regId);
+      return kErrorOk;
+    }
+  }
+
+Invalid:
+  out.appendFormat("InvalidReg[Type=%u ID=%u]", regType, regId);
+  return kErrorOk;
+}
+
+Error X86Formatter::formatOperand(StringBuilder& out, uint32_t logOptions, const Operand_& op) const noexcept {
+  if (op.isReg()) {
+    const Reg& r = static_cast<const Reg&>(op);
+    if (r.isPhysReg()) {
+      formatRegister(out, logOptions, r.getRegType(), r.getId());
+      return kErrorOk;
+    }
+    else {
+      if (hasVirtRegHandler())
+        return formatVirtReg(out, logOptions, r);
+
+      out.appendFormat("VirtReg[Type=%u ID=%u]", r.getRegType(), r.getId());
+      return kErrorOk;
+    }
+  }
+
+  if (op.isMem()) {
+    const X86Mem& m = static_cast<const X86Mem&>(op);
+    out.appendString(x86GetAddressSizeString(m.getSize()));
+
+    // Segment override prefix.
+    uint32_t seg = m.getSegmentId();
+    if (seg != X86Seg::kIdNone && seg < X86Seg::kIdCount)
+      out.appendString(x86FormatterSegmentNames + seg * 4);
+
+    out.appendChar('[');
+    if (m.hasBase()) {
+      if (m.hasBaseLabel()) {
+        out.appendFormat("L%u", Operand::unpackId(m.getBaseId()));
+      }
+      else {
+        X86Reg baseReg = X86Reg::fromTypeAndId(m.getBaseType(), m.getBaseId());
+        if (m.isRegHome()) {
+          out.appendString("&");
+          formatOperand(out, logOptions, baseReg);
+        }
+        else {
+          formatOperand(out, logOptions, baseReg);
+        }
+      }
+    }
+
+    if (m.hasIndex()) {
+      X86Reg indexReg = X86Reg::fromTypeAndId(m.getIndexType(), m.getIndexId());
+      out.appendChar('+');
+
+      formatOperand(out, logOptions, indexReg);
+      if (m.hasShift())
+        out.appendFormat("*%u", 1 << m.getShift());
+    }
+
+    uint64_t off = static_cast<uint64_t>(m.getOffset());
+    if (off) {
+      uint32_t base = 10;
+      char prefix = '+';
+
+      if (static_cast<int64_t>(off) < 0) {
+        off = ~off + 1;
+        prefix = '-';
+      }
+
+      out.appendChar(prefix);
+      if ((logOptions & Logger::kOptionHexDisplacement) != 0 && off > 9) {
+        out.appendString("0x", 2);
+        base = 16;
+      }
+      out.appendUInt(off, base);
+    }
+
+    out.appendChar(']');
+    return kErrorOk;
+  }
+
+  if (op.isImm()) {
+    const Imm& i = static_cast<const Imm&>(op);
+    int64_t val = i.getInt64();
+
+    if ((logOptions & Logger::kOptionHexImmediate) != 0 && static_cast<uint64_t>(val) > 9)
+      out.appendUInt(static_cast<uint64_t>(val), 16);
+    else
+      out.appendInt(val, 10);
+    return kErrorOk;
+  }
+
+  if (op.isLabel()) {
+    out.appendFormat("L%u", Operand::unpackId(op.getId()));
+    return kErrorOk;
+  }
+
+  out.appendString("None", 4);
+  return kErrorOk;
+}
+
+Error X86Formatter::formatInstruction(
+  StringBuilder& out,
+  uint32_t logOptions,
+  uint32_t instId,
+  uint32_t options,
+  const Operand_& opMask,
+  const Operand_* opArray, uint32_t opCount) const noexcept {
+
+  // Rex, lock and short prefix.
+  if (options & X86Inst::kOptionShortForm) out.appendString("short ");
+  if (options & X86Inst::kOptionLongForm) out.appendString("long ");
+  if (options & X86Inst::kOptionLock) out.appendString("lock ");
+
+  if (options & X86Inst::kOptionRex) {
+    const uint32_t kRXBWMask = X86Inst::kOptionOpCodeR |
+                               X86Inst::kOptionOpCodeX |
+                               X86Inst::kOptionOpCodeB |
+                               X86Inst::kOptionOpCodeW ;
+    if (options & kRXBWMask) {
+      out.appendString("rex.");
+      if (options & X86Inst::kOptionOpCodeR) out.appendChar('r');
+      if (options & X86Inst::kOptionOpCodeX) out.appendChar('x');
+      if (options & X86Inst::kOptionOpCodeB) out.appendChar('b');
+      if (options & X86Inst::kOptionOpCodeW) out.appendChar('w');
+      out.appendChar(' ');
+    }
+    else {
+      out.appendString("rex ");
+    }
+  }
+
+  if (options & X86Inst::kOptionVex3) {
+    out.appendString("vex3 ");
+  }
+
+  // Dump instruction name.
+  out.appendString(X86Inst::getNameById(instId));
+
+  for (uint32_t i = 0; i < opCount; i++) {
+    const Operand_& op = opArray[i];
+    if (op.isNone()) break;
+
+    out.appendString(i == 0 ? " " : ", ");
+    formatOperand(out, logOptions, op);
+
+    // Support AVX-512 op-mask.
+    if (i == 0 && !opMask.isNone()) {
+      out.appendString("{ ");
+      formatOperand(out, logOptions, opMask);
+      out.appendChar('}');
+    }
+  }
+
+  return kErrorOk;
+}
+
+} // asmjit namespace
+
+// [Api-End]
+#include "../apiend.h"
+
+// [Guard]
+#endif // !ASMJIT_DISABLE_LOGGING
