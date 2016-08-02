@@ -278,7 +278,7 @@ struct X86CDisp8SHL_T {
             (kTT == X86Inst::kOpCode_CDTT_DUP ) ? (kL128 ? 0    : kL256 ? 2    : 3   ) : 0,
 
     // Scale in a way we can just add it to the opcode.
-    kValue = kSHL << X86Inst::kOpCode_CDOff_Shift
+    kValue = kSHL << X86Inst::kOpCode_CDSHL_Shift
   };
 };
 static const uint32_t x86CDisp8SHL[32] = { R(X86CDisp8SHL_T, 0), R(X86CDisp8SHL_T, 8) };
@@ -638,8 +638,8 @@ static Error X86Assembler_validateInstruction(
 #define EMIT_PP(OPCODE)                                                  \
   do {                                                                   \
     uint32_t ppIndex =                                                   \
-      ((OPCODE                      ) >> X86Inst::kOpCode_PP_Shift) &    \
-      (X86Inst::kOpCode_PP_LegacyMask >> X86Inst::kOpCode_PP_Shift) ;    \
+      ((OPCODE                   ) >> X86Inst::kOpCode_PP_Shift) &       \
+      (X86Inst::kOpCode_PP_FPUMask >> X86Inst::kOpCode_PP_Shift) ;       \
     uint8_t ppCode = x86OpCodePP[ppIndex];                               \
                                                                          \
     cursor[0] = ppCode;                                                  \
@@ -2102,14 +2102,14 @@ CaseX86Pop_Gp:
         // We switch to the alternative opcode if the first operand is zero.
         if (opReg == 0) {
 CaseFpuArith_Reg:
-          opCode = ((0xD8   << X86Inst::kOpCode_2B_Shift)       ) +
-                   ((opCode >> X86Inst::kOpCode_2B_Shift) & 0xFF) + rbReg;
+          opCode = ((0xD8   << X86Inst::kOpCode_FPU_2B_Shift)       ) +
+                   ((opCode >> X86Inst::kOpCode_FPU_2B_Shift) & 0xFF) + rbReg;
           goto EmitFpuOp;
         }
         else if (rbReg == 0) {
           rbReg = opReg;
-          opCode = ((0xDC   << X86Inst::kOpCode_2B_Shift)       ) +
-                   ((opCode                             ) & 0xFF) + rbReg;
+          opCode = ((0xDC   << X86Inst::kOpCode_FPU_2B_Shift)       ) +
+                   ((opCode                                 ) & 0xFF) + rbReg;
           goto EmitFpuOp;
         }
         else {
@@ -2123,7 +2123,7 @@ CaseFpuArith_Mem:
         opCode = (o0.getSize() == 4) ? 0xD8 : 0xDC;
 
         // Clear compressed displacement before going to EmitX86M.
-        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDOff_Mask);
+        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
 
         rmMem = x86OpMem(o0);
         goto EmitX86M;
@@ -2150,16 +2150,16 @@ CaseFpuArith_Mem:
       if (isign3 == ENC_OPS1(Mem)) {
         rmMem = x86OpMem(o0);
 
-        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagMem4)) {
+        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagMem8)) {
+        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
           opCode += 4;
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 10 && iExtData->hasFlag(X86Inst::kInstFlagMem10)) {
+        if (o0.getSize() == 10 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M10)) {
           opCode = iExtData->getSecondaryOpCode();
           opReg  = x86ExtractO(opCode);
           goto EmitX86M;
@@ -2167,30 +2167,29 @@ CaseFpuArith_Mem:
       }
 
       if (isign3 == ENC_OPS1(Reg)) {
-        if (instId == X86Inst::kIdFld ) { opCode = (0xD9 << X86Inst::kOpCode_2B_Shift) + 0xC0 + o0.getId(); goto EmitFpuOp; }
-        if (instId == X86Inst::kIdFst ) { opCode = (0xDD << X86Inst::kOpCode_2B_Shift) + 0xD0 + o0.getId(); goto EmitFpuOp; }
-        if (instId == X86Inst::kIdFstp) { opCode = (0xDD << X86Inst::kOpCode_2B_Shift) + 0xD8 + o0.getId(); goto EmitFpuOp; }
+        if (instId == X86Inst::kIdFld ) { opCode = (0xD9 << X86Inst::kOpCode_FPU_2B_Shift) + 0xC0 + o0.getId(); goto EmitFpuOp; }
+        if (instId == X86Inst::kIdFst ) { opCode = (0xDD << X86Inst::kOpCode_FPU_2B_Shift) + 0xD0 + o0.getId(); goto EmitFpuOp; }
+        if (instId == X86Inst::kIdFstp) { opCode = (0xDD << X86Inst::kOpCode_FPU_2B_Shift) + 0xD8 + o0.getId(); goto EmitFpuOp; }
       }
       break;
-
 
     case X86Inst::kEncodingFpuM:
       if (isign3 == ENC_OPS1(Mem)) {
         // Clear compressed displacement before going to EmitX86M.
-        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDOff_Mask);
+        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
 
         rmMem = x86OpMem(o0);
-        if (o0.getSize() == 2 && iExtData->hasFlag(X86Inst::kInstFlagMem2)) {
+        if (o0.getSize() == 2 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M2)) {
           opCode += 4;
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagMem4)) {
+        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagMem8)) {
-          opCode = iExtData->getSecondaryOpCode() & ~static_cast<uint32_t>(X86Inst::kOpCode_CDOff_Mask);
+        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
+          opCode = iExtData->getSecondaryOpCode() & ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
           opReg  = x86ExtractO(opCode);
           goto EmitX86M;
         }
@@ -2222,7 +2221,7 @@ CaseFpuArith_Mem:
 
       if (isign3 == ENC_OPS1(Mem)) {
         // Clear compressed displacement before going to EmitX86M.
-        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDOff_Mask);
+        opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
 
         rmMem = x86OpMem(o0);
         goto EmitX86M;
@@ -3489,7 +3488,7 @@ EmitX86M:
   rmInfo = x86MemInfo[rmMem->getBaseIndexType()];
 
   // GP instructions have never compressed displacement specified.
-  ASMJIT_ASSERT((opCode & X86Inst::kOpCode_CDOff_Mask) == 0);
+  ASMJIT_ASSERT((opCode & X86Inst::kOpCode_CDSHL_Mask) == 0);
 
   // Address-override prefix.
   if (ASMJIT_UNLIKELY(rmInfo & _getAddressOverrideMask()))
@@ -3548,7 +3547,7 @@ EmitModSib:
         }
         // [XSP|R12 + DISP8|DISP32].
         else {
-          uint32_t cdShift = (opCode & X86Inst::kOpCode_CDOff_Mask) >> X86Inst::kOpCode_CDOff_Shift;
+          uint32_t cdShift = (opCode & X86Inst::kOpCode_CDSHL_Mask) >> X86Inst::kOpCode_CDSHL_Shift;
           int32_t cdOffset = dispOffset >> cdShift;
 
           if (Utils::isInt8(cdOffset) && dispOffset == (cdOffset << cdShift)) {
@@ -3569,7 +3568,7 @@ EmitModSib:
       }
       else {
         // [BASE + DISP8|DISP32].
-        uint32_t cdShift = (opCode & X86Inst::kOpCode_CDOff_Mask) >> X86Inst::kOpCode_CDOff_Shift;
+        uint32_t cdShift = (opCode & X86Inst::kOpCode_CDSHL_Mask) >> X86Inst::kOpCode_CDSHL_Shift;
         int32_t cdOffset = dispOffset >> cdShift;
 
         if (Utils::isInt8(cdOffset) && dispOffset == (cdOffset << cdShift)) {
@@ -3688,7 +3687,7 @@ EmitModVSib:
         EMIT_BYTE(sib);
       }
       else {
-        uint32_t cdShift = (opCode & X86Inst::kOpCode_CDOff_Mask) >> X86Inst::kOpCode_CDOff_Shift;
+        uint32_t cdShift = (opCode & X86Inst::kOpCode_CDSHL_Mask) >> X86Inst::kOpCode_CDSHL_Shift;
         int32_t cdOffset = dispOffset >> cdShift;
 
         if (Utils::isInt8(cdOffset) && dispOffset == (cdOffset << cdShift)) {
@@ -3742,7 +3741,7 @@ EmitFpuOp:
   EMIT_PP(opCode);
 
   // FPU instructions consist of two opcodes.
-  EMIT_BYTE(opCode >> X86Inst::kOpCode_2B_Shift);
+  EMIT_BYTE(opCode >> X86Inst::kOpCode_FPU_2B_Shift);
   EMIT_BYTE(opCode);
   goto EmitDone;
 
@@ -3922,8 +3921,8 @@ EmitVexEvexM:
       if (opCode & 0x10000000U) {
         // Broadcast, change the compressed displacement scale to either x4 (SHL 2) or x8 (SHL 3)
         // depending on instruction's W. If 'W' is 1 'SHL' must be 3, otherwise it must be 2.
-        opCode &=~static_cast<uint32_t>(X86Inst::kOpCode_CDOff_Mask);
-        opCode |= ((x & 0x00800000U) ? 3 : 2) << X86Inst::kOpCode_CDOff_Shift;
+        opCode &=~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
+        opCode |= ((x & 0x00800000U) ? 3 : 2) << X86Inst::kOpCode_CDSHL_Shift;
       }
       else {
         // Add the compressed displacement 'SHF' to the opcode based on 'TTWLL'.
@@ -3939,7 +3938,7 @@ EmitVexEvexM:
            ((x      >> 11             ) & 0x0400U) ;     // [00000000|00L00000|WvvvvLpp|RXB0mmmm].
 
       // Clear a possible CDisp specified by EVEX.
-      opCode &= ~X86Inst::kOpCode_CDOff_Mask;
+      opCode &= ~X86Inst::kOpCode_CDSHL_Mask;
 
       // Check if VEX3 is required / forced:                [........|........|x.......|.xx..x..].
       if (x & 0x0008064U) {

@@ -977,82 +977,82 @@ struct X86Inst {
     kIdVfixupimmps,                      // AVX512F-VL
     kIdVfixupimmsd,                      // AVX512F
     kIdVfixupimmss,                      // AVX512F
-    kIdVfmadd132pd,                      // FMA|AVX512F-VL
-    kIdVfmadd132ps,                      // FMA|AVX512F-VL
-    kIdVfmadd132sd,                      // FMA|AVX512F
-    kIdVfmadd132ss,                      // FMA|AVX512F
-    kIdVfmadd213pd,                      // FMA|AVX512F-VL
-    kIdVfmadd213ps,                      // FMA|AVX512F-VL
-    kIdVfmadd213sd,                      // FMA|AVX512F
-    kIdVfmadd213ss,                      // FMA|AVX512F
-    kIdVfmadd231pd,                      // FMA|AVX512F-VL
-    kIdVfmadd231ps,                      // FMA|AVX512F-VL
-    kIdVfmadd231sd,                      // FMA|AVX512F
-    kIdVfmadd231ss,                      // FMA|AVX512F
+    kIdVfmadd132pd,                      // FMA3|AVX512F-VL
+    kIdVfmadd132ps,                      // FMA3|AVX512F-VL
+    kIdVfmadd132sd,                      // FMA3|AVX512F
+    kIdVfmadd132ss,                      // FMA3|AVX512F
+    kIdVfmadd213pd,                      // FMA3|AVX512F-VL
+    kIdVfmadd213ps,                      // FMA3|AVX512F-VL
+    kIdVfmadd213sd,                      // FMA3|AVX512F
+    kIdVfmadd213ss,                      // FMA3|AVX512F
+    kIdVfmadd231pd,                      // FMA3|AVX512F-VL
+    kIdVfmadd231ps,                      // FMA3|AVX512F-VL
+    kIdVfmadd231sd,                      // FMA3|AVX512F
+    kIdVfmadd231ss,                      // FMA3|AVX512F
     kIdVfmaddpd,                         // FMA4
     kIdVfmaddps,                         // FMA4
     kIdVfmaddsd,                         // FMA4
     kIdVfmaddss,                         // FMA4
-    kIdVfmaddsub132pd,                   // FMA|AVX512F-VL
-    kIdVfmaddsub132ps,                   // FMA|AVX512F-VL
-    kIdVfmaddsub213pd,                   // FMA|AVX512F-VL
-    kIdVfmaddsub213ps,                   // FMA|AVX512F-VL
-    kIdVfmaddsub231pd,                   // FMA|AVX512F-VL
-    kIdVfmaddsub231ps,                   // FMA|AVX512F-VL
+    kIdVfmaddsub132pd,                   // FMA3|AVX512F-VL
+    kIdVfmaddsub132ps,                   // FMA3|AVX512F-VL
+    kIdVfmaddsub213pd,                   // FMA3|AVX512F-VL
+    kIdVfmaddsub213ps,                   // FMA3|AVX512F-VL
+    kIdVfmaddsub231pd,                   // FMA3|AVX512F-VL
+    kIdVfmaddsub231ps,                   // FMA3|AVX512F-VL
     kIdVfmaddsubpd,                      // FMA4
     kIdVfmaddsubps,                      // FMA4
-    kIdVfmsub132pd,                      // FMA|AVX512F-VL
-    kIdVfmsub132ps,                      // FMA|AVX512F-VL
-    kIdVfmsub132sd,                      // FMA|AVX512F
-    kIdVfmsub132ss,                      // FMA|AVX512F
-    kIdVfmsub213pd,                      // FMA|AVX512F-VL
-    kIdVfmsub213ps,                      // FMA|AVX512F-VL
-    kIdVfmsub213sd,                      // FMA|AVX512F
-    kIdVfmsub213ss,                      // FMA|AVX512F
-    kIdVfmsub231pd,                      // FMA|AVX512F-VL
-    kIdVfmsub231ps,                      // FMA|AVX512F-VL
-    kIdVfmsub231sd,                      // FMA|AVX512F
-    kIdVfmsub231ss,                      // FMA|AVX512F
-    kIdVfmsubadd132pd,                   // FMA|AVX512F-VL
-    kIdVfmsubadd132ps,                   // FMA|AVX512F-VL
-    kIdVfmsubadd213pd,                   // FMA|AVX512F-VL
-    kIdVfmsubadd213ps,                   // FMA|AVX512F-VL
-    kIdVfmsubadd231pd,                   // FMA|AVX512F-VL
-    kIdVfmsubadd231ps,                   // FMA|AVX512F-VL
+    kIdVfmsub132pd,                      // FMA3|AVX512F-VL
+    kIdVfmsub132ps,                      // FMA3|AVX512F-VL
+    kIdVfmsub132sd,                      // FMA3|AVX512F
+    kIdVfmsub132ss,                      // FMA3|AVX512F
+    kIdVfmsub213pd,                      // FMA3|AVX512F-VL
+    kIdVfmsub213ps,                      // FMA3|AVX512F-VL
+    kIdVfmsub213sd,                      // FMA3|AVX512F
+    kIdVfmsub213ss,                      // FMA3|AVX512F
+    kIdVfmsub231pd,                      // FMA3|AVX512F-VL
+    kIdVfmsub231ps,                      // FMA3|AVX512F-VL
+    kIdVfmsub231sd,                      // FMA3|AVX512F
+    kIdVfmsub231ss,                      // FMA3|AVX512F
+    kIdVfmsubadd132pd,                   // FMA3|AVX512F-VL
+    kIdVfmsubadd132ps,                   // FMA3|AVX512F-VL
+    kIdVfmsubadd213pd,                   // FMA3|AVX512F-VL
+    kIdVfmsubadd213ps,                   // FMA3|AVX512F-VL
+    kIdVfmsubadd231pd,                   // FMA3|AVX512F-VL
+    kIdVfmsubadd231ps,                   // FMA3|AVX512F-VL
     kIdVfmsubaddpd,                      // FMA4
     kIdVfmsubaddps,                      // FMA4
     kIdVfmsubpd,                         // FMA4
     kIdVfmsubps,                         // FMA4
     kIdVfmsubsd,                         // FMA4
     kIdVfmsubss,                         // FMA4
-    kIdVfnmadd132pd,                     // FMA|AVX512F-VL
-    kIdVfnmadd132ps,                     // FMA|AVX512F-VL
-    kIdVfnmadd132sd,                     // FMA|AVX512F
-    kIdVfnmadd132ss,                     // FMA|AVX512F
-    kIdVfnmadd213pd,                     // FMA|AVX512F-VL
-    kIdVfnmadd213ps,                     // FMA|AVX512F-VL
-    kIdVfnmadd213sd,                     // FMA|AVX512F
-    kIdVfnmadd213ss,                     // FMA|AVX512F
-    kIdVfnmadd231pd,                     // FMA|AVX512F-VL
-    kIdVfnmadd231ps,                     // FMA|AVX512F-VL
-    kIdVfnmadd231sd,                     // FMA|AVX512F
-    kIdVfnmadd231ss,                     // FMA|AVX512F
+    kIdVfnmadd132pd,                     // FMA3|AVX512F-VL
+    kIdVfnmadd132ps,                     // FMA3|AVX512F-VL
+    kIdVfnmadd132sd,                     // FMA3|AVX512F
+    kIdVfnmadd132ss,                     // FMA3|AVX512F
+    kIdVfnmadd213pd,                     // FMA3|AVX512F-VL
+    kIdVfnmadd213ps,                     // FMA3|AVX512F-VL
+    kIdVfnmadd213sd,                     // FMA3|AVX512F
+    kIdVfnmadd213ss,                     // FMA3|AVX512F
+    kIdVfnmadd231pd,                     // FMA3|AVX512F-VL
+    kIdVfnmadd231ps,                     // FMA3|AVX512F-VL
+    kIdVfnmadd231sd,                     // FMA3|AVX512F
+    kIdVfnmadd231ss,                     // FMA3|AVX512F
     kIdVfnmaddpd,                        // FMA4
     kIdVfnmaddps,                        // FMA4
     kIdVfnmaddsd,                        // FMA4
     kIdVfnmaddss,                        // FMA4
-    kIdVfnmsub132pd,                     // FMA|AVX512F-VL
-    kIdVfnmsub132ps,                     // FMA|AVX512F-VL
-    kIdVfnmsub132sd,                     // FMA|AVX512F
-    kIdVfnmsub132ss,                     // FMA|AVX512F
-    kIdVfnmsub213pd,                     // FMA|AVX512F-VL
-    kIdVfnmsub213ps,                     // FMA|AVX512F-VL
-    kIdVfnmsub213sd,                     // FMA|AVX512F
-    kIdVfnmsub213ss,                     // FMA|AVX512F
-    kIdVfnmsub231pd,                     // FMA|AVX512F-VL
-    kIdVfnmsub231ps,                     // FMA|AVX512F-VL
-    kIdVfnmsub231sd,                     // FMA|AVX512F
-    kIdVfnmsub231ss,                     // FMA|AVX512F
+    kIdVfnmsub132pd,                     // FMA3|AVX512F-VL
+    kIdVfnmsub132ps,                     // FMA3|AVX512F-VL
+    kIdVfnmsub132sd,                     // FMA3|AVX512F
+    kIdVfnmsub132ss,                     // FMA3|AVX512F
+    kIdVfnmsub213pd,                     // FMA3|AVX512F-VL
+    kIdVfnmsub213ps,                     // FMA3|AVX512F-VL
+    kIdVfnmsub213sd,                     // FMA3|AVX512F
+    kIdVfnmsub213ss,                     // FMA3|AVX512F
+    kIdVfnmsub231pd,                     // FMA3|AVX512F-VL
+    kIdVfnmsub231ps,                     // FMA3|AVX512F-VL
+    kIdVfnmsub231sd,                     // FMA3|AVX512F
+    kIdVfnmsub231ss,                     // FMA3|AVX512F
     kIdVfnmsubpd,                        // FMA4
     kIdVfnmsubps,                        // FMA4
     kIdVfnmsubsd,                        // FMA4
@@ -1615,22 +1615,17 @@ struct X86Inst {
     //! and/or ESI/RSI).
     kInstFlagSpecialMem   = 0x00000080U,
 
-    kInstFlagMem2         = 0x00000100U, //!< Instruction memory operand can refer to 16-bit address (used by FPU).
-    kInstFlagMem4         = 0x00000200U, //!< Instruction memory operand can refer to 32-bit address (used by FPU).
-    kInstFlagMem8         = 0x00000400U, //!< Instruction memory operand can refer to 64-bit address (used by FPU).
-    kInstFlagMem10        = 0x00000800U, //!< Instruction memory operand can refer to 80-bit address (used by FPU).
-
-    kInstFlagMem2_4       = kInstFlagMem2   | kInstFlagMem4,
-    kInstFlagMem2_4_8     = kInstFlagMem2_4 | kInstFlagMem8,
-    kInstFlagMem4_8       = kInstFlagMem4   | kInstFlagMem8,
-    kInstFlagMem4_8_10    = kInstFlagMem4_8 | kInstFlagMem10,
+    kInstFlagFPU_M2       = 0x00000100U, //!< FPU instruction can address word_ptr (shared with M10).
+    kInstFlagFPU_M10      = 0x00000100U, //!< FPU instruction can address tword_ptr (shared with M2).
+    kInstFlagFPU_M4       = 0x00000200U, //!< FPU instruction can address dword_ptr.
+    kInstFlagFPU_M8       = 0x00000400U, //!< FPU instruction can address qword_ptr.
 
     kInstFlagZeroIfMem    = 0x00001000U, //!< Cleans the rest of destination if source is memory (movss, movsd).
     kInstFlagVolatile     = 0x00002000U, //!< Hint for instruction scheduler to not reorder this instruction.
 
     // NOTE: If both `kInstFlagVex` and `kInstFlagEvex` flags are specified it
     // means that the instructions is both AVX and AVX512 and can be encoded by
-    // using VEX or EVEX prefixes. In that case AsmJit checks global options and
+    // either VEX or EVEX prefix. In that case AsmJit checks global options and
     // also instruction options to decide whether to emit EVEX prefix or not.
 
     kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
@@ -1641,9 +1636,9 @@ struct X86Inst {
     kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
     kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0z..k7z}.
     kInstFlagEvexB        = 0x00080000U, //!< Supports broadcast b32|b64.
-    kInstFlagEvexSAE      = 0x00100000U, //!< Supports {sae} - 'suppress-all-exceptions'.
-    kInstFlagEvexRC       = 0x00200000U, //!< Supports 'rounding-control' & SAE {rnd-sae},
-    kInstFlagEvexVL       = 0x00400000U, //!< Supported by AVX512-VL (access to XMM/YMM registers).
+    kInstFlagEvexSAE      = 0x00100000U, //!< Supports 'suppress-all-exceptions' {sae}.
+    kInstFlagEvexRC       = 0x00200000U, //!< Supports 'rounding-control' {rc} with implicit {sae},
+    kInstFlagEvexVL       = 0x00400000U, //!< Supports access to XMMYMM registers (AVX512-VL).
 
     kInstFlagEvexSet_Shift= 24,
     kInstFlagEvexSet_Mask = 0x0F000000U, //!< AVX-512 feature set required to execute the instruction.
@@ -1654,24 +1649,7 @@ struct X86Inst {
     kInstFlagEvexSet_DQ   = 0x04000000U, //!< Supported by AVX512-DQ.
     kInstFlagEvexSet_BW   = 0x05000000U, //!< Supported by AVX512-BW.
     kInstFlagEvexSet_IFMA = 0x06000000U, //!< Supported by AVX512-IFMA.
-    kInstFlagEvexSet_VBMI = 0x07000000U, //!< Supported by AVX512-VBMI.
-
-    kInstFlagEvexTT_Shift = 28,
-    kInstFlagEvexTT_Mask  = 0xF0000000U, //!< Tuple-type (used to calculate compressed displacement).
-    kInstFlagEvexTT_0     = 0x00000000U, //!< Not specified / not used.
-    kInstFlagEvexTT_FV    = 0x10000000U, //!< Full Vector (FV).
-    kInstFlagEvexTT_HV    = 0x20000000U, //!< Half Vector (HV).
-    kInstFlagEvexTT_FVM   = 0x30000000U, //!< Full Vector Mem (FVM).
-    kInstFlagEvexTT_T1S   = 0x40000000U, //!< Tuple1 Scalar (T1S).
-    kInstFlagEvexTT_T1F   = 0x50000000U, //!< Tuple1 Fixed (T1F).
-    kInstFlagEvexTT_T2    = 0x60000000U, //!< Tuple2 (T2).
-    kInstFlagEvexTT_T4    = 0x70000000U, //!< Tuple4 (T4).
-    kInstFlagEvexTT_T8    = 0x80000000U, //!< Tuple8 (T8).
-    kInstFlagEvexTT_HVM   = 0x90000000U, //!< Half Mem (HVM).
-    kInstFlagEvexTT_QVM   = 0xA0000000U, //!< Quarter Mem (QVM).
-    kInstFlagEvexTT_OVM   = 0xB0000000U, //!< Oct Mem (OCM).
-    kInstFlagEvexTT_128   = 0xC0000000U, //!< Mem128 (M128).
-    kInstFlagEvexTT_DUP   = 0xD0000000U  //!< MOVDDUP (DUP).
+    kInstFlagEvexSet_VBMI = 0x07000000U  //!< Supported by AVX512-VBMI.
   };
 
   //! \internal
@@ -1853,7 +1831,7 @@ struct X86Inst {
   //! representations of instructions passed to `X86Assembler::_emit`.
   ASMJIT_ENUM(OpCodeBits) {
     // ------------------------------------------------------------------------
-    // [MM / XOP]
+    // [MM|VEX|EVEX|XOP]
     // ------------------------------------------------------------------------
 
     // Two meanings:
@@ -1906,36 +1884,34 @@ struct X86Inst {
     kOpCode_MM_ForceEvex  = 0x10U << kOpCode_MM_Shift, // Force 4-BYTE EVEX prefix.
 
     // ------------------------------------------------------------------------
-    // [FPU]
+    // [FPU_2B (Secondary OpCode Byte)]
     // ------------------------------------------------------------------------
-
-    // FPU and AVX-512 information share the same 5 bits.
 
     // Second byte opcode. This BYTE is ONLY used by FPU instructions and
-    // collides with 2 bytes from kOpCode_MM, which is only used by NON-FPU
-    // instructions.
-    kOpCode_2B_Shift      = 10,
-    kOpCode_2B_Mask       = 0xFF << kOpCode_2B_Shift,
+    // collides with 3 bits from 'MM' and 5 bits from 'CDSHL' and 'CDTT'.
+    // It's fine as FPU and AVX512 flags are never used at the same time.
+    kOpCode_FPU_2B_Shift  = 10,
+    kOpCode_FPU_2B_Mask   = 0xFF << kOpCode_FPU_2B_Shift,
 
     // ------------------------------------------------------------------------
-    // [CDOff | CDTT]
+    // [CDSHL | CDTT]
     // ------------------------------------------------------------------------
 
     // Compressed displacement bits.
     //
-    // Each opcode defines the base size N bits:
+    // Each opcode defines the base size (N) shift:
     //   0: BYTE  (1 byte).
     //   1: WORD  (2 bytes).
     //   2: DWORD (4 bytes - float/int32).
     //   3: QWORD (8 bytes - double/int64).
     //   4: OWORD (16 bytes - used by FV|FVM|M128).
-    // Which is then scaled by the instructions' TT (TupleType) into possible:
+    // Which is then scaled by the instruction's TT (TupleType) into possible:
     //   5: YWORD (32 bytes)
     //   6: ZWORD (64 bytes)
     //
     // These bits are then adjusted before calling EmitModSib or EmitModVSib.
-    kOpCode_CDOff_Shift   = 13,
-    kOpCode_CDOff_Mask    = 0x7 << kOpCode_CDOff_Shift,
+    kOpCode_CDSHL_Shift   = 13,
+    kOpCode_CDSHL_Mask    = 0x7 << kOpCode_CDSHL_Shift,
 
     // Compressed displacement tuple-type (specific to AsmJit).
     //
@@ -1986,7 +1962,7 @@ struct X86Inst {
     // more bit that is used to emit 9B prefix for some X87-FPU instructions.
     kOpCode_PP_Shift      = 21,
     kOpCode_PP_VEXMask    = 0x03U << kOpCode_PP_Shift, // PP field mask used by VEX/EVEX.
-    kOpCode_PP_LegacyMask = 0x07U << kOpCode_PP_Shift, // Mask used by EMIT_PP, also includes 0x9B.
+    kOpCode_PP_FPUMask    = 0x07U << kOpCode_PP_Shift, // Mask used by EMIT_PP, also includes 0x9B.
     kOpCode_PP_00         = 0x00U << kOpCode_PP_Shift,
     kOpCode_PP_66         = 0x01U << kOpCode_PP_Shift,
     kOpCode_PP_F3         = 0x02U << kOpCode_PP_Shift,
@@ -1997,26 +1973,25 @@ struct X86Inst {
     kOpCode_PP_9B         = 0x07U << kOpCode_PP_Shift,
 
     // ------------------------------------------------------------------------
-    // [VSIB]
-    //
-    // If TRUE the instruction uses VSIB encoding to encode its memory operand.
+    // [VEX/EVEX VSIB]
     // ------------------------------------------------------------------------
 
+    // TRUE if the VEX|EVEX instruction uses VSIB encoding to encode its memory
+    // operand.
     kOpCode_VSIB_Shift    = 23,
-    kOpCode_VSIB_Mask     = 0x01U << kOpCode_VSIB_Shift,
     kOpCode_VSIB          = 0x01U << kOpCode_VSIB_Shift,
 
+
     // ------------------------------------------------------------------------
-    // [EVEX]
+    // [EVEX.W]
     // ------------------------------------------------------------------------
 
     // `W` field used by EVEX instruction encoding.
     kOpCode_EW_Shift      = 24,
-    kOpCode_EW_Mask       = 0x01U << kOpCode_EW_Shift,
     kOpCode_EW            = 0x01U << kOpCode_EW_Shift,
 
     // ------------------------------------------------------------------------
-    // [REX/VEX BXRW bits (part of REX/VEX/EVEX prefix)]
+    // [REX BXRW bits (part of REX prefix)]
     //
     // NOTE: REX.[B|X|R] are never stored within the opcode itself, they are
     // reserved by AsmJit are are added dynamically to the opcode to represent
@@ -2164,7 +2139,7 @@ struct X86Inst {
     kVCmpTRUE_US          = 0x1F         //!< True              (Signaling, Unordered).
   };
 
-  //! X86/X64 round encoding used by ROUND[PD|PS|SD|SS] instructions.
+  //! X86/X64 round predicate used by ROUND[PD|PS|SD|SS] instructions.
   ASMJIT_ENUM(RoundPredicate) {
     kRoundNearest         = 0x00,        //!< Round to nearest (even).
     kRoundDown            = 0x01,        //!< Round to down toward -INF (floor),
