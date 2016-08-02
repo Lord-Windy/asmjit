@@ -38,7 +38,7 @@ static const char* archIdToString(uint32_t archId) {
 }
 
 struct TestErrorHandler : public ErrorHandler {
-  virtual bool handleError(Error err, const char* message, CodeGen* origin) {
+  virtual bool handleError(Error err, const char* message, CodeEmitter* origin) {
     printf("ERROR 0x%0.8X: %s\n", err, message);
     return true;
   }
@@ -67,19 +67,19 @@ int main(int argc, char* argv[]) {
       info.useRex1 ? "true" : "false",
       info.useRex2 ? "true" : "false");
 
-    CodeHolder holder(info.arch);
-    holder.setLogger(&logger);
-    holder.setErrorHandler(&eh);
+    CodeHolder code(info.arch);
+    code.setLogger(&logger);
+    code.setErrorHandler(&eh);
 
-    X86Assembler a(&holder);
+    X86Assembler a(&code);
     asmtest::generateOpcodes(a, info.useRex1, info.useRex2);
 
     // If this is the host architecture the code generated can be executed
     // for debugging purposes (the first instruction is ret anyway).
-    if (holder.getArchId() == ArchInfo::kIdHost) {
+    if (code.getArchId() == ArchInfo::kIdHost) {
       JitRuntime runtime;
       VoidFunc p;
-      Error err = runtime.add((void**)&p, &holder);
+      Error err = runtime.add((void**)&p, &code);
       if (err == kErrorOk) p();
     }
   }

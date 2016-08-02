@@ -5,8 +5,8 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _ASMJIT_BASE_CODEGEN_H
-#define _ASMJIT_BASE_CODEGEN_H
+#ifndef _ASMJIT_BASE_CODEEMITTER_H
+#define _ASMJIT_BASE_CODEEMITTER_H
 
 // [Dependencies]
 #include "../base/codeholder.h"
@@ -26,14 +26,14 @@ namespace asmjit {
 class ConstPool;
 
 // ============================================================================
-// [asmjit::CodeGen]
+// [asmjit::CodeEmitter]
 // ============================================================================
 
-//! Provides a base foundation to produce assembly, inherited by \ref Assembler
-//! and \ref AsmBuilder.
-class ASMJIT_VIRTAPI CodeGen {
+//! Provides a base foundation to emit code - specialized by \ref Assembler and
+//! \ref CodeBuilder.
+class ASMJIT_VIRTAPI CodeEmitter {
 public:
-  //! CodeGen type.
+  //! CodeEmitter type.
   ASMJIT_ENUM(Type) {
     kTypeNone       = 0,
     kTypeAssembler  = 1,
@@ -42,7 +42,7 @@ public:
     kTypeCount      = 4
   };
 
-  //! CodeGen hints - global settings that affect machine-code generation.
+  //! CodeEmitter hints - global settings that affect machine-code generation.
   ASMJIT_ENUM(Hints) {
     //! Emit optimized code-alignment sequences.
     //!
@@ -80,26 +80,26 @@ public:
     kHintPredictedJumps = 0x00000002U
   };
 
-  //! CodeGen options that can be merged with instruction options.
+  //! CodeEmitter options that are merged with instruction options.
   ASMJIT_ENUM(Options) {
     //! Reserved, used to check for errors in `Assembler::_emit()`.
     //!
-    //! The `kOptionMaybeFailureCase` is always set when asm-consumer is in
+    //! The `kOptionMaybeFailureCase` is always set when CodeEmitter is in
     //! error state.
     kOptionMaybeFailureCase = 0x00000001U,
 
     //! Perform a strict validation before the instruction is emitted.
     //!
-    //! NOTE: This option is used by both `Assembler` and `Compiler`.
+    //! NOTE: This option is used by both Assembler and CodeCompiler.
     kOptionStrictValidation = 0x00000002U,
 
-    //! Logging is enabled and `Assembler::getLogger()` should return a valid
+    //! Logging is enabled and `CodeHolder::getLogger()` should return a valid
     //! \ref Logger pointer.
     kOptionLoggingEnabled   = 0x00000010U,
 
     //! Mask of all internal options that are not used to represent instruction
-    //! options, but are used to instrument Assembler / Compiler. These options
-    //! are internal and shouldn't be used outside of AsmJit itself.
+    //! options, but are used to instrument Assembler and CodeBuilder. These
+    //! options are internal and should not be used outside of AsmJit itself.
     kOptionReservedMask = 0x00000013U,
 
     //! Instruction has `_op4` (5th operand, indexed from zero).
@@ -108,20 +108,21 @@ public:
     kOptionHasOp5 = 0x0000040U,
     //! Instruction has mask-op (k) operand.
     kOptionHasOpMask = 0x00000080U,
-    //! Don't follow the jump (Compiler only).
 
-    //! Prevents following the jump during compilation (\ref Compiler only).
+    //! Don't follow the jump (CodeCompiler).
+    //!
+    //! Prevents following the jump during compilation (CodeCompiler).
     kOptionUnfollow = 0x00000100U,
 
-    //! Overwrite the destination operand (\ref Compiler only).
+    //! Overwrite the destination operand (CodeCompiler).
     //!
     //! Hint that is important for register liveness analysis. It tells the
     //! compiler that the destination operand will be overwritten now or by
-    //! adjacent instructions. Compiler knows when a register is completely
+    //! adjacent instructions. CodeCompiler knows when a register is completely
     //! overwritten by a single instruction, for example you don't have to
     //! mark "movaps" or "pxor x, x", however, if a pair of instructions is
     //! used and the first of them doesn't completely overwrite the content
-    //! of the destination, the compiler fails to mark that register as dead.
+    //! of the destination, CodeCompiler fails to mark that register as dead.
     //!
     //! X86/X64 Specific
     //! ----------------
@@ -158,17 +159,17 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API CodeGen(uint32_t type) noexcept;
-  ASMJIT_API virtual ~CodeGen() noexcept;
+  ASMJIT_API CodeEmitter(uint32_t type) noexcept;
+  ASMJIT_API virtual ~CodeEmitter() noexcept;
 
   // --------------------------------------------------------------------------
   // [Events]
   // --------------------------------------------------------------------------
 
-  //! Called after the \ref CodeGen was attached to the \ref CodeHolder.
-  virtual Error onAttach(CodeHolder* holder) noexcept = 0;
-  //! Called after the \ref CodeGen was detached from the \ref CodeHolder.
-  virtual Error onDetach(CodeHolder* holder) noexcept = 0;
+  //! Called after the \ref CodeEmitter was attached to the \ref CodeHolder.
+  virtual Error onAttach(CodeHolder* code) noexcept = 0;
+  //! Called after the \ref CodeEmitter was detached from the \ref CodeHolder.
+  virtual Error onDetach(CodeHolder* code) noexcept = 0;
 
   // --------------------------------------------------------------------------
   // [Code-Generation]
@@ -210,10 +211,10 @@ public:
   ASMJIT_API virtual Error finalize();
 
   // --------------------------------------------------------------------------
-  // [CodeGen Information]
+  // [CodeEmitter Information]
   // --------------------------------------------------------------------------
 
-  //! Get the type of this CodeGen, see \ref Type.
+  //! Get the type of this CodeEmitter, see \ref Type.
   ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
 
   // --------------------------------------------------------------------------
@@ -231,8 +232,8 @@ public:
   //! Get the number of usable (allocable) target GP registers.
   ASMJIT_INLINE uint32_t getGpUsable() const noexcept { return _archInfo._gpUsable; }
 
-  //! Get \ref CodeHolder this CodeGen is attached to.
-  ASMJIT_INLINE CodeHolder* getHolder() const noexcept { return _holder; }
+  //! Get \ref CodeHolder this CodeEmitter is attached to.
+  ASMJIT_INLINE CodeHolder* getCode() const noexcept { return _code; }
 
   //! Get global options.
   //!
@@ -294,7 +295,7 @@ public:
   //! Set annotation of the next instruction.
   //!
   //! NOTE: This string is set back to null by `_emit()`, but until that it has
-  //! to remain valid as `CodeGen` is not required to make a copy of it (and
+  //! to remain valid as `CodeEmitter` is not required to make a copy of it (and
   //! it would be slow to do that for each instruction).
   ASMJIT_INLINE void setInlineComment(const char* s) noexcept { _inlineComment = s; }
   //! Reset annotation of the next instruction to null.
@@ -374,19 +375,19 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  CodeHolder* _holder;                   //!< Code holder.
-  CodeGen* _cgNext;                      //!< Linked list of `CodeGen`s attached to a single \ref CodeHolder.
+  CodeHolder* _code;                     //!< CodeHolder.
+  CodeEmitter* _nextEmitter;             //!< Linked list of `CodeEmitter`s attached to a single \ref CodeHolder.
   ArchInfo _archInfo;                    //!< Target architecture information, acquired from \ref CodeHolder.
 
-  uint8_t _type;                         //!< See CodeGen::Type.
-  uint8_t _destroyed;                    //!< Set by ~CodeGen() before calling `_holder->detach()`.
-  uint8_t _finalized;                    //!< True if the CodeGen is finalized (AsmBuilder / Compiler).
+  uint8_t _type;                         //!< See CodeEmitter::Type.
+  uint8_t _destroyed;                    //!< Set by ~CodeEmitter() before calling `_code->detach()`.
+  uint8_t _finalized;                    //!< True if the CodeEmitter is finalized (CodeBuilder & CodeCompiler).
   uint8_t _reserved;                     //!< \internal
-
   Error _lastError;                      //!< Last error code.
 
-  uint32_t _globalHints;                 //!< Global hints, always in sync with \ref CodeHolder.
-  uint32_t _globalOptions;               //!< Global options, combined with `_options` before used by the instruction.
+  uint32_t _privateData;                 //!< Internal private data used freely by any CodeEmitter.
+  uint32_t _globalHints;                 //!< Global hints, always in sync with CodeHolder.
+  uint32_t _globalOptions;               //!< Global options, combined with `_options` before used by each instruction.
 
   uint32_t _options;                     //!< Used to pass instruction options       (affects the next instruction).
   const char* _inlineComment;            //!< Inline comment of the next instruction (affects the next instruction).
@@ -404,4 +405,4 @@ public:
 #include "../apiend.h"
 
 // [Guard]
-#endif // _ASMJIT_BASE_CODEGEN_H
+#endif // _ASMJIT_BASE_CODEEMITTER_H

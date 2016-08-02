@@ -120,7 +120,7 @@ bool X86CallNode::_setRet(uint32_t i, const Operand_& op) noexcept {
 // [asmjit::X86Compiler - Construction / Destruction]
 // ============================================================================
 
-X86Compiler::X86Compiler(CodeHolder* holder) noexcept : Compiler() {
+X86Compiler::X86Compiler(CodeHolder* code) noexcept : CodeCompiler() {
   zax.reset();
   zcx.reset();
   zdx.reset();
@@ -130,8 +130,8 @@ X86Compiler::X86Compiler(CodeHolder* holder) noexcept : Compiler() {
   zsi.reset();
   zdi.reset();
 
-  if (holder)
-    holder->attach(this);
+  if (code)
+    code->attach(this);
 }
 X86Compiler::~X86Compiler() noexcept {}
 
@@ -139,8 +139,8 @@ X86Compiler::~X86Compiler() noexcept {}
 // [asmjit::X86Compiler - Events]
 // ============================================================================
 
-Error X86Compiler::onAttach(CodeHolder* holder) noexcept {
-  uint32_t archId = holder->getArchId();
+Error X86Compiler::onAttach(CodeHolder* code) noexcept {
+  uint32_t archId = code->getArchId();
 
   const uint32_t* idMap = nullptr;
   const X86Gp* gpRegs = nullptr;
@@ -152,18 +152,18 @@ Error X86Compiler::onAttach(CodeHolder* holder) noexcept {
       return DebugUtils::errored(kErrorInvalidArch);
   }
 
-  _archInfo = holder->getArchInfo();
+  _archInfo = code->getArchInfo();
   _typeIdMap = idMap;
   _finalized = false;
 
   ::memcpy(&zax, gpRegs, sizeof(Operand) * 8);
-  return Base::onAttach(holder);
+  return Base::onAttach(code);
 }
 
-Error X86Compiler::onDetach(CodeHolder* holder) noexcept {
+Error X86Compiler::onDetach(CodeHolder* code) noexcept {
   for (uint32_t i = 0; i < 8; i++)
     (static_cast<Operand*>(&zax))[i].reset();
-  return Base::onDetach(holder);
+  return Base::onDetach(code);
 }
 
 // ============================================================================
@@ -179,7 +179,7 @@ Error X86Compiler::finalize() {
     _globalConstPool = nullptr;
   }
 
-  AsmNode* node = _firstNode;
+  CBNode* node = _firstNode;
   if (!node) return kErrorOk;
 
   Error err = kErrorOk;
@@ -188,7 +188,7 @@ Error X86Compiler::finalize() {
   // Find all functions and use the `X86Context` to translate/emit them.
   do {
     _resetTokenGenerator();
-    if (node->getType() == AsmNode::kNodeFunc) {
+    if (node->getType() == CBNode::kNodeFunc) {
       X86FuncNode* func = static_cast<X86FuncNode*>(node);
       node = func->getEnd();
 
@@ -198,7 +198,7 @@ Error X86Compiler::finalize() {
 
     do {
       node = node->getNext();
-    } while (node && node->getType() != AsmNode::kNodeFunc);
+    } while (node && node->getType() != CBNode::kNodeFunc);
 
     ctx.cleanup();
     ctx.reset(false);
@@ -207,11 +207,11 @@ Error X86Compiler::finalize() {
       break;
   } while (node);
 
-  if (_holder->_cgAsm) {
-    return serialize(_holder->_cgAsm);
+  if (_code->_cgAsm) {
+    return serialize(_code->_cgAsm);
   }
   else {
-    X86Assembler a(_holder);
+    X86Assembler a(_code);
     return serialize(&a);
   }
 }
@@ -231,7 +231,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
 
   // Handle failure and rare cases first.
   const uint32_t kErrorsAndSpecialCases =
-    kOptionMaybeFailureCase | // CodeGen in error state.
+    kOptionMaybeFailureCase | // CodeEmitter in error state.
     kOptionStrictValidation | // Strict validation.
     kOptionHasOp4           | // Has 5th operand (o4, indexed from zero).
     kOptionHasOp5           ; // Has 6th operand (o5, indexed from zero).
@@ -266,10 +266,10 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
   resetOptions();
   resetInlineComment();
 
-  // decide between `AsmInst` and `AsmJump`.
+  // decide between `CBInst` and `CBJump`.
   if (Utils::inInterval<uint32_t>(instId, X86Inst::_kIdJbegin, X86Inst::_kIdJend)) {
-    AsmJump* node = _nodeAllocator.allocT<AsmJump>(sizeof(AsmJump) + opCount * sizeof(Operand));
-    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(AsmJump));
+    CBJump* node = _nodeAllocator.allocT<CBJump>(sizeof(CBJump) + opCount * sizeof(Operand));
+    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBJump));
 
     if (ASMJIT_UNLIKELY(!node))
       return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
@@ -280,12 +280,12 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (opCount > 3) opArray[3].copyFrom(o3);
     if (opCount > 4) opArray[4].copyFrom(_op4);
     if (opCount > 5) opArray[5].copyFrom(_op5);
-    new(node) AsmJump(this, instId, options, opArray, opCount);
+    new(node) CBJump(this, instId, options, opArray, opCount);
 
-    AsmLabel* jTarget = nullptr;
+    CBLabel* jTarget = nullptr;
     if (!(options & kOptionUnfollow)) {
       if (opArray[0].isLabel()) {
-        Error err = getAsmLabel(&jTarget, static_cast<Label&>(opArray[0]));
+        Error err = getCBLabel(&jTarget, static_cast<Label&>(opArray[0]));
         if (err) return setLastError(err);
       }
       else {
@@ -294,28 +294,28 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     }
     node->setOptions(options);
 
-    node->orFlags(instId == X86Inst::kIdJmp ? AsmNode::kFlagIsJmp | AsmNode::kFlagIsTaken : AsmNode::kFlagIsJcc);
+    node->orFlags(instId == X86Inst::kIdJmp ? CBNode::kFlagIsJmp | CBNode::kFlagIsTaken : CBNode::kFlagIsJcc);
     node->_target = jTarget;
     node->_jumpNext = nullptr;
 
     if (jTarget) {
-      node->_jumpNext = static_cast<AsmJump*>(jTarget->_from);
+      node->_jumpNext = static_cast<CBJump*>(jTarget->_from);
       jTarget->_from = node;
       jTarget->addNumRefs();
     }
 
     // The 'jmp' is always taken, conditional jump can contain hint, we detect it.
     if (instId == X86Inst::kIdJmp)
-      node->orFlags(AsmNode::kFlagIsTaken);
+      node->orFlags(CBNode::kFlagIsTaken);
     else if (options & X86Inst::kOptionTaken)
-      node->orFlags(AsmNode::kFlagIsTaken);
+      node->orFlags(CBNode::kFlagIsTaken);
 
     addNode(node);
     return kErrorOk;
   }
   else {
-    AsmInst* node = _nodeAllocator.allocT<AsmInst>(sizeof(AsmInst) + opCount * sizeof(Operand));
-    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(AsmInst));
+    CBInst* node = _nodeAllocator.allocT<CBInst>(sizeof(CBInst) + opCount * sizeof(Operand));
+    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBInst));
 
     if (ASMJIT_UNLIKELY(!node))
       return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
@@ -327,7 +327,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (opCount > 4) opArray[4].copyFrom(_op4);
     if (opCount > 5) opArray[5].copyFrom(_op5);
 
-    addNode(new(node) AsmInst(this, instId, options, opArray, opCount));
+    addNode(new(node) CBInst(this, instId, options, opArray, opCount));
     return kErrorOk;
   }
 }
@@ -350,7 +350,7 @@ X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
   }
 
   // Create helper nodes.
-  func->_end = newNodeT<AsmSentinel>();
+  func->_end = newNodeT<CBSentinel>();
   func->_exitNode = newLabelNode();
   if (!func->_exitNode || !func->_end) goto _NoMemory;
 
@@ -398,7 +398,7 @@ X86FuncNode* X86Compiler::addFunc(const FuncPrototype& p) {
   return static_cast<X86FuncNode*>(addFunc(func));
 }
 
-AsmSentinel* X86Compiler::endFunc() {
+CBSentinel* X86Compiler::endFunc() {
   X86FuncNode* func = getFunc();
   if (!func) {
     // TODO:
@@ -425,8 +425,8 @@ AsmSentinel* X86Compiler::endFunc() {
 // [asmjit::X86Compiler - Ret]
 // ============================================================================
 
-AsmFuncRet* X86Compiler::newRet(const Operand_& o0, const Operand_& o1) noexcept {
-  AsmFuncRet* node = newNodeT<AsmFuncRet>(o0, o1);
+CCFuncRet* X86Compiler::newRet(const Operand_& o0, const Operand_& o1) noexcept {
+  CCFuncRet* node = newNodeT<CCFuncRet>(o0, o1);
   if (!node) {
     setLastError(DebugUtils::errored(kErrorNoHeapMemory));
     return nullptr;
@@ -434,10 +434,10 @@ AsmFuncRet* X86Compiler::newRet(const Operand_& o0, const Operand_& o1) noexcept
   return node;
 }
 
-AsmFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept {
-  AsmFuncRet* node = newRet(o0, o1);
+CCFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept {
+  CCFuncRet* node = newRet(o0, o1);
   if (!node) return nullptr;
-  return static_cast<AsmFuncRet*>(addNode(node));
+  return static_cast<CCFuncRet*>(addNode(node));
 }
 
 // ============================================================================
@@ -568,7 +568,7 @@ Error X86Compiler::_newStack(Mem& m, uint32_t size, uint32_t alignment, const ch
 // ============================================================================
 
 Error X86Compiler::_newConst(Mem& m, uint32_t scope, const void* data, size_t size) {
-  AsmConstPool** pPool;
+  CBConstPool** pPool;
   if (scope == kConstScopeLocal)
     pPool = &_localConstPool;
   else if (scope == kConstScopeGlobal)
@@ -579,7 +579,7 @@ Error X86Compiler::_newConst(Mem& m, uint32_t scope, const void* data, size_t si
   if (!*pPool && !(*pPool = newConstPool()))
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
-  AsmConstPool* pool = *pPool;
+  CBConstPool* pool = *pPool;
   size_t off;
 
   Error err = pool->add(data, size, off);

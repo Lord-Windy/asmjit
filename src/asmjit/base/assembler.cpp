@@ -24,37 +24,37 @@ namespace asmjit {
 // ============================================================================
 
 Assembler::Assembler() noexcept
-  : CodeGen(kTypeAssembler),
+  : CodeEmitter(kTypeAssembler),
     _section(nullptr),
     _bufferData(nullptr),
     _bufferEnd(nullptr),
     _bufferPtr(nullptr) {}
 
 Assembler::~Assembler() noexcept {
-  if (_holder) sync();
+  if (_code) sync();
 }
 
 // ============================================================================
 // [asmjit::Assembler - Events]
 // ============================================================================
 
-Error Assembler::onAttach(CodeHolder* holder) noexcept {
+Error Assembler::onAttach(CodeHolder* code) noexcept {
   // Attach to the end of the .text section.
-  _section = holder->_sections[0];
+  _section = code->_sections[0];
   uint8_t* p = _section->buffer.data;
 
   _bufferData = p;
   _bufferEnd  = p + _section->buffer.capacity;
   _bufferPtr  = p + _section->buffer.length;
-  return Base::onAttach(holder);
+  return Base::onAttach(code);
 }
 
-Error Assembler::onDetach(CodeHolder* holder) noexcept {
+Error Assembler::onDetach(CodeHolder* code) noexcept {
   _section    = nullptr;
   _bufferData = nullptr;
   _bufferEnd  = nullptr;
   _bufferPtr  = nullptr;
-  return Base::onDetach(holder);
+  return Base::onDetach(code);
 }
 
 // ============================================================================
@@ -62,7 +62,7 @@ Error Assembler::onDetach(CodeHolder* holder) noexcept {
 // ============================================================================
 
 void Assembler::sync() noexcept {
-  ASMJIT_ASSERT(_holder != nullptr);                   // Only called by holder, so it must be attached.
+  ASMJIT_ASSERT(_code != nullptr);                     // Only called by CodeHolder, so we must be attached.
   ASMJIT_ASSERT(_section != nullptr);                  // One section must always be active, no matter what.
   ASMJIT_ASSERT(_bufferData == _section->buffer.data); // `_bufferStart` is a shortcut to `_section->buffer.data`.
 
@@ -103,7 +103,7 @@ Error Assembler::comment(const char* s, size_t len) {
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
   if (_globalOptions & kOptionLoggingEnabled)
-    return _holder->_logger->log(s, len);
+    return _code->_logger->log(s, len);
 #else
   ASMJIT_UNUSED(s);
   ASMJIT_UNUSED(len);
@@ -119,8 +119,8 @@ Error Assembler::comment(const char* s, size_t len) {
 Label Assembler::newLabel() {
   uint32_t id = kInvalidValue;
   if (!_lastError) {
-    ASMJIT_ASSERT(_holder != nullptr);
-    Error err = _holder->newLabelId(id);
+    ASMJIT_ASSERT(_code != nullptr);
+    Error err = _code->newLabelId(id);
     if (err) setLastError(err);
   }
   return Label(id);
@@ -128,9 +128,9 @@ Label Assembler::newLabel() {
 
 Error Assembler::bind(const Label& label) {
   if (_lastError) return _lastError;
-  ASMJIT_ASSERT(_holder != nullptr);
+  ASMJIT_ASSERT(_code != nullptr);
 
-  CodeHolder::LabelEntry* le = _holder->getLabelEntry(label);
+  CodeHolder::LabelEntry* le = _code->getLabelEntry(label);
   if (!le)
     return setLastError(DebugUtils::errored(kErrorInvalidLabel));
 
@@ -144,11 +144,11 @@ Error Assembler::bind(const Label& label) {
     sb.setFormat("L%u:", Operand::unpackId(label.getId()));
 
     size_t binSize = 0;
-    if (!_holder->_logger->hasOption(Logger::kOptionBinaryForm))
+    if (!_code->_logger->hasOption(Logger::kOptionBinaryForm))
       binSize = kInvalidIndex;
 
     LogUtil::formatLine(sb, nullptr, binSize, 0, 0, getInlineComment());
-    _holder->_logger->log(sb.getData(), sb.getLength());
+    _code->_logger->log(sb.getData(), sb.getLength());
   }
 #endif // !ASMJIT_DISABLE_LOGGING
 
@@ -163,7 +163,7 @@ Error Assembler::bind(const Label& label) {
 
     if (link->relocId != -1) {
       // Handle relocation info.
-      _holder->_relocations[link->relocId].data += static_cast<uint64_t>(pos);
+      _code->_relocations[link->relocId].data += static_cast<uint64_t>(pos);
     }
     else {
       // Not using relocId, this means that we are overwriting a real
@@ -196,8 +196,8 @@ Error Assembler::bind(const Label& label) {
   if (link) {
     if (!prev) prev = link;
 
-    prev->prev = _holder->_unusedLinks;
-    _holder->_unusedLinks = link;
+    prev->prev = _code->_unusedLinks;
+    _code->_unusedLinks = link;
   }
 
   // Set as bound (offset is zero or greater and no links).
@@ -215,7 +215,7 @@ Error Assembler::embed(const void* data, uint32_t size) {
   if (_lastError) return _lastError;
 
   if (getRemainingSpace() < size) {
-    Error err = _holder->growBuffer(&_section->buffer, size);
+    Error err = _code->growBuffer(&_section->buffer, size);
     if (ASMJIT_UNLIKELY(err != kErrorOk)) return setLastError(err);
   }
 
@@ -224,7 +224,7 @@ Error Assembler::embed(const void* data, uint32_t size) {
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
   if (_globalOptions & kOptionLoggingEnabled)
-    _holder->_logger->logBinary(data, size);
+    _code->_logger->logBinary(data, size);
 #endif // !ASMJIT_DISABLE_LOGGING
 
   return kErrorOk;
@@ -241,7 +241,7 @@ Error Assembler::embedConstPool(const Label& label, const ConstPool& pool) {
 
   size_t size = pool.getSize();
   if (getRemainingSpace() < size) {
-    Error err = _holder->growBuffer(&_section->buffer, size);
+    Error err = _code->growBuffer(&_section->buffer, size);
     if (ASMJIT_UNLIKELY(err)) return setLastError(err);
   }
 
@@ -253,21 +253,21 @@ Error Assembler::embedConstPool(const Label& label, const ConstPool& pool) {
 
 Error Assembler::embedLabel(const Label& label) {
   if (_lastError) return _lastError;
-  ASMJIT_ASSERT(_holder != nullptr);
+  ASMJIT_ASSERT(_code != nullptr);
 
-  CodeHolder::LabelEntry* le = _holder->getLabelEntry(label);
+  CodeHolder::LabelEntry* le = _code->getLabelEntry(label);
   if (!le)
     return setLastError(DebugUtils::errored(kErrorInvalidLabel));
 
   uint32_t gpSize = getGpSize();
   if (getRemainingSpace() < gpSize) {
-    Error err = _holder->growBuffer(&_section->buffer, gpSize);
+    Error err = _code->growBuffer(&_section->buffer, gpSize);
     if (ASMJIT_UNLIKELY(err)) return setLastError(err);
   }
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
   if (_globalOptions & kOptionLoggingEnabled)
-    _holder->_logger->logf(gpSize == 4 ? ".dd L%u\n" : ".dq L%u\n", Operand::unpackId(label.getId()));
+    _code->_logger->logf(gpSize == 4 ? ".dd L%u\n" : ".dq L%u\n", Operand::unpackId(label.getId()));
 #endif // !ASMJIT_DISABLE_LOGGING
 
   CodeHolder::RelocEntry re;
@@ -283,7 +283,7 @@ Error Assembler::embedLabel(const Label& label) {
   else {
     // Non-bound label. Need to chain.
 
-    CodeHolder::LabelLink* link = _holder->newLabelLink();
+    CodeHolder::LabelLink* link = _code->newLabelLink();
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
     link->prev = (CodeHolder::LabelLink*)le->links;
@@ -293,7 +293,7 @@ Error Assembler::embedLabel(const Label& label) {
     le->links = link;
   }
 
-  if (_holder->_relocations.append(re) != kErrorOk)
+  if (_code->_relocations.append(re) != kErrorOk)
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   // Emit dummy intptr_t (4 or 8 bytes; depends on the address size).

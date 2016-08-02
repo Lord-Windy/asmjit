@@ -12,7 +12,7 @@
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
-#include "../base/asmbuilder.h"
+#include "../base/codebuilder.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -20,11 +20,11 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::AsmBuilder - Construction / Destruction]
+// [asmjit::CodeBuilder - Construction / Destruction]
 // ============================================================================
 
-AsmBuilder::AsmBuilder(CodeHolder* holder) noexcept
-  : CodeGen(kTypeBuilder),
+CodeBuilder::CodeBuilder(CodeHolder* code) noexcept
+  : CodeEmitter(kTypeBuilder),
     _nodeAllocator(32768 - Zone::kZoneOverhead),
     _dataAllocator(8192  - Zone::kZoneOverhead),
     _nodeFlowId(0),
@@ -33,20 +33,20 @@ AsmBuilder::AsmBuilder(CodeHolder* holder) noexcept
     _lastNode(nullptr),
     _cursor(nullptr) {
 
-  if (holder)
-    holder->attach(this);
+  if (code)
+    code->attach(this);
 }
-AsmBuilder::~AsmBuilder() noexcept {}
+CodeBuilder::~CodeBuilder() noexcept {}
 
 // ============================================================================
-// [asmjit::AsmBuilder - Events]
+// [asmjit::CodeBuilder - Events]
 // ============================================================================
 
-Error AsmBuilder::onAttach(CodeHolder* holder) noexcept {
-  return Base::onAttach(holder);
+Error CodeBuilder::onAttach(CodeHolder* code) noexcept {
+  return Base::onAttach(code);
 }
 
-Error AsmBuilder::onDetach(CodeHolder* holder) noexcept {
+Error CodeBuilder::onDetach(CodeHolder* code) noexcept {
   _nodeAllocator.reset(false);
   _dataAllocator.reset(false);
   _labelArray.reset(false);
@@ -58,27 +58,27 @@ Error AsmBuilder::onDetach(CodeHolder* holder) noexcept {
   _lastNode = nullptr;
   _cursor = nullptr;
 
-  return Base::onDetach(holder);
+  return Base::onDetach(code);
 }
 
 // ============================================================================
-// [asmjit::AsmBuilder - Node-Factory]
+// [asmjit::CodeBuilder - Node-Factory]
 // ============================================================================
 
-Error AsmBuilder::getAsmLabel(AsmLabel** pOut, uint32_t id) noexcept {
+Error CodeBuilder::getCBLabel(CBLabel** pOut, uint32_t id) noexcept {
   if (_lastError) return _lastError;
-  ASMJIT_ASSERT(_holder != nullptr);
+  ASMJIT_ASSERT(_code != nullptr);
 
   size_t index = Operand::unpackId(id);
-  if (ASMJIT_UNLIKELY(index >= _holder->getLabelsCount()))
+  if (ASMJIT_UNLIKELY(index >= _code->getLabelsCount()))
     return DebugUtils::errored(kErrorInvalidLabel);
 
   if (index >= _labelArray.getLength())
     ASMJIT_PROPAGATE(_labelArray.resize(index + 1));
 
-  AsmLabel* node = _labelArray[index];
+  CBLabel* node = _labelArray[index];
   if (!node) {
-    node = newNodeT<AsmLabel>(id);
+    node = newNodeT<CBLabel>(id);
     if (ASMJIT_UNLIKELY(!node))
       return DebugUtils::errored(kErrorNoHeapMemory);
     _labelArray[index] = node;
@@ -88,14 +88,14 @@ Error AsmBuilder::getAsmLabel(AsmLabel** pOut, uint32_t id) noexcept {
   return kErrorOk;
 }
 
-Error AsmBuilder::registerLabelNode(AsmLabel* node) noexcept {
+Error CodeBuilder::registerLabelNode(CBLabel* node) noexcept {
   if (_lastError) return _lastError;
-  ASMJIT_ASSERT(_holder != nullptr);
+  ASMJIT_ASSERT(_code != nullptr);
 
   // Don't call setLastError() from here, we are noexcept and we are called
   // by `newLabelNode()` and `newFuncNode()`, which are noexcept as too.
   uint32_t id;
-  ASMJIT_PROPAGATE(_holder->newLabelId(id));
+  ASMJIT_PROPAGATE(_code->newLabelId(id));
   size_t index = Operand::unpackId(id);
 
   // We just added one label so it must be true.
@@ -107,19 +107,19 @@ Error AsmBuilder::registerLabelNode(AsmLabel* node) noexcept {
   return kErrorOk;
 }
 
-AsmLabel* AsmBuilder::newLabelNode() noexcept {
-  AsmLabel* node = newNodeT<AsmLabel>();
+CBLabel* CodeBuilder::newLabelNode() noexcept {
+  CBLabel* node = newNodeT<CBLabel>();
   if (!node || registerLabelNode(node) != kErrorOk)
     return nullptr;
   return node;
 }
 
-AsmAlign* AsmBuilder::newAlignNode(uint32_t mode, uint32_t alignment) noexcept {
-  return newNodeT<AsmAlign>(mode, alignment);
+CBAlign* CodeBuilder::newAlignNode(uint32_t mode, uint32_t alignment) noexcept {
+  return newNodeT<CBAlign>(mode, alignment);
 }
 
-AsmData* AsmBuilder::newDataNode(const void* data, uint32_t size) noexcept {
-  if (size > AsmData::kInlineBufferSize) {
+CBData* CodeBuilder::newDataNode(const void* data, uint32_t size) noexcept {
+  if (size > CBData::kInlineBufferSize) {
     void* cloned = _dataAllocator.alloc(size);
     if (!cloned) return nullptr;
 
@@ -127,17 +127,17 @@ AsmData* AsmBuilder::newDataNode(const void* data, uint32_t size) noexcept {
     data = cloned;
   }
 
-  return newNodeT<AsmData>(const_cast<void*>(data), size);
+  return newNodeT<CBData>(const_cast<void*>(data), size);
 }
 
-AsmConstPool* AsmBuilder::newConstPool() noexcept {
-  AsmConstPool* node = newNodeT<AsmConstPool>();
+CBConstPool* CodeBuilder::newConstPool() noexcept {
+  CBConstPool* node = newNodeT<CBConstPool>();
   if (!node || registerLabelNode(node) != kErrorOk)
     return nullptr;
   return node;
 }
 
-AsmComment* AsmBuilder::newCommentNode(const char* s, size_t len) noexcept {
+CBComment* CodeBuilder::newCommentNode(const char* s, size_t len) noexcept {
   if (s) {
     if (len == kInvalidIndex) len = ::strlen(s);
     if (len > 0) {
@@ -146,14 +146,14 @@ AsmComment* AsmBuilder::newCommentNode(const char* s, size_t len) noexcept {
     }
   }
 
-  return newNodeT<AsmComment>(s);
+  return newNodeT<CBComment>(s);
 }
 
 // ============================================================================
-// [asmjit::AsmBuilder - Node-Builder]
+// [asmjit::CodeBuilder - Node-Builder]
 // ============================================================================
 
-AsmNode* AsmBuilder::addNode(AsmNode* node) noexcept {
+CBNode* CodeBuilder::addNode(CBNode* node) noexcept {
   ASMJIT_ASSERT(node);
   ASMJIT_ASSERT(node->_prev == nullptr);
   ASMJIT_ASSERT(node->_next == nullptr);
@@ -170,8 +170,8 @@ AsmNode* AsmBuilder::addNode(AsmNode* node) noexcept {
     }
   }
   else {
-    AsmNode* prev = _cursor;
-    AsmNode* next = _cursor->_next;
+    CBNode* prev = _cursor;
+    CBNode* next = _cursor->_next;
 
     node->_prev = prev;
     node->_next = next;
@@ -187,15 +187,15 @@ AsmNode* AsmBuilder::addNode(AsmNode* node) noexcept {
   return node;
 }
 
-AsmNode* AsmBuilder::addAfter(AsmNode* node, AsmNode* ref) noexcept {
+CBNode* CodeBuilder::addAfter(CBNode* node, CBNode* ref) noexcept {
   ASMJIT_ASSERT(node);
   ASMJIT_ASSERT(ref);
 
   ASMJIT_ASSERT(node->_prev == nullptr);
   ASMJIT_ASSERT(node->_next == nullptr);
 
-  AsmNode* prev = ref;
-  AsmNode* next = ref->_next;
+  CBNode* prev = ref;
+  CBNode* next = ref->_next;
 
   node->_prev = prev;
   node->_next = next;
@@ -209,14 +209,14 @@ AsmNode* AsmBuilder::addAfter(AsmNode* node, AsmNode* ref) noexcept {
   return node;
 }
 
-AsmNode* AsmBuilder::addBefore(AsmNode* node, AsmNode* ref) noexcept {
+CBNode* CodeBuilder::addBefore(CBNode* node, CBNode* ref) noexcept {
   ASMJIT_ASSERT(node != nullptr);
   ASMJIT_ASSERT(node->_prev == nullptr);
   ASMJIT_ASSERT(node->_next == nullptr);
   ASMJIT_ASSERT(ref != nullptr);
 
-  AsmNode* prev = ref->_prev;
-  AsmNode* next = ref;
+  CBNode* prev = ref->_prev;
+  CBNode* next = ref;
 
   node->_prev = prev;
   node->_next = next;
@@ -230,18 +230,18 @@ AsmNode* AsmBuilder::addBefore(AsmNode* node, AsmNode* ref) noexcept {
   return node;
 }
 
-static ASMJIT_INLINE void AsmBuilder_nodeRemoved(AsmBuilder* self, AsmNode* node_) noexcept {
+static ASMJIT_INLINE void CodeBuilder_nodeRemoved(CodeBuilder* self, CBNode* node_) noexcept {
   if (node_->isJmpOrJcc()) {
-    AsmJump* node = static_cast<AsmJump*>(node_);
-    AsmLabel* label = node->getTarget();
+    CBJump* node = static_cast<CBJump*>(node_);
+    CBLabel* label = node->getTarget();
 
     if (label) {
       // Disconnect.
-      AsmJump** pPrev = &label->_from;
+      CBJump** pPrev = &label->_from;
       for (;;) {
         ASMJIT_ASSERT(*pPrev != nullptr);
 
-        AsmJump* current = *pPrev;
+        CBJump* current = *pPrev;
         if (!current) break;
 
         if (current == node) {
@@ -257,9 +257,9 @@ static ASMJIT_INLINE void AsmBuilder_nodeRemoved(AsmBuilder* self, AsmNode* node
   }
 }
 
-AsmNode* AsmBuilder::removeNode(AsmNode* node) noexcept {
-  AsmNode* prev = node->_prev;
-  AsmNode* next = node->_next;
+CBNode* CodeBuilder::removeNode(CBNode* node) noexcept {
+  CBNode* prev = node->_prev;
+  CBNode* next = node->_next;
 
   if (_firstNode == node)
     _firstNode = next;
@@ -276,19 +276,19 @@ AsmNode* AsmBuilder::removeNode(AsmNode* node) noexcept {
 
   if (_cursor == node)
     _cursor = prev;
-  AsmBuilder_nodeRemoved(this, node);
+  CodeBuilder_nodeRemoved(this, node);
 
   return node;
 }
 
-void AsmBuilder::removeNodes(AsmNode* first, AsmNode* last) noexcept {
+void CodeBuilder::removeNodes(CBNode* first, CBNode* last) noexcept {
   if (first == last) {
     removeNode(first);
     return;
   }
 
-  AsmNode* prev = first->_prev;
-  AsmNode* next = last->_next;
+  CBNode* prev = first->_prev;
+  CBNode* next = last->_next;
 
   if (_firstNode == first)
     _firstNode = next;
@@ -300,9 +300,9 @@ void AsmBuilder::removeNodes(AsmNode* first, AsmNode* last) noexcept {
   else
     next->_prev = prev;
 
-  AsmNode* node = first;
+  CBNode* node = first;
   for (;;) {
-    AsmNode* next = node->getNext();
+    CBNode* next = node->getNext();
     ASMJIT_ASSERT(next != nullptr);
 
     node->_prev = nullptr;
@@ -310,7 +310,7 @@ void AsmBuilder::removeNodes(AsmNode* first, AsmNode* last) noexcept {
 
     if (_cursor == node)
       _cursor = prev;
-    AsmBuilder_nodeRemoved(this, node);
+    CodeBuilder_nodeRemoved(this, node);
 
     if (node == last)
       break;
@@ -318,21 +318,21 @@ void AsmBuilder::removeNodes(AsmNode* first, AsmNode* last) noexcept {
   }
 }
 
-AsmNode* AsmBuilder::setCursor(AsmNode* node) noexcept {
-  AsmNode* old = _cursor;
+CBNode* CodeBuilder::setCursor(CBNode* node) noexcept {
+  CBNode* old = _cursor;
   _cursor = node;
   return old;
 }
 
 // ============================================================================
-// [asmjit::AsmBuilder - Code-Generation]
+// [asmjit::CodeBuilder - Code-Generation]
 // ============================================================================
 
-Label AsmBuilder::newLabel() {
+Label CodeBuilder::newLabel() {
   uint32_t id = kInvalidValue;
 
   if (!_lastError) {
-    AsmLabel* node = newNodeT<AsmLabel>(id);
+    CBLabel* node = newNodeT<CBLabel>(id);
     if (ASMJIT_UNLIKELY(!node)) {
       setLastError(DebugUtils::errored(kErrorNoHeapMemory));
     }
@@ -346,11 +346,11 @@ Label AsmBuilder::newLabel() {
   return Label(id);
 }
 
-Error AsmBuilder::bind(const Label& label) {
+Error CodeBuilder::bind(const Label& label) {
   if (_lastError) return _lastError;
 
-  AsmLabel* node;
-  Error err = getAsmLabel(&node, label);
+  CBLabel* node;
+  Error err = getCBLabel(&node, label);
   if (ASMJIT_UNLIKELY(err))
     return setLastError(err);
 
@@ -358,23 +358,23 @@ Error AsmBuilder::bind(const Label& label) {
   return kErrorOk;
 }
 
-Error AsmBuilder::align(uint32_t mode, uint32_t alignment) {
-  AsmAlign* node = newAlignNode(mode, alignment);
+Error CodeBuilder::align(uint32_t mode, uint32_t alignment) {
+  CBAlign* node = newAlignNode(mode, alignment);
   if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
   return kErrorOk;
 }
 
-Error AsmBuilder::embed(const void* data, uint32_t size) {
-  AsmData* node = newDataNode(data, size);
+Error CodeBuilder::embed(const void* data, uint32_t size) {
+  CBData* node = newDataNode(data, size);
   if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
   return kErrorOk;
 }
 
-Error AsmBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
+Error CodeBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
   if (_lastError) return _lastError;
 
   if (!isLabelValid(label))
@@ -383,7 +383,7 @@ Error AsmBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
   ASMJIT_PROPAGATE(align(kAlignData, static_cast<uint32_t>(pool.getAlignment())));
   ASMJIT_PROPAGATE(bind(label));
 
-  AsmData* node = newDataNode(nullptr, static_cast<uint32_t>(pool.getSize()));
+  CBData* node = newDataNode(nullptr, static_cast<uint32_t>(pool.getSize()));
   if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   pool.fill(node->getData());
@@ -391,8 +391,8 @@ Error AsmBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
   return kErrorOk;
 }
 
-Error AsmBuilder::comment(const char* s, size_t len) {
-  AsmComment* node = newCommentNode(s, len);
+Error CodeBuilder::comment(const char* s, size_t len) {
+  CBComment* node = newCommentNode(s, len);
   if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
@@ -400,48 +400,48 @@ Error AsmBuilder::comment(const char* s, size_t len) {
 }
 
 // ============================================================================
-// [asmjit::AsmBuilder - Code-Serialization]
+// [asmjit::CodeBuilder - Code-Serialization]
 // ============================================================================
 
-Error AsmBuilder::serialize(CodeGen* dst) {
-  AsmNode* node_ = getFirstNode();
+Error CodeBuilder::serialize(CodeEmitter* dst) {
+  CBNode* node_ = getFirstNode();
 
   do {
     dst->setInlineComment(node_->getInlineComment());
 
     switch (node_->getType()) {
-      case AsmNode::kNodeAlign: {
-        AsmAlign* node = static_cast<AsmAlign*>(node_);
+      case CBNode::kNodeAlign: {
+        CBAlign* node = static_cast<CBAlign*>(node_);
         ASMJIT_PROPAGATE(
           dst->align(node->getMode(), node->getAlignment()));
         break;
       }
 
-      case AsmNode::kNodeData: {
-        AsmData* node = static_cast<AsmData*>(node_);
+      case CBNode::kNodeData: {
+        CBData* node = static_cast<CBData*>(node_);
         ASMJIT_PROPAGATE(
           dst->embed(node->getData(), node->getSize()));
         break;
       }
 
-      case AsmNode::kNodeFunc:
-      case AsmNode::kNodeLabel: {
-        AsmLabel* node = static_cast<AsmLabel*>(node_);
+      case CBNode::kNodeFunc:
+      case CBNode::kNodeLabel: {
+        CBLabel* node = static_cast<CBLabel*>(node_);
         ASMJIT_PROPAGATE(
           dst->bind(node->getLabel()));
         break;
       }
 
-      case AsmNode::kNodeConstPool: {
-        AsmConstPool* node = static_cast<AsmConstPool*>(node_);
+      case CBNode::kNodeConstPool: {
+        CBConstPool* node = static_cast<CBConstPool*>(node_);
         ASMJIT_PROPAGATE(
           dst->embedConstPool(node->getLabel(), node->getConstPool()));
         break;
       }
 
-      case AsmNode::kNodeInst:
-      case AsmNode::kNodeCall: {
-        AsmInst* node = static_cast<AsmInst*>(node_);
+      case CBNode::kNodeInst:
+      case CBNode::kNodeCall: {
+        CBInst* node = static_cast<CBInst*>(node_);
 
         uint32_t instId = node->getInstId();
         uint32_t options = node->getOptions();
@@ -467,8 +467,8 @@ Error AsmBuilder::serialize(CodeGen* dst) {
         break;
       }
 
-      case AsmNode::kNodeComment: {
-        AsmComment* node = static_cast<AsmComment*>(node_);
+      case CBNode::kNodeComment: {
+        CBComment* node = static_cast<CBComment*>(node_);
         ASMJIT_PROPAGATE(
           dst->comment(node->getInlineComment()));
         break;

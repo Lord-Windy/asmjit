@@ -13,7 +13,7 @@
 
 // [Dependencies]
 #include "../base/assembler.h"
-#include "../base/compiler.h"
+#include "../base/codecompiler.h"
 #include "../base/compilercontext_p.h"
 #include "../base/cpuinfo.h"
 #include "../base/logging.h"
@@ -33,11 +33,11 @@ static const char noName[1] = { '\0' };
 enum { kCompilerDefaultLookAhead = 64 };
 
 // ============================================================================
-// [asmjit::Compiler - Construction / Destruction]
+// [asmjit::CodeCompiler - Construction / Destruction]
 // ============================================================================
 
-Compiler::Compiler() noexcept
-  : AsmBuilder(),
+CodeCompiler::CodeCompiler() noexcept
+  : CodeBuilder(),
     _maxLookAhead(kCompilerDefaultLookAhead),
     _tokenGenerator(0),
     _typeIdMap(nullptr),
@@ -48,17 +48,17 @@ Compiler::Compiler() noexcept
 
   _type = kTypeCompiler;
 }
-Compiler::~Compiler() noexcept {}
+CodeCompiler::~CodeCompiler() noexcept {}
 
 // ============================================================================
-// [asmjit::Compiler - Events]
+// [asmjit::CodeCompiler - Events]
 // ============================================================================
 
-Error Compiler::onAttach(CodeHolder* holder) noexcept {
-  return Base::onAttach(holder);
+Error CodeCompiler::onAttach(CodeHolder* code) noexcept {
+  return Base::onAttach(code);
 }
 
-Error Compiler::onDetach(CodeHolder* holder) noexcept {
+Error CodeCompiler::onDetach(CodeHolder* code) noexcept {
   _maxLookAhead = kCompilerDefaultLookAhead;
 
   _tokenGenerator = 0;
@@ -70,30 +70,30 @@ Error Compiler::onDetach(CodeHolder* holder) noexcept {
   _vRegAllocator.reset(false);
   _vRegArray.reset(false);
 
-  return Base::onDetach(holder);
+  return Base::onDetach(code);
 }
 
 // ============================================================================
-// [asmjit::Compiler - Node-Factory]
+// [asmjit::CodeCompiler - Node-Factory]
 // ============================================================================
 
-AsmHint* Compiler::newHintNode(Reg& r, uint32_t hint, uint32_t value) noexcept {
+CCHint* CodeCompiler::newHintNode(Reg& r, uint32_t hint, uint32_t value) noexcept {
   if (!r.isVirtReg()) return nullptr;
 
   VirtReg* vr = getVirtReg(r);
-  return newNodeT<AsmHint>(vr, hint, value);
+  return newNodeT<CCHint>(vr, hint, value);
 }
 
 // ============================================================================
-// [asmjit::Compiler - Func]
+// [asmjit::CodeCompiler - Func]
 // ============================================================================
 
-AsmFunc* Compiler::addFunc(AsmFunc* func) {
+CCFunc* CodeCompiler::addFunc(CCFunc* func) {
   ASMJIT_ASSERT(_func == nullptr);
   _func = func;
 
   addNode(func);                 // Function node.
-  AsmNode* cursor = getCursor(); // {CURSOR}.
+  CBNode* cursor = getCursor(); // {CURSOR}.
   addNode(func->getExitNode());  // Function exit label.
   addNode(func->getEnd());       // Function end marker.
 
@@ -102,13 +102,13 @@ AsmFunc* Compiler::addFunc(AsmFunc* func) {
 }
 
 // ============================================================================
-// [asmjit::Compiler - Hint]
+// [asmjit::CodeCompiler - Hint]
 // ============================================================================
 
-Error Compiler::_hint(Reg& r, uint32_t hint, uint32_t value) {
+Error CodeCompiler::_hint(Reg& r, uint32_t hint, uint32_t value) {
   if (!r.isVirtReg()) return kErrorOk;
 
-  AsmHint* node = newHintNode(r, hint, value);
+  CCHint* node = newHintNode(r, hint, value);
   if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
@@ -116,10 +116,10 @@ Error Compiler::_hint(Reg& r, uint32_t hint, uint32_t value) {
 }
 
 // ============================================================================
-// [asmjit::Compiler - Vars]
+// [asmjit::CodeCompiler - Vars]
 // ============================================================================
 
-VirtReg* Compiler::newVirtReg(const VirtType& typeInfo, const char* name) noexcept {
+VirtReg* CodeCompiler::newVirtReg(const VirtType& typeInfo, const char* name) noexcept {
   size_t index = _vRegArray.getLength();
   if (index <= Operand::kPackedIdCount) {
     VirtReg* vreg;
@@ -163,42 +163,42 @@ VirtReg* Compiler::newVirtReg(const VirtType& typeInfo, const char* name) noexce
   return nullptr;
 }
 
-Error Compiler::alloc(Reg& reg) {
+Error CodeCompiler::alloc(Reg& reg) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintAlloc, kInvalidValue);
+  return _hint(reg, CCHint::kHintAlloc, kInvalidValue);
 }
 
-Error Compiler::alloc(Reg& reg, uint32_t physId) {
+Error CodeCompiler::alloc(Reg& reg, uint32_t physId) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintAlloc, physId);
+  return _hint(reg, CCHint::kHintAlloc, physId);
 }
 
-Error Compiler::alloc(Reg& reg, const Reg& physReg) {
+Error CodeCompiler::alloc(Reg& reg, const Reg& physReg) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintAlloc, physReg.getId());
+  return _hint(reg, CCHint::kHintAlloc, physReg.getId());
 }
 
-Error Compiler::save(Reg& reg) {
+Error CodeCompiler::save(Reg& reg) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintSave, kInvalidValue);
+  return _hint(reg, CCHint::kHintSave, kInvalidValue);
 }
 
-Error Compiler::spill(Reg& reg) {
+Error CodeCompiler::spill(Reg& reg) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintSpill, kInvalidValue);
+  return _hint(reg, CCHint::kHintSpill, kInvalidValue);
 }
 
-Error Compiler::unuse(Reg& reg) {
+Error CodeCompiler::unuse(Reg& reg) {
   if (!reg.isVirtReg()) return kErrorOk;
-  return _hint(reg, AsmHint::kHintUnuse, kInvalidValue);
+  return _hint(reg, CCHint::kHintUnuse, kInvalidValue);
 }
 
-uint32_t Compiler::getPriority(Reg& reg) const {
+uint32_t CodeCompiler::getPriority(Reg& reg) const {
   if (!reg.isVirtReg()) return 0;
   return getVirtRegById(reg.getId())->getPriority();
 }
 
-void Compiler::setPriority(Reg& reg, uint32_t priority) {
+void CodeCompiler::setPriority(Reg& reg, uint32_t priority) {
   if (!reg.isVirtReg()) return;
   if (priority > 255) priority = 255;
 
@@ -206,14 +206,14 @@ void Compiler::setPriority(Reg& reg, uint32_t priority) {
   if (vreg) vreg->_priority = static_cast<uint8_t>(priority);
 }
 
-bool Compiler::getSaveOnUnuse(Reg& reg) const {
+bool CodeCompiler::getSaveOnUnuse(Reg& reg) const {
   if (!reg.isVirtReg()) return false;
 
   VirtReg* vreg = getVirtRegById(reg.getId());
   return static_cast<bool>(vreg->_saveOnUnuse);
 }
 
-void Compiler::setSaveOnUnuse(Reg& reg, bool value) {
+void CodeCompiler::setSaveOnUnuse(Reg& reg, bool value) {
   if (!reg.isVirtReg()) return;
 
   VirtReg* vreg = getVirtRegById(reg.getId());
@@ -222,7 +222,7 @@ void Compiler::setSaveOnUnuse(Reg& reg, bool value) {
   vreg->_saveOnUnuse = value;
 }
 
-void Compiler::rename(Reg& reg, const char* fmt, ...) {
+void CodeCompiler::rename(Reg& reg, const char* fmt, ...) {
   if (!reg.isVirtReg()) return;
 
   VirtReg* vreg = getVirtRegById(reg.getId());

@@ -30,10 +30,11 @@ namespace asmjit {
 //! C library `malloc/free`, but divides these blocks into smaller segments
 //! requirested by calling `Zone::alloc()` and friends.
 //!
-//! Zone memory allocators are designed to allocate data of short lifetime. The
-//! data used by `Assembler` and `Compiler` has a very short lifetime, thus, is
-//! allocated by `Zone`. The advantage is that `Zone` can free all of the data
-//! allocated at once by calling `reset()` or by `Zone` destructor.
+//! Zone memory allocators are designed to allocate data structures that have
+//! a short lifetime. Data structures used by CodeEmitter (and all classes that
+//! inherit it) are small and all have a very short life-time. It's much faster
+//! (and easier) to use an incremental memory allocator like Zone to allocate
+//! them and deallocate them all at once when the data is no longer needed.
 class Zone {
 public:
   //! \internal

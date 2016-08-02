@@ -90,7 +90,7 @@ public:
   //! The beginning of the memory allocated for the function is returned in
   //! `dst`. If failed the \ref Error code is returned and `dst` is set to null
   //! (this means that you don't have to set it to null before calling `add()`).
-  virtual Error add(void** dst, CodeHolder* holder) noexcept = 0;
+  virtual Error add(void** dst, CodeHolder* code) noexcept = 0;
 
   //! Release `p` allocated by `add()`.
   virtual Error release(void* p) noexcept = 0;
@@ -182,7 +182,7 @@ public:
   // [Interface]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error add(void** dst, CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error add(void** dst, CodeHolder* code) noexcept override;
   ASMJIT_API virtual Error release(void* p) noexcept override;
 
   // --------------------------------------------------------------------------

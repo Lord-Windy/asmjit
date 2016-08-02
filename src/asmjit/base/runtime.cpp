@@ -74,8 +74,8 @@ JitRuntime::~JitRuntime() noexcept {}
 // [asmjit::JitRuntime - Interface]
 // ============================================================================
 
-Error JitRuntime::add(void** dst, CodeHolder* holder) noexcept {
-  size_t codeSize = holder->getCodeSize();
+Error JitRuntime::add(void** dst, CodeHolder* code) noexcept {
+  size_t codeSize = code->getCodeSize();
   if (ASMJIT_UNLIKELY(codeSize == 0)) {
     *dst = nullptr;
     return DebugUtils::errored(kErrorNoCodeGenerated);
@@ -88,7 +88,7 @@ Error JitRuntime::add(void** dst, CodeHolder* holder) noexcept {
   }
 
   // Relocate the code and release the unused memory back to `VMemMgr`.
-  size_t relocSize = holder->relocate(p);
+  size_t relocSize = code->relocate(p);
   if (ASMJIT_UNLIKELY(relocSize == 0)) {
     *dst = nullptr;
     _memMgr.release(p);

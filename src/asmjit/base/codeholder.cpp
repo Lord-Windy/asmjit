@@ -32,18 +32,18 @@ static void CodeHolder_setGlobalOption(CodeHolder* self, uint32_t clear, uint32_
   // Modify global options of `CodeHolder` itself.
   self->_globalOptions = (self->_globalOptions & ~clear) | add;
 
-  // Modify all global options of all `CodeGen`s attached.
-  CodeGen* cg = self->_cgList;
-  while (cg) {
-    cg->_globalOptions = (cg->_globalOptions & ~clear) | add;
-    cg = cg->_cgNext;
+  // Modify all global options of all `CodeEmitter`s attached.
+  CodeEmitter* emitter = self->_emitters;
+  while (emitter) {
+    emitter->_globalOptions = (emitter->_globalOptions & ~clear) | add;
+    emitter = emitter->_nextEmitter;
   }
 }
 
 static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
-  // Detach all `CodeGen`s.
-  while (self->_cgList)
-    self->detach(self->_cgList);
+  // Detach all `CodeEmitter`s.
+  while (self->_emitters)
+    self->detach(self->_emitters);
 
   // Reset everything into its construction state.
   self->_archInfo.reset();
@@ -106,7 +106,7 @@ CodeHolder::CodeHolder(uint32_t archId) noexcept
     _isLocked(false),
     _globalHints(0),
     _globalOptions(0),
-    _cgList(nullptr),
+    _emitters(nullptr),
     _cgAsm(nullptr),
     _logger(nullptr),
     _errorHandler(nullptr),
@@ -141,76 +141,78 @@ void CodeHolder::reset(bool releaseMemory) noexcept {
 // [asmjit::CodeHolder - Attach / Detach]
 // ============================================================================
 
-Error CodeHolder::attach(CodeGen* cg) noexcept {
+Error CodeHolder::attach(CodeEmitter* emitter) noexcept {
   // Catch a possible misuse of the API.
-  if (!cg)
+  if (!emitter)
     return DebugUtils::errored(kErrorInvalidArgument);
 
-  uint32_t type = cg->getType();
-  if (type == CodeGen::kTypeNone || type >= CodeGen::kTypeCount)
+  uint32_t type = emitter->getType();
+  if (type == CodeEmitter::kTypeNone || type >= CodeEmitter::kTypeCount)
     return DebugUtils::errored(kErrorInvalidState);
 
-  // This is suspicious, but don't fail if `cg` matches.
-  if (cg->_holder != nullptr) {
-    if (cg->_holder == this) return kErrorOk;
+  // This is suspicious, but don't fail if `emitter` matches.
+  if (emitter->_code != nullptr) {
+    if (emitter->_code == this) return kErrorOk;
     return DebugUtils::errored(kErrorInvalidState);
   }
 
   // Special case - attach `Assembler`.
-  CodeGen** pSlot = nullptr;
-  if (type == CodeGen::kTypeAssembler) {
+  CodeEmitter** pSlot = nullptr;
+  if (type == CodeEmitter::kTypeAssembler) {
     if (_cgAsm)
       return DebugUtils::errored(kErrorSlotOccupied);
-    pSlot = reinterpret_cast<CodeGen**>(&_cgAsm);
+    pSlot = reinterpret_cast<CodeEmitter**>(&_cgAsm);
   }
 
-  Error err = cg->onAttach(this);
+  Error err = emitter->onAttach(this);
   if (err != kErrorOk) return err;
 
-  // Add to a single-linked list of `CodeGen`s.
-  cg->_cgNext = _cgList;
-  _cgList = cg;
-  if (pSlot) *pSlot = cg;
+  // Add to a single-linked list of `CodeEmitter`s.
+  emitter->_nextEmitter = _emitters;
+  _emitters = emitter;
+  if (pSlot) *pSlot = emitter;
 
   // Establish the connection.
-  cg->_holder = this;
+  emitter->_code = this;
   return kErrorOk;
 }
 
-Error CodeHolder::detach(CodeGen* cg) noexcept {
-  if (!cg)
+Error CodeHolder::detach(CodeEmitter* emitter) noexcept {
+  if (!emitter)
     return DebugUtils::errored(kErrorInvalidArgument);
 
-  if (cg->_holder != this)
+  if (emitter->_code != this)
     return DebugUtils::errored(kErrorInvalidState);
 
-  uint32_t type = cg->getType();
+  uint32_t type = emitter->getType();
   Error err = kErrorOk;
 
   // NOTE: We always detach if we were asked to, if error happens during
-  // `cg->onDetach()` we just propagate it, but the CodeGen will be detached.
-  if (!cg->_destroyed)
-    err = cg->onDetach(this);
+  // `emitter->onDetach()` we just propagate it, but the CodeEmitter will
+  // be detached.
+  if (!emitter->_destroyed)
+    err = emitter->onDetach(this);
 
   // Special case - detach `Assembler`.
-  if (type == CodeGen::kTypeAssembler) _cgAsm = nullptr;
+  if (type == CodeEmitter::kTypeAssembler) _cgAsm = nullptr;
 
-  // Remove from a single-linked list of `CodeGen`s.
-  CodeGen** pPrev = &_cgList;
+  // Remove from a single-linked list of `CodeEmitter`s.
+  CodeEmitter** pPrev = &_emitters;
   for (;;) {
     ASMJIT_ASSERT(*pPrev != nullptr);
-    CodeGen* cur = *pPrev;
+    CodeEmitter* cur = *pPrev;
 
-    if (cur == cg) {
-      *pPrev = cg->_cgNext;
+    if (cur == emitter) {
+      *pPrev = emitter->_nextEmitter;
       break;
     }
 
-    pPrev = &cur->_cgNext;
+    pPrev = &cur->_nextEmitter;
   }
 
-  cg->_holder = nullptr;
-  cg->_cgNext = nullptr;
+  emitter->_code = nullptr;
+  emitter->_nextEmitter = nullptr;
+
   return err;
 }
 
@@ -252,10 +254,10 @@ size_t CodeHolder::getCodeSize() const noexcept {
 #if !defined(ASMJIT_DISABLE_LOGGING)
 void CodeHolder::setLogger(Logger* logger) noexcept {
   uint32_t opt = 0;
-  if (logger) opt = CodeGen::kOptionLoggingEnabled;
+  if (logger) opt = CodeEmitter::kOptionLoggingEnabled;
 
   _logger = logger;
-  CodeHolder_setGlobalOption(this, CodeGen::kOptionLoggingEnabled, opt);
+  CodeHolder_setGlobalOption(this, CodeEmitter::kOptionLoggingEnabled, opt);
 }
 #endif // !ASMJIT_DISABLE_LOGGING
 
@@ -412,7 +414,7 @@ Error CodeHolder::newLabelId(uint32_t& out) noexcept {
 }
 
 // ============================================================================
-// [asmjit::CodeGen - Relocate]
+// [asmjit::CodeEmitter - Relocate]
 // ============================================================================
 
 //! Encode MOD byte.

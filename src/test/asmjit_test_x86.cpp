@@ -21,7 +21,7 @@ using namespace asmjit;
 
 class MyErrorHandler : public ErrorHandler {
 public:
-  virtual bool handleError(Error err, const char* message, CodeGen* origin) {
+  virtual bool handleError(Error err, const char* message, CodeEmitter* origin) {
     fprintf(stderr, "ERROR: %s\n", message);
     return false;
   }
@@ -31,7 +31,7 @@ public:
 // [X86Test]
 // ============================================================================
 
-//! Interface used to test Compiler.
+//! Interface used to test CodeCompiler.
 class X86Test {
 public:
   X86Test(const char* name = NULL) { _name.setString(name); }
@@ -3290,19 +3290,19 @@ int X86TestSuite::run() {
   for (i = 0; i < count; i++) {
     JitRuntime runtime;
 
-    CodeHolder holder(runtime.getArchId());
-    holder.setErrorHandler(&errorHandler);
+    CodeHolder code(runtime.getArchId());
+    code.setErrorHandler(&errorHandler);
 
     if (alwaysPrintLog) {
       fprintf(file, "\n");
-      holder.setLogger(&fileLogger);
+      code.setLogger(&fileLogger);
     }
     else {
       stringLogger.clearString();
-      holder.setLogger(&stringLogger);
+      code.setLogger(&stringLogger);
     }
 
-    X86Compiler c(&holder);
+    X86Compiler c(&code);
     X86Test* test = tests[i];
     test->compile(c);
 
@@ -3310,7 +3310,7 @@ int X86TestSuite::run() {
     void* func;
 
     if (err == kErrorOk)
-      err = runtime.add(&func, &holder);
+      err = runtime.add(&func, &code);
     if (alwaysPrintLog) fflush(file);
 
     if (err == kErrorOk) {

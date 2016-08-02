@@ -408,12 +408,12 @@ public:
 //!
 //! Label represents a location in code typically used as a jump target, but
 //! may be also a reference to some data or a static variable. Label has to be
-//! explicitly created by `Assembler` or `AsmBuilder`.
+//! explicitly created by CodeEmitter.
 //!
 //! Example of using labels:
 //!
 //! ~~~
-//! // Create Assembler/Compiler.
+//! // Create a CodeEmitter (for example X86Assembler).
 //! X86Assembler a;
 //!
 //! // Create Label instance.
@@ -471,7 +471,7 @@ public:
   // [Label Specific]
   // --------------------------------------------------------------------------
 
-  //! Get whether the label has been initialized by `Assembler` or `Compiler`.
+  //! Get if the label was created by CodeEmitter and has an assigned id.
   ASMJIT_INLINE bool isValid() const noexcept { return _label.id != kInvalidValue; }
 
   // --------------------------------------------------------------------------
@@ -539,7 +539,7 @@ public:
   ASMJIT_INLINE bool isValid() const noexcept { return _reg.id != kInvalidValue; }
   //! Get if this is a physical register.
   ASMJIT_INLINE bool isPhysReg() const noexcept { return _reg.id < kInvalidReg; }
-  //! Get if this is a virtual register (used by \ref Compiler).
+  //! Get if this is a virtual register (used by \ref CodeCompiler).
   ASMJIT_INLINE bool isVirtReg() const noexcept { return isPackedId(_reg.id); }
 
   using Operand_::isReg;
@@ -669,8 +669,9 @@ public:
   //! Memory operand flags.
   ASMJIT_ENUM(Flags) {
     //! Memory operand BASE register is virtual-register's home location, not
-    //! the BASE register itself. This flag is designed for \ref Compiler. It
-    //! should lower such operands and clear the flag when done.
+    //! the BASE register itself. This flag is designed for \ref CodeCompiler,
+    //! which should lower such operands and clear the flag before it gets
+    //! used by \ref Assembler.
     kFlagIsRegHome = 0x80
   };
 
@@ -731,9 +732,9 @@ public:
     _init_packed_d2_d3(0, 0);
   }
 
-  //! Get if this `Mem` is a home of a variable or stack-allocated memory, used by Compiler.
+  //! Get if this `Mem` is a home of a variable or stack-allocated memory, used by \ref CodeCompiler.
   ASMJIT_INLINE bool isRegHome() const noexcept { return (_mem.flags & kFlagIsRegHome) != 0; }
-  //! Clear the reg-home bit, called by the \ref Compiler to finalize the operand.
+  //! Clear the reg-home bit, called by the \ref CodeCompiler to finalize the operand.
   ASMJIT_INLINE void clearRegHome() noexcept { _mem.flags &= ~kFlagIsRegHome; }
 
   //! Get if the memory operand has a BASE register or label specified.

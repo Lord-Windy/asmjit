@@ -12,7 +12,7 @@
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
-#include "../base/compiler.h"
+#include "../base/codecompiler.h"
 #include "../base/compilercontext_p.h"
 #include "../base/utils.h"
 #include "../x86/x86assembler.h"

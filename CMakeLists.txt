@@ -251,17 +251,17 @@ asmjit_add_source(ASMJIT_SRC asmjit
 asmjit_add_source(ASMJIT_SRC asmjit/base
   archinfo.cpp
   archinfo.h
-  asmbuilder.cpp
-  asmbuilder.h
   assembler.cpp
   assembler.h
   bitutils.h
-  codegen.cpp
-  codegen.h
+  codebuilder.cpp
+  codebuilder.h
+  codecompiler.cpp
+  codecompiler.h
+  codeemitter.cpp
+  codeemitter.h
   codeholder.cpp
   codeholder.h
-  compiler.cpp
-  compiler.h
   compilercontext.cpp
   compilercontext_p.h
   constpool.cpp

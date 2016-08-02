@@ -4,7 +4,7 @@ AsmJit
 Complete x86/x64 JIT and Remote Assembler for C++.
 
   * [Official Repository (asmjit/asmjit)](https://github.com/asmjit/asmjit)
-  * [Official Blog (asmbits)] (https://asmbits.blogspot.com/ncr)
+  * [Official Blog (asmbits)](https://asmbits.blogspot.com/ncr)
   * [Official Chat (gitter)](https://gitter.im/asmjit/asmjit)
   * [Permissive ZLIB license](./LICENSE.md)
 

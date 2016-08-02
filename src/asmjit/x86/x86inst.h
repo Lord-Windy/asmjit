@@ -1562,7 +1562,7 @@ struct X86Inst {
 
   //! X86/X64 instruction options.
   ASMJIT_ENUM(Options) {
-    // NOTE: Don't collide with bits used by CodeGen::kOptionReservedMask.
+    // NOTE: Don't collide with bits used by CodeEmitter::kOptionReservedMask.
 
     kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
     kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).

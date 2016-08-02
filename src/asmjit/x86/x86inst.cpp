@@ -3532,8 +3532,8 @@ Error X86Inst::validate(
   }
 
   // Decrease the number of operands of those that are none. This is important
-  // as Assembler and Compiler may just pass more operands where some of them
-  // are none (it means that no operand is given at that index). However,
+  // as Assembler and CodeCompiler may just pass more operands where some of
+  // them are none (it means that no operand is given at that index). However,
   // validate that there are no gaps (like [reg, none, reg] or [none, reg]).
   if (i < opCount) {
     while (--opCount > i)

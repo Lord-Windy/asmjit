@@ -187,7 +187,7 @@ public:
 // [asmjit::FileLogger]
 // ============================================================================
 
-//! Logger that can log to standard C `FILE*` stream.
+//! Logger that can log to a `FILE*` stream.
 class ASMJIT_VIRTAPI FileLogger : public Logger {
 public:
   ASMJIT_NO_COPY(FileLogger)
@@ -233,7 +233,7 @@ public:
 // [asmjit::StringLogger]
 // ============================================================================
 
-//! String logger.
+//! Logger that stores everything in an internal string buffer.
 class ASMJIT_VIRTAPI StringLogger : public Logger {
 public:
   ASMJIT_NO_COPY(StringLogger)

@@ -9,10 +9,10 @@
 #define _ASMJIT_BASE_ASSEMBLER_H
 
 // [Dependencies]
+#include "../base/codeemitter.h"
+#include "../base/codeholder.h"
 #include "../base/operand.h"
 #include "../base/simdtypes.h"
-#include "../base/codeholder.h"
-#include "../base/codegen.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -31,11 +31,11 @@ namespace asmjit {
 //! This class implements a base interface that is used by architecture
 //! specific assemblers.
 //!
-//! \sa Compiler.
-class ASMJIT_VIRTAPI Assembler : public CodeGen {
+//! \sa CodeCompiler.
+class ASMJIT_VIRTAPI Assembler : public CodeEmitter {
 public:
   ASMJIT_NO_COPY(Assembler)
-  typedef CodeGen Base;
+  typedef CodeEmitter Base;
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -50,8 +50,8 @@ public:
   // [Events]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error onAttach(CodeHolder* holder) noexcept override;
-  ASMJIT_API virtual Error onDetach(CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error onAttach(CodeHolder* code) noexcept override;
+  ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Code-Buffer]
@@ -65,19 +65,19 @@ public:
   //! Get the number of remaining bytes in the current CodeBuffer.
   ASMJIT_INLINE size_t getRemainingSpace() const noexcept { return (size_t)(_bufferEnd - _bufferPtr); }
 
-  //! Get the current position in the code-buffer.
+  //! Get the current position in the CodeBuffer.
   ASMJIT_INLINE size_t getOffset() const noexcept { return (size_t)(_bufferPtr - _bufferData); }
-  //! Set the current position in the code-buffer to `offset`.
+  //! Set the current position in the CodeBuffer to `offset`.
   //!
   //! NOTE: The `offset` cannot be outside of the buffer length (even if it's
   //! within buffer's capacity).
   ASMJIT_API Error setOffset(size_t offset);
 
-  //! Get start of the code-buffer of the current section.
+  //! Get start of the CodeBuffer of the current section.
   ASMJIT_INLINE uint8_t* getBufferData() const noexcept { return _bufferData; }
   //! Get end (first invalid byte) of the current section.
   ASMJIT_INLINE uint8_t* getBufferEnd() const noexcept { return _bufferEnd; }
-  //! Get pointer in the code-buffer of the current section.
+  //! Get pointer in the CodeBuffer of the current section.
   ASMJIT_INLINE uint8_t* getBufferPtr() const noexcept { return _bufferPtr; }
 
   // --------------------------------------------------------------------------
@@ -99,9 +99,9 @@ public:
   // --------------------------------------------------------------------------
 
   CodeHolder::SectionEntry* _section;    //!< Current section where the assembling happens.
-  uint8_t* _bufferData;                  //!< Start of the code-buffer of the current section.
+  uint8_t* _bufferData;                  //!< Start of the CodeBuffer of the current section.
   uint8_t* _bufferEnd;                   //!< End (first invalid byte) of the current section.
-  uint8_t* _bufferPtr;                   //!< Pointer in the code-buffer of the current section.
+  uint8_t* _bufferPtr;                   //!< Pointer in the CodeBuffer of the current section.
 };
 
 //! \}

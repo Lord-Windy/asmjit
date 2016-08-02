@@ -231,7 +231,6 @@ struct X86VEXPrefix_T {
     kValue = ((MM & 0x08) ? kX86ByteXop3 : kX86ByteVex3) | (0xF << 19) | (0x7 << 13)
   };
 };
-
 static const uint32_t x86VEXPrefix[16] = { R(X86VEXPrefix_T, 0) };
 
 // Table that contains LL opcode field addressed by a register size / 16. It's
@@ -375,9 +374,9 @@ static ASMJIT_INLINE uint32_t x86EncodeSib(uint32_t s, uint32_t i, uint32_t b) n
 // [asmjit::X86Assembler - Construction / Destruction]
 // ============================================================================
 
-X86Assembler::X86Assembler(CodeHolder* holder) noexcept : Assembler() {
-  if (holder)
-    holder->attach(this);
+X86Assembler::X86Assembler(CodeHolder* code) noexcept : Assembler() {
+  if (code)
+    code->attach(this);
 }
 X86Assembler::~X86Assembler() noexcept {}
 
@@ -385,18 +384,20 @@ X86Assembler::~X86Assembler() noexcept {}
 // [asmjit::X86Assembler - Events]
 // ============================================================================
 
-Error X86Assembler::onAttach(CodeHolder* holder) noexcept {
-  if (holder->getArchId() == ArchInfo::kIdX86) {
-    ASMJIT_PROPAGATE(Base::onAttach(holder));
+Error X86Assembler::onAttach(CodeHolder* code) noexcept {
+  if (code->getArchId() == ArchInfo::kIdX86) {
+    ASMJIT_PROPAGATE(Base::onAttach(code));
 
-    // Ban REX prefix globally.
+    _setAddressOverrideMask(kX86MemInfo_67H_X86);
     _globalOptions |= X86Inst::_kOptionInvalidRex;
     ::memcpy(&zax, &x86OpData.gpd, sizeof(Operand) * 8);
     return kErrorOk;
   }
 
-  if (holder->getArchId() == ArchInfo::kIdX64) {
-    ASMJIT_PROPAGATE(Base::onAttach(holder));
+  if (code->getArchId() == ArchInfo::kIdX64) {
+    ASMJIT_PROPAGATE(Base::onAttach(code));
+
+    _setAddressOverrideMask(kX86MemInfo_67H_X64);
     ::memcpy(&zax, &x86OpData.gpq, sizeof(Operand) * 8);
     return kErrorOk;
   }
@@ -404,7 +405,7 @@ Error X86Assembler::onAttach(CodeHolder* holder) noexcept {
   return DebugUtils::errored(kErrorInvalidArch);
 }
 
-Error X86Assembler::onDetach(CodeHolder* holder) noexcept {
+Error X86Assembler::onDetach(CodeHolder* code) noexcept {
   zax.reset();
   zbx.reset();
   zcx.reset();
@@ -414,7 +415,7 @@ Error X86Assembler::onDetach(CodeHolder* holder) noexcept {
   zsi.reset();
   zdi.reset();
 
-  return Base::onDetach(holder);
+  return Base::onDetach(code);
 }
 
 // ============================================================================
@@ -424,7 +425,7 @@ Error X86Assembler::onDetach(CodeHolder* holder) noexcept {
 Error X86Assembler::align(uint32_t mode, uint32_t alignment) {
 #if !defined(ASMJIT_DISABLE_LOGGING)
   if (_globalOptions & kOptionLoggingEnabled)
-    _holder->_logger->logf("%s.align %u\n", _holder->_logger->getIndentation(), alignment);
+    _code->_logger->logf("%s.align %u\n", _code->_logger->getIndentation(), alignment);
 #endif // !ASMJIT_DISABLE_LOGGING
 
   if (mode > kAlignZero)
@@ -441,7 +442,7 @@ Error X86Assembler::align(uint32_t mode, uint32_t alignment) {
     return kErrorOk;
 
   if (getRemainingSpace() < i) {
-    Error err = _holder->growBuffer(&_section->buffer, i);
+    Error err = _code->growBuffer(&_section->buffer, i);
     if (ASMJIT_UNLIKELY(err)) return setLastError(err);
   }
 
@@ -503,9 +504,9 @@ static void X86Assembler_logInstruction(X86Assembler* self,
   uint32_t instId, uint32_t options, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3,
   uint32_t dispSize, uint32_t imLen, uint8_t* afterCursor) {
 
-  Logger* logger = self->_holder->getLogger();
+  Logger* logger = self->_code->getLogger();
   ASMJIT_ASSERT(logger != nullptr);
-  ASMJIT_ASSERT(options & CodeGen::kOptionLoggingEnabled);
+  ASMJIT_ASSERT(options & CodeEmitter::kOptionLoggingEnabled);
 
   StringBuilderTmp<256> sb;
   uint32_t logOptions = logger->getOptions();
@@ -522,8 +523,8 @@ static void X86Assembler_logInstruction(X86Assembler* self,
   opArray[3].copyFrom(o3);
   opArray[4].copyFrom(self->_op4);
   opArray[5].copyFrom(self->_op5);
-  if (!(options & CodeGen::kOptionHasOp4)) opArray[4].reset();
-  if (!(options & CodeGen::kOptionHasOp5)) opArray[5].reset();
+  if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
+  if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
   self->_formatter.formatInstruction(sb, logOptions, instId, options, self->_opMask, opArray, 6);
 
@@ -551,8 +552,8 @@ static Error X86Assembler_failedInstruction(
   opArray[3].copyFrom(o3);
   opArray[4].copyFrom(self->_op4);
   opArray[5].copyFrom(self->_op5);
-  if (!(options & CodeGen::kOptionHasOp4)) opArray[4].reset();
-  if (!(options & CodeGen::kOptionHasOp5)) opArray[5].reset();
+  if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
+  if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
   self->_formatter.formatInstruction(sb, 0, instId, options, self->_opMask, opArray, 6);
 
@@ -586,8 +587,8 @@ static Error X86Assembler_validateInstruction(
   opArray[3].copyFrom(o3);
   opArray[4].copyFrom(self->_op4);
   opArray[5].copyFrom(self->_op5);
-  if (!(options & CodeGen::kOptionHasOp4)) opArray[4].reset();
-  if (!(options & CodeGen::kOptionHasOp5)) opArray[5].reset();
+  if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
+  if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
   Error err = X86Inst::validate(self->getArchId(), instId, options, self->getOpMask(), opArray, 6);
   if (err) return X86Assembler_failedInstruction(self, err, instId, options, o0, o1, o2, o3);
@@ -685,10 +686,6 @@ static Error X86Assembler_validateInstruction(
 #define ENC_OPS5(OP0, OP1, OP2, OP3, OP4) ((Operand::kOp##OP0) + ((Operand::kOp##OP1) << 3) + ((Operand::kOp##OP2) << 6) + ((Operand::kOp##OP3) << 9) + ((Operand::kOp##OP4) << 12))
 
 Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) {
-  uint8_t* cursor = _bufferPtr;
-  uint32_t options = static_cast<uint32_t>(instId >= X86Inst::_kIdCount) |
-                     static_cast<uint32_t>((size_t)(_bufferEnd - cursor) < 16);
-
   const X86Mem* rmMem;           // Memory operand.
   uint32_t rmInfo;               // Memory operand's info based on x86MemInfo.
   uint32_t rbReg;                // Memory base or modRM register.
@@ -704,25 +701,22 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
   int64_t imVal;                 // Immediate value (must be 64-bit).
   FastUInt8 imLen = 0;           // Immediate length.
 
-  // Check to emit address-override (67H) based on the `rmInfo`.
-  // TODO: Could this be more optimized?
-  const uint32_t k67HOverrideBit =
-    getArchId() == ArchInfo::kIdX86
-      ? kX86MemInfo_67H_X86
-      : kX86MemInfo_67H_X64;
-
   const uint32_t kSHR_W_PP = X86Inst::kOpCode_PP_Shift - 16;
   const uint32_t kSHR_W_EW = X86Inst::kOpCode_EW_Shift - 23;
+
+  uint8_t* cursor = _bufferPtr;
+  uint32_t options = static_cast<uint32_t>(instId >= X86Inst::_kIdCount)       |
+                     static_cast<uint32_t>((size_t)(_bufferEnd - cursor) < 16) |
+                     getGlobalOptions() | getOptions();
+
 
   const X86Inst* iData = _x86InstData + instId;
   const X86Inst::ExtendedData* iExtData;
 
-  options |= getGlobalOptions() | getOptions();
-
   // Handle failure and rare cases first.
   const uint32_t kErrorsAndSpecialCases =
-    CodeGen::kOptionMaybeFailureCase | // Error / Buffer check.
-    CodeGen::kOptionStrictValidation | // Strict validation.
+    CodeEmitter::kOptionMaybeFailureCase | // Error / Buffer check.
+    CodeEmitter::kOptionStrictValidation | // Strict validation.
     X86Inst::kOptionLock;              // LOCK prefix check.
 
   // Signature of the first 3 operands. Instructions that use more operands
@@ -733,14 +727,14 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
     // Don't do anything if we are in error state.
     if (_lastError) return _lastError;
 
-    if (options & CodeGen::kOptionMaybeFailureCase) {
+    if (options & CodeEmitter::kOptionMaybeFailureCase) {
       // Unknown instruction.
       if (instId >= X86Inst::_kIdCount)
         goto UnknownInstruction;
 
       // Grow request, happens rarely.
       if ((size_t)(_bufferEnd - cursor) < 16) {
-        Error err = _holder->growBuffer(&_section->buffer, 16);
+        Error err = _code->growBuffer(&_section->buffer, 16);
         if (ASMJIT_UNLIKELY(err))
           return X86Assembler_failedInstruction(this, err, instId, options, o0, o1, o2, o3);
         cursor = _bufferPtr;
@@ -750,7 +744,7 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
     // Strict validation.
 #if !defined(ASMJIT_DISABLE_VALIDATION)
     // It calls `X86Assembler_failedInstruction` on error, no need to call it.
-    if (options & CodeGen::kOptionStrictValidation)
+    if (options & CodeEmitter::kOptionStrictValidation)
       ASMJIT_PROPAGATE(X86Assembler_validateInstruction(this, instId, options, o0, o1, o2, o3));
 #endif // !ASMJIT_DISABLE_VALIDATION
 
@@ -1097,7 +1091,7 @@ CaseX86M_OptB_MulDiv:
       }
 
       if (isign3 == ENC_OPS1(Label)) {
-        label = _holder->getLabelEntry(static_cast<const Label&>(o0));
+        label = _code->getLabelEntry(static_cast<const Label&>(o0));
         if (!label) goto InvalidLabel;
 
         if (label->offset != -1) {
@@ -1335,10 +1329,10 @@ CaseX86M_OptB_MulDiv:
 
     case X86Inst::kEncodingX86Jcc:
       if (isign3 == ENC_OPS1(Label)) {
-        label = _holder->getLabelEntry(static_cast<const Label&>(o0));
+        label = _code->getLabelEntry(static_cast<const Label&>(o0));
         if (!label) goto InvalidLabel;
 
-        if (_globalHints & CodeGen::kHintPredictedJumps) {
+        if (_globalHints & CodeEmitter::kHintPredictedJumps) {
           if (options & X86Inst::kOptionTaken)
             EMIT_BYTE(0x3E);
           if (options & X86Inst::kOptionNotTaken)
@@ -1395,7 +1389,7 @@ CaseX86M_OptB_MulDiv:
         if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdCx))
           goto IllegalInstruction;
 
-        label = _holder->getLabelEntry(static_cast<const Label&>(o1));
+        label = _code->getLabelEntry(static_cast<const Label&>(o1));
         if (!label) goto InvalidLabel;
 
         if ((getArchId() == ArchInfo::kIdX86 && o0.getSize() == 2) ||
@@ -1443,7 +1437,7 @@ CaseX86M_OptB_MulDiv:
       }
 
       if (isign3 == ENC_OPS1(Label)) {
-        label = _holder->getLabelEntry(static_cast<const Label&>(o0));
+        label = _code->getLabelEntry(static_cast<const Label&>(o0));
         if (!label) goto InvalidLabel;
 
         if (label->offset != -1) {
@@ -3308,7 +3302,7 @@ CaseVexRmMr_AfterRegReg:
     }
 
     case X86Inst::kEncodingVexRvrmiRvmri_Lx: {
-      if (!(options & CodeGen::kOptionHasOp4) || !_op4.isImm())
+      if (!(options & CodeEmitter::kOptionHasOp4) || !_op4.isImm())
         goto IllegalInstruction;
 
       const uint32_t isign4 = isign3 + (o3.getOp() << 9);
@@ -3471,9 +3465,9 @@ EmitX86R:
                    ((opReg & 0x08) >> 1) | // REX.R (0x04).
                    ((rbReg       ) >> 3) ; // REX.B (0x01).
     if (rex) {
-      EMIT_BYTE(rex | kX86ByteRex);
       if (options & X86Inst::_kOptionInvalidRex)
         goto IllegalInstruction;
+      EMIT_BYTE(rex | kX86ByteRex);
       opReg &= 0x07;
       rbReg &= 0x07;
     }
@@ -3498,7 +3492,7 @@ EmitX86M:
   ASMJIT_ASSERT((opCode & X86Inst::kOpCode_CDOff_Mask) == 0);
 
   // Address-override prefix.
-  if (ASMJIT_UNLIKELY(rmInfo & k67HOverrideBit))
+  if (ASMJIT_UNLIKELY(rmInfo & _getAddressOverrideMask()))
     EMIT_BYTE(0x67);
 
   // Segment override prefix.
@@ -3523,9 +3517,9 @@ EmitX86M:
     rex |= x86ExtractREX(opCode, options);
 
     if (rex) {
-      EMIT_BYTE(rex | kX86ByteRex);
       if (options & X86Inst::_kOptionInvalidRex)
         goto IllegalInstruction;
+      EMIT_BYTE(rex | kX86ByteRex);
       opReg &= 0x07;
     }
   }
@@ -3603,22 +3597,22 @@ EmitModSib_LabelRip_X86:
         dispOffset = rmMem->getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
           // [LABEL->ABS].
-          label = _holder->getLabelEntry(rmMem->getBaseId());
+          label = _code->getLabelEntry(rmMem->getBaseId());
           if (!label) goto InvalidLabel;
 
-          relocId = _holder->_relocations.getLength();
+          relocId = _code->_relocations.getLength();
           CodeHolder::RelocEntry re;
           re.type = kRelocRelToAbs;
           re.size = 4;
           re.from = static_cast<uint64_t>((uintptr_t)(cursor - _bufferData));
           re.data = static_cast<int64_t>(dispOffset);
 
-          if (_holder->_relocations.append(re) != kErrorOk)
+          if (_code->_relocations.append(re) != kErrorOk)
             return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
           if (label->offset != -1) {
             // Bound label.
-            _holder->_relocations[relocId].data += static_cast<int64_t>(label->offset);
+            _code->_relocations[relocId].data += static_cast<int64_t>(label->offset);
             EMIT_DWORD(0);
           }
           else {
@@ -3630,7 +3624,7 @@ EmitModSib_LabelRip_X86:
         }
         else {
           // [RIP->ABS].
-          relocId = _holder->_relocations.getLength();
+          relocId = _code->_relocations.getLength();
 
           CodeHolder::RelocEntry re;
           re.type = kRelocRelToAbs;
@@ -3638,7 +3632,7 @@ EmitModSib_LabelRip_X86:
           re.from = static_cast<uint64_t>((uintptr_t)(cursor - _bufferData));
           re.data = re.from + static_cast<int64_t>(dispOffset);
 
-          if (_holder->_relocations.append(re) != kErrorOk)
+          if (_code->_relocations.append(re) != kErrorOk)
             return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
           EMIT_DWORD(0);
@@ -3649,7 +3643,7 @@ EmitModSib_LabelRip_X64:
         dispOffset = rmMem->getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
           // [RIP].
-          label = _holder->getLabelEntry(rmMem->getBaseId());
+          label = _code->getLabelEntry(rmMem->getBaseId());
           if (!label) goto InvalidLabel;
 
           dispOffset -= (4 + imLen);
@@ -3803,11 +3797,11 @@ EmitVexEvexR:
     opReg &= 0x7;
 
     // Handle {k} and {kz} by a single branch.
-    if (options & (CodeGen::kOptionHasOpMask | X86Inst::kOptionEvexZero)) {
+    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionEvexZero)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything should be zeroed. It's valid EVEX.
-      if (options & CodeGen::kOptionHasOpMask) x |= _opMask.getId() << 16;
+      if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
       x |= options & X86Inst::kOptionEvexZero;           // [........|zLL..aaa|Vvvvv..R|RBBmmmmm].
     }
 
@@ -3878,7 +3872,7 @@ EmitVexEvexM:
   rmInfo = x86MemInfo[rmMem->getBaseIndexType()];
 
   // Address-override prefix.
-  if (ASMJIT_UNLIKELY(rmInfo & k67HOverrideBit))
+  if (ASMJIT_UNLIKELY(rmInfo & _getAddressOverrideMask()))
     EMIT_BYTE(0x67);
 
   // Segment override prefix.
@@ -3901,11 +3895,11 @@ EmitVexEvexM:
     opReg &= 0x07U;
 
     // Handle {k}, {kz}, {1tox} by a single branch.
-    if (options & (CodeGen::kOptionHasOpMask | X86Inst::kOptionEvex1ToX | X86Inst::kOptionEvexZero)) {
+    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionEvex1ToX | X86Inst::kOptionEvexZero)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything would be zeroed. It's a valid EVEX.
-      if (options & CodeGen::kOptionHasOpMask) x |= _opMask.getId() << 16;
+      if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
 
       x |= options & (X86Inst::kOptionEvex1ToX |         // [........|.LLbXaaa|Vvvvv..R|RXBmmmmm].
                       X86Inst::kOptionEvexZero );        // [........|zLLbXaaa|Vvvvv..R|RXBmmmmm].
@@ -4003,7 +3997,7 @@ EmitJmpOrCallAbs:
     uint32_t trampolineSize = 0;
 
     if (getArchId() == ArchInfo::kIdX64) {
-      uint64_t baseAddress = _holder->getBaseAddress();
+      uint64_t baseAddress = _code->getBaseAddress();
 
       // If the base address of the output is known, it's possible to determine
       // the need for a trampoline here. This saves possible REX prefix in
@@ -4025,11 +4019,11 @@ EmitJmpOrCallAbs:
     EMIT_BYTE(opCode);
     EMIT_DWORD(0);
 
-    if (_holder->_relocations.append(re) != kErrorOk)
+    if (_code->_relocations.append(re) != kErrorOk)
       return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
     // Reserve space for a possible trampoline.
-    _holder->_trampolinesSize += trampolineSize;
+    _code->_trampolinesSize += trampolineSize;
   }
   goto EmitDone;
 
@@ -4043,7 +4037,7 @@ EmitDisplacement:
     ASMJIT_ASSERT(dispSize == 1 || dispSize == 4);
 
     // Chain with label.
-    CodeHolder::LabelLink* link = _holder->newLabelLink();
+    CodeHolder::LabelLink* link = _code->newLabelLink();
     // TODO: nullcheck.
     link->prev = label->links;
     link->offset = (intptr_t)(cursor - _bufferData);
@@ -4101,7 +4095,7 @@ EmitImm:
 EmitDone:
 #if !defined(ASMJIT_DISABLE_LOGGING)
   // Logging is a performance hit anyway, so make it the unlikely case.
-  if (ASMJIT_UNLIKELY(options & CodeGen::kOptionLoggingEnabled))
+  if (ASMJIT_UNLIKELY(options & CodeEmitter::kOptionLoggingEnabled))
     X86Assembler_logInstruction(this, instId, options, o0, o1, o2, o3, dispSize, imLen, cursor);
 #endif // !ASMJIT_DISABLE_LOGGING
 

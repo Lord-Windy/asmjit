@@ -24,8 +24,8 @@ namespace asmjit {
 // [asmjit::RAContext - Construction / Destruction]
 // ============================================================================
 
-RAContext::RAContext(Compiler* compiler) :
-  _holder(compiler->getHolder()),
+RAContext::RAContext(CodeCompiler* compiler) :
+  _code(compiler->getCode()),
   _compiler(compiler),
   _tmpAllocator(8192 - Zone::kZoneOverhead),
   _traceNode(nullptr),
@@ -268,16 +268,16 @@ Error RAContext::resolveCellOffsets() {
 // ============================================================================
 
 Error RAContext::removeUnreachableCode() {
-  Compiler* compiler = getCompiler();
+  CodeCompiler* compiler = getCompiler();
 
-  PodList<AsmNode*>::Link* link = _unreachableList.getFirst();
-  AsmNode* stop = getStop();
+  PodList<CBNode*>::Link* link = _unreachableList.getFirst();
+  CBNode* stop = getStop();
 
   while (link) {
-    AsmNode* node = link->getValue();
+    CBNode* node = link->getValue();
     if (node && node->getPrev() && node != stop) {
       // Locate all unreachable nodes.
-      AsmNode* first = node;
+      CBNode* first = node;
       do {
         if (node->hasWorkData())
           break;
@@ -286,7 +286,7 @@ Error RAContext::removeUnreachableCode() {
 
       // Remove unreachable nodes that are neither informative nor directives.
       if (node != first) {
-        AsmNode* end = node;
+        CBNode* end = node;
         node = first;
 
         // NOTE: The strategy is as follows:
@@ -294,7 +294,7 @@ Error RAContext::removeUnreachableCode() {
         // 2. After the first label is found it removes only removable nodes.
         bool removeEverything = true;
         do {
-          AsmNode* next = node->getNext();
+          CBNode* next = node->getNext();
           bool remove = node->isRemovable();
 
           if (!remove) {
@@ -328,8 +328,8 @@ Error RAContext::removeUnreachableCode() {
 //! \internal
 struct LivenessTarget {
   LivenessTarget* prev;  //!< Previous target.
-  AsmLabel* node;        //!< Target node.
-  AsmJump* from;         //!< Jumped from.
+  CBLabel* node;        //!< Target node.
+  CBJump* from;         //!< Jumped from.
 };
 
 Error RAContext::livenessAnalysis() {
@@ -340,16 +340,16 @@ Error RAContext::livenessAnalysis() {
   if (bLen == 0)
     return kErrorOk;
 
-  AsmFunc* func = getFunc();
-  AsmJump* from = nullptr;
+  CCFunc* func = getFunc();
+  CBJump* from = nullptr;
 
   LivenessTarget* ltCur = nullptr;
   LivenessTarget* ltUnused = nullptr;
 
-  PodList<AsmNode*>::Link* retPtr = _returningList.getFirst();
+  PodList<CBNode*>::Link* retPtr = _returningList.getFirst();
   ASMJIT_ASSERT(retPtr != nullptr);
 
-  AsmNode* node = retPtr->getValue();
+  CBNode* node = retPtr->getValue();
   RAData* wd;
 
   size_t varMapToVaListOffset = _varMapToVaListOffset;
@@ -395,7 +395,7 @@ Visit:
       }
     }
 
-    if (node->getType() == AsmNode::kNodeLabel)
+    if (node->getType() == CBNode::kNodeLabel)
       goto Target;
 
     if (node == func)
@@ -413,14 +413,14 @@ Patch:
 
     BitArray* bNode = node->getWorkData<RAData>()->liveness;
     if (!bNode->_addBitsDelSource(bCur, bLen)) goto Done;
-    if (node->getType() == AsmNode::kNodeLabel) goto Target;
+    if (node->getType() == CBNode::kNodeLabel) goto Target;
 
     if (node == func) goto Done;
     node = node->getPrev();
   }
 
 Target:
-  if (static_cast<AsmLabel*>(node)->getNumRefs() != 0) {
+  if (static_cast<CBLabel*>(node)->getNumRefs() != 0) {
     // Push a new LivenessTarget onto the stack if needed.
     if (!ltCur || ltCur->node != node) {
       // Allocate a new LivenessTarget object (from pool or zone).
@@ -437,10 +437,10 @@ Target:
 
       // Initialize and make current - ltTmp->from will be set later on.
       ltTmp->prev = ltCur;
-      ltTmp->node = static_cast<AsmLabel*>(node);
+      ltTmp->node = static_cast<CBLabel*>(node);
       ltCur = ltTmp;
 
-      from = static_cast<AsmLabel*>(node)->getFrom();
+      from = static_cast<CBLabel*>(node)->getFrom();
       ASMJIT_ASSERT(from != nullptr);
     }
     else {
@@ -510,7 +510,7 @@ NoMem:
 // [asmjit::RAContext - Annotate]
 // ============================================================================
 
-Error RAContext::formatInlineComment(StringBuilder& dst, AsmNode* node) {
+Error RAContext::formatInlineComment(StringBuilder& dst, CBNode* node) {
 #if !defined(ASMJIT_DISABLE_LOGGING)
   RAData* wd = node->getWorkData<RAData>();
 
@@ -581,9 +581,9 @@ void RAContext::cleanup() {
 // [asmjit::RAContext - CompileFunc]
 // ============================================================================
 
-Error RAContext::compile(AsmFunc* func) {
-  AsmNode* end = func->getEnd();
-  AsmNode* stop = end->getNext();
+Error RAContext::compile(CCFunc* func) {
+  CBNode* end = func->getEnd();
+  CBNode* stop = end->getNext();
 
   _func = func;
   _stop = stop;
@@ -593,10 +593,10 @@ Error RAContext::compile(AsmFunc* func) {
   ASMJIT_PROPAGATE(removeUnreachableCode());
   ASMJIT_PROPAGATE(livenessAnalysis());
 
-  Compiler* compiler = getCompiler();
+  CodeCompiler* compiler = getCompiler();
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-  if (compiler->getHolder()->hasLogger())
+  if (compiler->getCode()->hasLogger())
     ASMJIT_PROPAGATE(annotate());
 #endif // !ASMJIT_DISABLE_LOGGING
 

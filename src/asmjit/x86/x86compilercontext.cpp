@@ -47,13 +47,13 @@ static ASMJIT_INLINE uint32_t x86TypeIdToClass(uint32_t typeId) noexcept {
 #if !defined(ASMJIT_DISABLE_LOGGING)
 static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOptions, const Reg& r, void* handlerData) noexcept {
   X86Context* self = static_cast<X86Context*>(handlerData);
-  X86Compiler* c = self->getCompiler();
+  X86Compiler* cc = self->getCompiler();
 
   uint32_t id = r.getId();
-  if (!c->isVirtRegValid(id))
+  if (!cc->isVirtRegValid(id))
     return DebugUtils::errored(kErrorInvalidState);
 
-  VirtReg* vreg = c->getVirtRegById(id);
+  VirtReg* vreg = cc->getVirtRegById(id);
   ASMJIT_ASSERT(vreg != nullptr);
 
   const char* name = vreg->getName();
@@ -70,32 +70,32 @@ static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOpti
 #endif // !ASMJIT_DISABLE_LOGGING
 
 #if defined(ASMJIT_TRACE)
-static void ASMJIT_CDECL X86Context_traceNode(X86Context* self, AsmNode* node_, const char* prefix) {
+static void ASMJIT_CDECL X86Context_traceNode(X86Context* self, CBNode* node_, const char* prefix) {
   StringBuilderTmp<256> sb;
 
   switch (node_->getType()) {
-    case AsmNode::kNodeAlign: {
-      AsmAlign* node = static_cast<AsmAlign*>(node_);
+    case CBNode::kNodeAlign: {
+      CBAlign* node = static_cast<CBAlign*>(node_);
       sb.appendFormat(".align %u (%s)",
         node->getAlignment(),
         node->getMode() == kAlignCode ? "code" : "data");
       break;
     }
 
-    case AsmNode::kNodeData: {
-      AsmData* node = static_cast<AsmData*>(node_);
+    case CBNode::kNodeData: {
+      CBData* node = static_cast<CBData*>(node_);
       sb.appendFormat(".embed (%u bytes)", node->getSize());
       break;
     }
 
-    case AsmNode::kNodeComment: {
-      AsmComment* node = static_cast<AsmComment*>(node_);
+    case CBNode::kNodeComment: {
+      CBComment* node = static_cast<CBComment*>(node_);
       sb.appendFormat("; %s", node->getComment());
       break;
     }
 
-    case AsmNode::kNodeHint: {
-      AsmHint* node = static_cast<AsmHint*>(node_);
+    case CBNode::kNodeHint: {
+      CCHint* node = static_cast<CCHint*>(node_);
       static const char* hint[16] = {
         "alloc",
         "spill",
@@ -108,14 +108,14 @@ static void ASMJIT_CDECL X86Context_traceNode(X86Context* self, AsmNode* node_, 
       break;
     }
 
-    case AsmNode::kNodeLabel: {
-      AsmLabel* node = static_cast<AsmLabel*>(node_);
+    case CBNode::kNodeLabel: {
+      CBLabel* node = static_cast<CBLabel*>(node_);
       sb.appendFormat("L%u: (NumRefs=%u)", Operand::labelIndexFromId(node->getId()), node->getNumRefs());
       break;
     }
 
-    case AsmNode::kNodeInst: {
-      AsmInst* node = static_cast<AsmInst*>(node_);
+    case CBNode::kNodeInst: {
+      CBInst* node = static_cast<CBInst*>(node_);
       self->_formatter.formatInstruction(sb, 0,
         node->getInstId(),
         node->getOptions(),
@@ -124,32 +124,32 @@ static void ASMJIT_CDECL X86Context_traceNode(X86Context* self, AsmNode* node_, 
       break;
     }
 
-    case AsmNode::kNodeSentinel: {
-      AsmSentinel* node = static_cast<AsmSentinel*>(node_);
+    case CBNode::kNodeSentinel: {
+      CBSentinel* node = static_cast<CBSentinel*>(node_);
       sb.appendFormat("[end]");
       break;
     }
 
-    case AsmNode::kNodeFunc: {
-      AsmFunc* node = static_cast<AsmFunc*>(node_);
+    case CBNode::kNodeFunc: {
+      CCFunc* node = static_cast<CCFunc*>(node_);
       sb.appendFormat("[func]");
       break;
     }
 
-    case AsmNode::kNodeFuncExit: {
-      AsmFuncRet* node = static_cast<AsmFuncRet*>(node_);
+    case CBNode::kNodeFuncExit: {
+      CCFuncRet* node = static_cast<CCFuncRet*>(node_);
       sb.appendFormat("[ret]");
       break;
     }
 
-    case AsmNode::kNodeCall: {
-      AsmCall* node = static_cast<AsmCall*>(node_);
+    case CBNode::kNodeCall: {
+      CCFuncCall* node = static_cast<CCFuncCall*>(node_);
       sb.appendFormat("[call]");
       break;
     }
 
-    case AsmNode::kNodePushArg: {
-      AsmPushArg* node = static_cast<AsmPushArg*>(node_);
+    case CBNode::kNodePushArg: {
+      CCPushArg* node = static_cast<CCPushArg*>(node_);
       sb.appendFormat("[sarg]");
       break;
     }
@@ -185,7 +185,7 @@ X86Context::X86Context(X86Compiler* compiler) : RAContext(compiler) {
 #endif // ASMJIT_TRACE
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-  _emitComments = (compiler->getGlobalOptions() & CodeGen::kOptionLoggingEnabled) != 0;
+  _emitComments = (compiler->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
   _formatter.setVirtRegHandler(X86VirtRegHandler, this);
 #endif // !ASMJIT_DISABLE_LOGGING
 
@@ -1455,7 +1455,7 @@ void X86Context::intersectStates(RAState* a_, RAState* b_) {
 // ============================================================================
 
 //! \internal
-static ASMJIT_INLINE AsmNode* X86Context_getJccFlow(AsmJump* jNode) {
+static ASMJIT_INLINE CBNode* X86Context_getJccFlow(CBJump* jNode) {
   if (jNode->isTaken())
     return jNode->getTarget();
   else
@@ -1463,7 +1463,7 @@ static ASMJIT_INLINE AsmNode* X86Context_getJccFlow(AsmJump* jNode) {
 }
 
 //! \internal
-static ASMJIT_INLINE AsmNode* X86Context_getOppositeJccFlow(AsmJump* jNode) {
+static ASMJIT_INLINE CBNode* X86Context_getOppositeJccFlow(CBJump* jNode) {
   if (jNode->isTaken())
     return jNode->getNext();
   else
@@ -1533,7 +1533,7 @@ static ASMJIT_INLINE X86RegMask X86Context_getUsedArgs(X86Context* self, X86Call
 struct SArgData {
   VirtReg* sVd;
   VirtReg* cVd;
-  AsmPushArg* sArg;
+  CCPushArg* sArg;
   uint32_t aType;
 };
 
@@ -1639,7 +1639,7 @@ static ASMJIT_INLINE Error X86Context_insertPushArg(
     VirtReg* cReg = compiler->newVirtReg(cInfo, nullptr);
     if (!cReg) return DebugUtils::errored(kErrorNoHeapMemory);
 
-    AsmPushArg* sArg = compiler->newNodeT<AsmPushArg>(call, sReg, cReg);
+    CCPushArg* sArg = compiler->newNodeT<CCPushArg>(call, sReg, cReg);
     if (!sArg) return DebugUtils::errored(kErrorNoHeapMemory);
 
     X86RAData* raData = self->newRAData(2);
@@ -1684,11 +1684,11 @@ static ASMJIT_INLINE Error X86Context_insertPushArg(
     return kErrorOk;
   }
   else {
-    AsmPushArg* sArg = sArgData->sArg;
+    CCPushArg* sArg = sArgData->sArg;
     ASMJIT_PROPAGATE(self->makeLocal(sReg));
 
     if (!sArg) {
-      sArg = compiler->newNodeT<AsmPushArg>(call, sReg, (VirtReg*)nullptr);
+      sArg = compiler->newNodeT<CCPushArg>(call, sReg, (VirtReg*)nullptr);
       if (!sArg) return DebugUtils::errored(kErrorNoHeapMemory);
 
       X86RAData* raData = self->newRAData(1);
@@ -1733,15 +1733,15 @@ Error X86Context::fetch() {
 
   uint32_t archId = compiler->getArchId();
 
-  AsmNode* node_ = func;
-  AsmNode* next = nullptr;
-  AsmNode* stop = getStop();
+  CBNode* node_ = func;
+  CBNode* next = nullptr;
+  CBNode* stop = getStop();
 
   TiedReg agTmp[80];
   SArgData sArgList[80];
 
   uint32_t flowId = 0;
-  PodList<AsmNode*>::Link* jLink = nullptr;
+  PodList<CBNode*>::Link* jLink = nullptr;
 
   // Function flags.
   func->clearFuncFlags(kFuncFlagIsNaked   |
@@ -1873,7 +1873,7 @@ _NextGroup:
         jLink = jLink->getNext();
 
       if (!jLink) goto _Done;
-      node_ = X86Context_getOppositeJccFlow(static_cast<AsmJump*>(jLink->getValue()));
+      node_ = X86Context_getOppositeJccFlow(static_cast<CBJump*>(jLink->getValue()));
     }
 
     flowId++;
@@ -1887,8 +1887,8 @@ _NextGroup:
       // [Align/Embed]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeAlign:
-      case AsmNode::kNodeData:
+      case CBNode::kNodeAlign:
+      case CBNode::kNodeData:
       default:
         RA_POPULATE(node_);
         break;
@@ -1897,13 +1897,13 @@ _NextGroup:
       // [Hint]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeHint: {
-        AsmHint* node = static_cast<AsmHint*>(node_);
+      case CBNode::kNodeHint: {
+        CCHint* node = static_cast<CCHint*>(node_);
         RA_DECLARE();
 
-        if (node->getHint() == AsmHint::kHintAlloc) {
+        if (node->getHint() == CCHint::kHintAlloc) {
           uint32_t remain[X86Reg::_kClassManagedCount];
-          AsmHint* cur = node;
+          CCHint* cur = node;
 
           remain[X86Reg::kClassGp ] = _regCount.getGp() - 1 - func->hasFuncFlag(kFuncFlagIsNaked);
           remain[X86Reg::kClassMm ] = _regCount.getMm();
@@ -1947,8 +1947,8 @@ _NextGroup:
             if (cur != node)
               compiler->removeNode(cur);
 
-            cur = static_cast<AsmHint*>(node->getNext());
-            if (!cur || cur->getType() != AsmNode::kNodeHint || cur->getHint() != AsmHint::kHintAlloc)
+            cur = static_cast<CCHint*>(node->getNext());
+            if (!cur || cur->getType() != CBNode::kNodeHint || cur->getHint() != CCHint::kHintAlloc)
               break;
           }
 
@@ -1960,10 +1960,10 @@ _NextGroup:
 
           uint32_t flags = 0;
           switch (node->getHint()) {
-            case AsmHint::kHintSpill       : flags = TiedReg::kRMem | TiedReg::kSpill; break;
-            case AsmHint::kHintSave        : flags = TiedReg::kRMem                  ; break;
-            case AsmHint::kHintSaveAndUnuse: flags = TiedReg::kRMem | TiedReg::kUnuse; break;
-            case AsmHint::kHintUnuse       : flags = TiedReg::kUnuse                 ; break;
+            case CCHint::kHintSpill       : flags = TiedReg::kRMem | TiedReg::kSpill; break;
+            case CCHint::kHintSave        : flags = TiedReg::kRMem                  ; break;
+            case CCHint::kHintSaveAndUnuse: flags = TiedReg::kRMem | TiedReg::kUnuse; break;
+            case CCHint::kHintUnuse       : flags = TiedReg::kUnuse                 ; break;
           }
           RA_INSERT(vreg, tied, flags, 0);
         }
@@ -1976,7 +1976,7 @@ _NextGroup:
       // [Label]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeLabel: {
+      case CBNode::kNodeLabel: {
         RA_POPULATE(node_);
         if (node_ == func->getExitNode()) {
           ASMJIT_PROPAGATE(addReturningNode(node_));
@@ -1989,8 +1989,8 @@ _NextGroup:
       // [Inst]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeInst: {
-        AsmInst* node = static_cast<AsmInst*>(node_);
+      case CBNode::kNodeInst: {
+        CBInst* node = static_cast<CBInst*>(node_);
 
         uint32_t instId = node->getInstId();
         uint32_t flags = node->getFlags();
@@ -2005,10 +2005,10 @@ _NextGroup:
 
           // Collect instruction flags and merge all 'TiedReg's.
           if (extendedData.isFp())
-            flags |= AsmNode::kFlagIsFp;
+            flags |= CBNode::kFlagIsFp;
 
           if (extendedData.isSpecial() && (special = X86SpecialInst_get(instId, opArray, opCount)) != nullptr)
-            flags |= AsmNode::kFlagIsSpecial;
+            flags |= CBNode::kFlagIsSpecial;
 
           uint32_t gpAllowedMask = 0xFFFFFFFF;
           for (uint32_t i = 0; i < opCount; i++) {
@@ -2079,7 +2079,7 @@ _NextGroup:
                   // Read/Write is usually the combination of the first operand.
                   combinedFlags = inFlags | outFlags;
 
-                  if (node->getOptions() & CodeGen::kOptionOverwrite) {
+                  if (node->getOptions() & CodeEmitter::kOptionOverwrite) {
                     // Manually forcing write-only.
                     combinedFlags = outFlags;
                   }
@@ -2216,8 +2216,8 @@ _NextGroup:
 
         // Handle conditional/unconditional jump.
         if (node->isJmpOrJcc()) {
-          AsmJump* jNode = static_cast<AsmJump*>(node);
-          AsmLabel* jTarget = jNode->getTarget();
+          CBJump* jNode = static_cast<CBJump*>(node);
+          CBLabel* jTarget = jNode->getTarget();
 
           // If this jump is unconditional we put next node to unreachable node
           // list so we can eliminate possible dead code. We have to do this in
@@ -2245,11 +2245,11 @@ _NextGroup:
             if (jTarget->hasWorkData()) {
               uint32_t jTargetFlowId = jTarget->getFlowId();
 
-              // Update AsmNode::kFlagIsTaken to true if this is a conditional
+              // Update CBNode::kFlagIsTaken to true if this is a conditional
               // backward jump. This behavior can be overridden by using
               // `X86Inst::kOptionTaken` when the instruction is created.
               if (!jNode->isTaken() && opCount == 1 && jTargetFlowId <= flowId) {
-                jNode->_flags |= AsmNode::kFlagIsTaken;
+                jNode->_flags |= CBNode::kFlagIsTaken;
               }
             }
             else if (next->hasWorkData()) {
@@ -2270,7 +2270,7 @@ _NextGroup:
       // [Func-Entry]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeFunc: {
+      case CBNode::kNodeFunc: {
         ASMJIT_ASSERT(node_ == func);
         X86FuncDecl* decl = func->getDecl();
 
@@ -2320,7 +2320,7 @@ _NextGroup:
       // [End]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeSentinel: {
+      case CBNode::kNodeSentinel: {
         RA_POPULATE(node_);
         ASMJIT_PROPAGATE(addReturningNode(node_));
         goto _NextGroup;
@@ -2330,8 +2330,8 @@ _NextGroup:
       // [Func-Exit]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeFuncExit: {
-        AsmFuncRet* node = static_cast<AsmFuncRet*>(node_);
+      case CBNode::kNodeFuncExit: {
+        CCFuncRet* node = static_cast<CCFuncRet*>(node_);
         ASMJIT_PROPAGATE(addReturningNode(node));
 
         X86FuncDecl* decl = func->getDecl();
@@ -2349,7 +2349,7 @@ _NextGroup:
               RA_MERGE(vreg, tied, 0, 0);
 
               if (retClass == vreg->getRegClass()) {
-                // TODO: [COMPILER] Fix AsmFuncRet fetch.
+                // TODO: [COMPILER] Fix CCFuncRet fetch.
                 tied->flags |= TiedReg::kRReg;
                 tied->inRegs = (i == 0) ? Utils::mask(X86Gp::kIdAx) : Utils::mask(X86Gp::kIdDx);
                 inRegs.or_(retClass, tied->inRegs);
@@ -2376,7 +2376,7 @@ _NextGroup:
       // [Call]
       // ----------------------------------------------------------------------
 
-      case AsmNode::kNodeCall: {
+      case CBNode::kNodeCall: {
         X86CallNode* node = static_cast<X86CallNode*>(node_);
         X86FuncDecl* decl = node->getDecl();
 
@@ -2458,7 +2458,7 @@ _NextGroup:
               tied->flags |= TiedReg::kRConv | TiedReg::kRFunc;
             }
           }
-          // If this is a stack-based argument we insert AsmPushArg instead of
+          // If this is a stack-based argument we insert CCPushArg instead of
           // using TiedReg. It improves the code, because the argument can be
           // moved onto stack as soon as it is ready and the register used by
           // the variable can be reused for something else. It is also much
@@ -2512,7 +2512,7 @@ _Done:
   // `removeUnreachableCode()`, which would lead to a crash in some later step.
   node_ = func->getEnd();
   if (!node_->hasWorkData()) {
-    AsmLabel* fExit = func->getExitNode();
+    CBLabel* fExit = func->getExitNode();
     RA_POPULATE(fExit);
     fExit->setFlowId(++flowId);
 
@@ -2538,10 +2538,10 @@ NoMem:
 
 Error X86Context::annotate() {
 #if !defined(ASMJIT_DISABLE_LOGGING)
-  AsmFunc* func = getFunc();
+  CCFunc* func = getFunc();
 
-  AsmNode* node_ = func;
-  AsmNode* end = func->getEnd();
+  CBNode* node_ = func;
+  CBNode* end = func->getEnd();
 
   Zone& zone = _compiler->_dataAllocator;
   StringBuilderTmp<256> sb;
@@ -2549,8 +2549,8 @@ Error X86Context::annotate() {
   uint32_t maxLen = 0;
   while (node_ != end) {
     if (!node_->hasInlineComment()) {
-      if (node_->getType() == AsmNode::kNodeInst) {
-        AsmInst* node = static_cast<AsmInst*>(node_);
+      if (node_->getType() == CBNode::kNodeInst) {
+        CBInst* node = static_cast<CBInst*>(node_);
         _formatter.formatInstruction(sb, 0,
           node->getInstId(),
           node->getOptions(),
@@ -2598,7 +2598,7 @@ struct X86BaseAlloc {
   ASMJIT_INLINE X86RAState* getState() const { return _context->getState(); }
 
   //! Get the node.
-  ASMJIT_INLINE AsmNode* getNode() const { return _node; }
+  ASMJIT_INLINE CBNode* getNode() const { return _node; }
 
   //! Get TiedReg list (all).
   ASMJIT_INLINE TiedReg* getTiedArray() const { return _tiedArray[0]; }
@@ -2630,7 +2630,7 @@ struct X86BaseAlloc {
 protected:
   // Just to prevent calling these methods by X86Context::translate().
 
-  ASMJIT_INLINE void init(AsmNode* node, X86RAData* map);
+  ASMJIT_INLINE void init(CBNode* node, X86RAData* map);
   ASMJIT_INLINE void cleanup();
 
   // --------------------------------------------------------------------------
@@ -2653,7 +2653,7 @@ protected:
   X86Compiler* _compiler;
 
   //! Node.
-  AsmNode* _node;
+  CBNode* _node;
 
   //! Register allocator (RA) data.
   X86RAData* _raData;
@@ -2673,7 +2673,7 @@ protected:
 // [asmjit::X86BaseAlloc - Init / Cleanup]
 // ============================================================================
 
-ASMJIT_INLINE void X86BaseAlloc::init(AsmNode* node, X86RAData* raData) {
+ASMJIT_INLINE void X86BaseAlloc::init(CBNode* node, X86RAData* raData) {
   _node = node;
   _raData = raData;
 
@@ -2767,7 +2767,7 @@ struct X86VarAlloc : public X86BaseAlloc {
   // [Run]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Error run(AsmNode* node);
+  ASMJIT_INLINE Error run(CBNode* node);
 
   // --------------------------------------------------------------------------
   // [Init / Cleanup]
@@ -2776,7 +2776,7 @@ struct X86VarAlloc : public X86BaseAlloc {
 protected:
   // Just to prevent calling these methods by X86Context::translate().
 
-  ASMJIT_INLINE void init(AsmNode* node, X86RAData* map);
+  ASMJIT_INLINE void init(CBNode* node, X86RAData* map);
   ASMJIT_INLINE void cleanup();
 
   // --------------------------------------------------------------------------
@@ -2831,7 +2831,7 @@ protected:
 // [asmjit::X86VarAlloc - Run]
 // ============================================================================
 
-ASMJIT_INLINE Error X86VarAlloc::run(AsmNode* node_) {
+ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
   // Initialize.
   X86RAData* raData = node_->getWorkData<X86RAData>();
   // Initialize the allocator; connect Vd->Va.
@@ -2860,12 +2860,12 @@ ASMJIT_INLINE Error X86VarAlloc::run(AsmNode* node_) {
     alloc<X86Reg::kClassXyz>();
 
     // Translate node operands.
-    if (node_->getType() == AsmNode::kNodeInst) {
-      AsmInst* node = static_cast<AsmInst*>(node_);
+    if (node_->getType() == CBNode::kNodeInst) {
+      CBInst* node = static_cast<CBInst*>(node_);
       ASMJIT_PROPAGATE(X86Context_translateOperands(_context, node->getOpArray(), node->getOpCount()));
     }
-    else if (node_->getType() == AsmNode::kNodePushArg) {
-      AsmPushArg* node = static_cast<AsmPushArg*>(node_);
+    else if (node_->getType() == CBNode::kNodePushArg) {
+      CCPushArg* node = static_cast<CCPushArg*>(node_);
 
       X86CallNode* call = static_cast<X86CallNode*>(node->getCall());
       X86FuncDecl* decl = call->getDecl();
@@ -2930,7 +2930,7 @@ ASMJIT_INLINE Error X86VarAlloc::run(AsmNode* node_) {
 // [asmjit::X86VarAlloc - Init / Cleanup]
 // ============================================================================
 
-ASMJIT_INLINE void X86VarAlloc::init(AsmNode* node, X86RAData* raData) {
+ASMJIT_INLINE void X86VarAlloc::init(CBNode* node, X86RAData* raData) {
   X86BaseAlloc::init(node, raData);
 
   // These will block planner from assigning them during planning. Planner will
@@ -3127,8 +3127,6 @@ ASMJIT_INLINE void X86VarAlloc::plan() {
         if (candidateRegs == 0)
           candidateRegs = m;
       }
-
-      // printf("CANDIDATE: %s %08X\n", vreg->getName(), homeMask);
       if (candidateRegs & homeMask) candidateRegs &= homeMask;
 
       physId = Utils::findFirstBit(candidateRegs);
@@ -3312,14 +3310,14 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
 enum { kMaxGuessFlow = 10 };
 
 struct GuessFlowData {
-  ASMJIT_INLINE void init(AsmNode* node, uint32_t counter, uint32_t safeRegs) {
+  ASMJIT_INLINE void init(CBNode* node, uint32_t counter, uint32_t safeRegs) {
     _node = node;
     _counter = counter;
     _safeRegs = safeRegs;
   }
 
   //! Node to start.
-  AsmNode* _node;
+  CBNode* _node;
   //! Number of instructions processed from the beginning.
   uint32_t _counter;
   //! Safe registers, which can be used for the allocation.
@@ -3347,7 +3345,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   uint32_t gfIndex = 0;
   GuessFlowData gfArray[kMaxGuessFlow];
 
-  AsmNode* node = _node;
+  CBNode* node = _node;
 
   // Mark this node and also exit node, it will terminate the loop if encountered.
   node->setTokenId(localToken);
@@ -3473,25 +3471,25 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
 
 _Advance:
       // Terminate if this is a return node.
-      if (node->hasFlag(AsmNode::kFlagIsRet))
+      if (node->hasFlag(CBNode::kFlagIsRet))
         goto _Done;
 
       // Advance on non-conditional jump.
-      if (node->hasFlag(AsmNode::kFlagIsJmp)) {
+      if (node->hasFlag(CBNode::kFlagIsJmp)) {
         // Stop on a jump that is not followed.
-        node = static_cast<AsmJump*>(node)->getTarget();
+        node = static_cast<CBJump*>(node)->getTarget();
         if (!node) break;
         continue;
       }
 
       // Split flow on a conditional jump.
-      if (node->hasFlag(AsmNode::kFlagIsJcc)) {
+      if (node->hasFlag(CBNode::kFlagIsJcc)) {
         // Put the next node on the stack and follow the target if possible.
-        AsmNode* next = node->getNext();
+        CBNode* next = node->getNext();
         if (next && gfIndex < kMaxGuessFlow)
           gfArray[gfIndex++].init(next, counter, safeRegs);
 
-        node = static_cast<AsmJump*>(node)->getTarget();
+        node = static_cast<CBJump*>(node)->getTarget();
         if (!node) break;
         continue;
       }
@@ -3538,7 +3536,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   uint32_t maxLookAhead = _compiler->getMaxLookAhead();
 
   // Look ahead and calculate mask of special registers on both - input/output.
-  AsmNode* node = _node;
+  CBNode* node = _node;
   for (i = 0; i < maxLookAhead; i++) {
     X86RAData* raData = node->getWorkData<X86RAData>();
     BitArray* liveness = raData ? raData->liveness : static_cast<BitArray*>(nullptr);
@@ -3546,15 +3544,15 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
     // If the variable becomes dead it doesn't make sense to continue.
     if (liveness && !liveness->getBit(localId)) break;
 
-    // Stop on `AsmSentinel` and `AsmFuncRet`.
-    if (node->hasFlag(AsmNode::kFlagIsRet)) break;
+    // Stop on `CBSentinel` and `CCFuncRet`.
+    if (node->hasFlag(CBNode::kFlagIsRet)) break;
 
     // Stop on conditional jump, we don't follow them.
-    if (node->hasFlag(AsmNode::kFlagIsJcc)) break;
+    if (node->hasFlag(CBNode::kFlagIsJcc)) break;
 
     // Advance on non-conditional jump.
-    if (node->hasFlag(AsmNode::kFlagIsJmp)) {
-      node = static_cast<AsmJump*>(node)->getTarget();
+    if (node->hasFlag(CBNode::kFlagIsJmp)) {
+      node = static_cast<CBJump*>(node)->getTarget();
       // Stop on jump that is not followed.
       if (!node) break;
     }
@@ -4134,19 +4132,19 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessAlloc(VirtReg* vreg, uint32_t allocabl
   uint32_t maxLookAhead = _compiler->getMaxLookAhead();
 
   // Look ahead and calculate mask of special registers on both - input/output.
-  AsmNode* node = _node;
+  CBNode* node = _node;
   for (i = 0; i < maxLookAhead; i++) {
-    // Stop on `AsmFuncRet` and `AsmSentinel`.
-    if (node->hasFlag(AsmNode::kFlagIsRet))
+    // Stop on `CCFuncRet` and `CBSentinel`.
+    if (node->hasFlag(CBNode::kFlagIsRet))
       break;
 
     // Stop on conditional jump, we don't follow them.
-    if (node->hasFlag(AsmNode::kFlagIsJcc))
+    if (node->hasFlag(CBNode::kFlagIsJcc))
       break;
 
     // Advance on non-conditional jump.
-    if (node->hasFlag(AsmNode::kFlagIsJmp)) {
-      node = static_cast<AsmJump*>(node)->getTarget();
+    if (node->hasFlag(CBNode::kFlagIsJmp)) {
+      node = static_cast<CBJump*>(node)->getTarget();
       // Stop on jump that is not followed.
       if (!node) break;
     }
@@ -4553,13 +4551,13 @@ static Error X86Context_initFunc(X86Context* self, X86FuncNode* func) {
 }
 
 //! \internal
-static Error X86Context_patchFuncMem(X86Context* self, X86FuncNode* func, AsmNode* stop) {
+static Error X86Context_patchFuncMem(X86Context* self, X86FuncNode* func, CBNode* stop) {
   X86Compiler* compiler = self->getCompiler();
-  AsmNode* node = func;
+  CBNode* node = func;
 
   do {
-    if (node->getType() == AsmNode::kNodeInst) {
-      AsmInst* iNode = static_cast<AsmInst*>(node);
+    if (node->getType() == CBNode::kNodeInst) {
+      CBInst* iNode = static_cast<CBInst*>(node);
 
       if (iNode->hasMemOp()) {
         X86Mem* m = iNode->getMemOp<X86Mem>();
@@ -4830,9 +4828,9 @@ static Error X86Context_translatePrologEpilog(X86Context* self, X86FuncNode* fun
 // ============================================================================
 
 //! \internal
-static void X86Context_translateJump(X86Context* self, AsmJump* jNode, AsmLabel* jTarget) {
+static void X86Context_translateJump(X86Context* self, CBJump* jNode, CBLabel* jTarget) {
   X86Compiler* compiler = self->getCompiler();
-  AsmNode* extNode = self->getExtraBlock();
+  CBNode* extNode = self->getExtraBlock();
 
   compiler->_setCursor(extNode);
   self->switchState(jTarget->getWorkData<RAData>()->state);
@@ -4841,7 +4839,7 @@ static void X86Context_translateJump(X86Context* self, AsmJump* jNode, AsmLabel*
   // moved at the end of the function body.
   if (compiler->getCursor() != extNode) {
     // TODO: Can fail.
-    AsmLabel* jTrampolineTarget = compiler->newLabelNode();
+    CBLabel* jTrampolineTarget = compiler->newLabelNode();
 
     // Add the jump to the target.
     compiler->jmp(jTarget->getLabel());
@@ -4865,9 +4863,9 @@ static void X86Context_translateJump(X86Context* self, AsmJump* jNode, AsmLabel*
 // [asmjit::X86Context - Translate - Ret]
 // ============================================================================
 
-static Error X86Context_translateRet(X86Context* self, AsmFuncRet* rNode, AsmLabel* exitTarget) {
+static Error X86Context_translateRet(X86Context* self, CCFuncRet* rNode, CBLabel* exitTarget) {
   X86Compiler* compiler = self->getCompiler();
-  AsmNode* node = rNode->getNext();
+  CBNode* node = rNode->getNext();
 
   // 32-bit mode requires to push floating point return value(s), handle it
   // here as it's a special case.
@@ -4897,29 +4895,29 @@ static Error X86Context_translateRet(X86Context* self, AsmFuncRet* rNode, AsmLab
     switch (node->getType()) {
       // If we have found an exit label we just return, there is no need to
       // emit jump to that.
-      case AsmNode::kNodeLabel:
-        if (static_cast<AsmLabel*>(node) == exitTarget)
+      case CBNode::kNodeLabel:
+        if (static_cast<CBLabel*>(node) == exitTarget)
           return kErrorOk;
         goto _EmitRet;
 
-      case AsmNode::kNodeData:
-      case AsmNode::kNodeInst:
-      case AsmNode::kNodeCall:
-      case AsmNode::kNodeFuncExit:
+      case CBNode::kNodeData:
+      case CBNode::kNodeInst:
+      case CBNode::kNodeCall:
+      case CBNode::kNodeFuncExit:
         goto _EmitRet;
 
       // Continue iterating.
-      case AsmNode::kNodeComment:
-      case AsmNode::kNodeAlign:
-      case AsmNode::kNodeHint:
+      case CBNode::kNodeComment:
+      case CBNode::kNodeAlign:
+      case CBNode::kNodeHint:
         break;
 
       // Invalid node to be here.
-      case AsmNode::kNodeFunc:
+      case CBNode::kNodeFunc:
         return self->getCompiler()->setLastError(DebugUtils::errored(kErrorInvalidState));
 
       // We can't go forward from here.
-      case AsmNode::kNodeSentinel:
+      case CBNode::kNodeSentinel:
         return kErrorOk;
     }
 
@@ -4949,17 +4947,17 @@ Error X86Context::translate() {
   X86CallAlloc cAlloc(this);
 
   // Flow.
-  AsmNode* node_ = func;
-  AsmNode* next = nullptr;
-  AsmNode* stop = getStop();
+  CBNode* node_ = func;
+  CBNode* next = nullptr;
+  CBNode* stop = getStop();
 
-  PodList<AsmNode*>::Link* jLink = _jccList.getFirst();
+  PodList<CBNode*>::Link* jLink = _jccList.getFirst();
 
   for (;;) {
     while (node_->isTranslated()) {
       // Switch state if we went to a node that is already translated.
-      if (node_->getType() == AsmNode::kNodeLabel) {
-        AsmLabel* node = static_cast<AsmLabel*>(node_);
+      if (node_->getType() == CBNode::kNodeLabel) {
+        CBLabel* node = static_cast<CBLabel*>(node_);
         compiler->_setCursor(node->getPrev());
         switchState(node->getWorkData<RAData>()->state);
       }
@@ -4972,11 +4970,11 @@ _NextGroup:
         node_ = jLink->getValue();
         jLink = jLink->getNext();
 
-        AsmNode* jFlow = X86Context_getOppositeJccFlow(static_cast<AsmJump*>(node_));
+        CBNode* jFlow = X86Context_getOppositeJccFlow(static_cast<CBJump*>(node_));
         loadState(node_->getWorkData<RAData>()->state);
 
         if (jFlow->hasWorkData() && jFlow->getWorkData<RAData>()->state) {
-          X86Context_translateJump(this, static_cast<AsmJump*>(node_), static_cast<AsmLabel*>(jFlow));
+          X86Context_translateJump(this, static_cast<CBJump*>(node_), static_cast<CBLabel*>(jFlow));
 
           node_ = jFlow;
           if (node_->isTranslated())
@@ -4991,7 +4989,7 @@ _NextGroup:
     }
 
     next = node_->getNext();
-    node_->_flags |= AsmNode::kFlagIsTranslated;
+    node_->_flags |= CBNode::kFlagIsTranslated;
     ASMJIT_TSEC({ this->_traceNode(this, node_, "[T] "); });
 
     if (node_->hasWorkData()) {
@@ -5000,16 +4998,16 @@ _NextGroup:
         // [Align / Embed]
         // --------------------------------------------------------------------
 
-        case AsmNode::kNodeAlign:
-        case AsmNode::kNodeData:
+        case CBNode::kNodeAlign:
+        case CBNode::kNodeData:
           break;
 
         // --------------------------------------------------------------------
         // [Label]
         // --------------------------------------------------------------------
 
-        case AsmNode::kNodeLabel: {
-          AsmLabel* node = static_cast<AsmLabel*>(node_);
+        case CBNode::kNodeLabel: {
+          CBLabel* node = static_cast<CBLabel*>(node_);
           ASMJIT_ASSERT(node->getWorkData<RAData>()->state == nullptr);
           node->getWorkData<RAData>()->state = saveState();
           break;
@@ -5019,9 +5017,9 @@ _NextGroup:
         // [Inst/Call/SArg/Ret]
         // --------------------------------------------------------------------
 
-        case AsmNode::kNodeInst:
-        case AsmNode::kNodeCall:
-        case AsmNode::kNodePushArg:
+        case CBNode::kNodeInst:
+        case CBNode::kNodeCall:
+        case CBNode::kNodePushArg:
           // Update TiedReg's unuse flags based on liveness of the next node.
           if (!node_->isJcc()) {
             X86RAData* raData = node_->getWorkData<X86RAData>();
@@ -5041,20 +5039,20 @@ _NextGroup:
             }
           }
 
-          if (node_->getType() == AsmNode::kNodeCall) {
+          if (node_->getType() == CBNode::kNodeCall) {
             ASMJIT_PROPAGATE(cAlloc.run(static_cast<X86CallNode*>(node_)));
             break;
           }
           ASMJIT_FALLTHROUGH;
 
-        case AsmNode::kNodeHint:
-        case AsmNode::kNodeFuncExit: {
+        case CBNode::kNodeHint:
+        case CBNode::kNodeFuncExit: {
           ASMJIT_PROPAGATE(vAlloc.run(node_));
 
           // Handle conditional/unconditional jump.
           if (node_->isJmpOrJcc()) {
-            AsmJump* node = static_cast<AsmJump*>(node_);
-            AsmLabel* jTarget = node->getTarget();
+            CBJump* node = static_cast<CBJump*>(node_);
+            CBLabel* jTarget = node->getTarget();
 
             // Target not followed.
             if (!jTarget) {
@@ -5076,11 +5074,11 @@ _NextGroup:
               }
             }
             else {
-              AsmNode* jNext = node->getNext();
+              CBNode* jNext = node->getNext();
 
               if (jTarget->isTranslated()) {
                 if (jNext->isTranslated()) {
-                  ASMJIT_ASSERT(jNext->getType() == AsmNode::kNodeLabel);
+                  ASMJIT_ASSERT(jNext->getType() == CBNode::kNodeLabel);
                   compiler->_setCursor(node->getPrev());
                   intersectStates(
                     jTarget->getWorkData<RAData>()->state,
@@ -5094,7 +5092,7 @@ _NextGroup:
                 next = jNext;
               }
               else if (jNext->isTranslated()) {
-                ASMJIT_ASSERT(jNext->getType() == AsmNode::kNodeLabel);
+                ASMJIT_ASSERT(jNext->getType() == CBNode::kNodeLabel);
 
                 RAState* savedState = saveState();
                 node->getWorkData<RAData>()->state = savedState;
@@ -5111,7 +5109,7 @@ _NextGroup:
           }
           else if (node_->isRet()) {
             ASMJIT_PROPAGATE(
-              X86Context_translateRet(this, static_cast<AsmFuncRet*>(node_), func->getExitNode()));
+              X86Context_translateRet(this, static_cast<CCFuncRet*>(node_), func->getExitNode()));
           }
           break;
         }
@@ -5120,7 +5118,7 @@ _NextGroup:
         // [Func]
         // --------------------------------------------------------------------
 
-        case AsmNode::kNodeFunc: {
+        case CBNode::kNodeFunc: {
           ASMJIT_ASSERT(node_ == func);
 
           X86FuncDecl* decl = func->getDecl();
@@ -5166,7 +5164,7 @@ _NextGroup:
         // [End]
         // --------------------------------------------------------------------
 
-        case AsmNode::kNodeSentinel: {
+        case CBNode::kNodeSentinel: {
           goto _NextGroup;
         }
 

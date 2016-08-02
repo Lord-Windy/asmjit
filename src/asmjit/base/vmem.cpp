@@ -26,10 +26,9 @@
 // Goals:
 //
 // - Granularity of allocated blocks is different than granularity for a typical
-//   C malloc. It is at least 64-bytes so Assembler/Compiler can guarantee the
-//   alignment required. Alignment requirements can grow in the future, but at
-//   the moment 64 bytes is safe (we may jump to 128 bytes if necessary or make
-//   it configurable).
+//   C malloc. It is at least 64-bytes so CodeEmitter can guarantee the alignment
+//   required. Alignment requirements can grow in the future, but at the moment
+//   64 bytes is safe (we may jump to 128 bytes if necessary or make it configurable).
 //
 // - Keep memory manager information outside of the allocated virtual memory
 //   pages, because these pages allow executing of machine code and there should

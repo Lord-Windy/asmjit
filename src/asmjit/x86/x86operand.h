@@ -10,7 +10,7 @@
 
 // [Dependencies]
 #include "../base/assembler.h"
-#include "../base/compiler.h"
+#include "../base/codecompiler.h"
 #include "../base/operand.h"
 #include "../base/utils.h"
 

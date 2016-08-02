@@ -5,8 +5,8 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _ASMJIT_BASE_ASMBUILDER_H
-#define _ASMJIT_BASE_ASMBUILDER_H
+#ifndef _ASMJIT_BASE_CODEBUILDER_H
+#define _ASMJIT_BASE_CODEBUILDER_H
 
 #include "../build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
@@ -28,43 +28,43 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-class AsmAlign;
-class AsmComment;
-class AsmConstPool;
-class AsmData;
-class AsmInst;
-class AsmJump;
-class AsmNode;
-class AsmLabel;
-class AsmSentinel;
+class CBAlign;
+class CBComment;
+class CBConstPool;
+class CBData;
+class CBInst;
+class CBJump;
+class CBNode;
+class CBLabel;
+class CBSentinel;
 
 //! \addtogroup asmjit_base
 //! \{
 
 // ============================================================================
-// [asmjit::AsmBuilder]
+// [asmjit::CodeBuilder]
 // ============================================================================
 
-class ASMJIT_VIRTAPI AsmBuilder : public CodeGen {
+class ASMJIT_VIRTAPI CodeBuilder : public CodeEmitter {
 public:
-  ASMJIT_NO_COPY(AsmBuilder)
-  typedef CodeGen Base;
+  ASMJIT_NO_COPY(CodeBuilder)
+  typedef CodeEmitter Base;
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmBuilder` instance.
-  ASMJIT_API AsmBuilder(CodeHolder* holder = nullptr) noexcept;
-  //! Destroy the `AsmBuilder` instance.
-  ASMJIT_API virtual ~AsmBuilder() noexcept;
+  //! Create a new `CodeBuilder` instance.
+  ASMJIT_API CodeBuilder(CodeHolder* code = nullptr) noexcept;
+  //! Destroy the `CodeBuilder` instance.
+  ASMJIT_API virtual ~CodeBuilder() noexcept;
 
   // --------------------------------------------------------------------------
   // [Events]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error onAttach(CodeHolder* holder) noexcept override;
-  ASMJIT_API virtual Error onDetach(CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error onAttach(CodeHolder* code) noexcept override;
+  ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Node-Factory]
@@ -86,52 +86,52 @@ public:
   template<typename T, typename P0, typename P1, typename P2>
   ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1, P2 p2) noexcept { return new(_nodeAllocator.alloc(sizeof(T))) T(this, p0, p1, p2); }
 
-  ASMJIT_API Error registerLabelNode(AsmLabel* node) noexcept;
-  //! Get `AsmLabel` by `id`.
-  ASMJIT_API Error getAsmLabel(AsmLabel** pOut, uint32_t id) noexcept;
-  //! Get `AsmLabel` by `label`.
-  ASMJIT_INLINE Error getAsmLabel(AsmLabel** pOut, const Label& label) noexcept { return getAsmLabel(pOut, label.getId()); }
+  ASMJIT_API Error registerLabelNode(CBLabel* node) noexcept;
+  //! Get `CBLabel` by `id`.
+  ASMJIT_API Error getCBLabel(CBLabel** pOut, uint32_t id) noexcept;
+  //! Get `CBLabel` by `label`.
+  ASMJIT_INLINE Error getCBLabel(CBLabel** pOut, const Label& label) noexcept { return getCBLabel(pOut, label.getId()); }
 
-  //! Create a new \ref AsmLabel node.
-  ASMJIT_API AsmLabel* newLabelNode() noexcept;
-  //! Create a new \ref AsmAlign node.
-  ASMJIT_API AsmAlign* newAlignNode(uint32_t mode, uint32_t alignment) noexcept;
-  //! Create a new \ref AsmData node.
-  ASMJIT_API AsmData* newDataNode(const void* data, uint32_t size) noexcept;
-  //! Create a new \ref AsmConstPool node.
-  ASMJIT_API AsmConstPool* newConstPool() noexcept;
-  //! Create a new \ref AsmComment node.
-  ASMJIT_API AsmComment* newCommentNode(const char* s, size_t len) noexcept;
+  //! Create a new \ref CBLabel node.
+  ASMJIT_API CBLabel* newLabelNode() noexcept;
+  //! Create a new \ref CBAlign node.
+  ASMJIT_API CBAlign* newAlignNode(uint32_t mode, uint32_t alignment) noexcept;
+  //! Create a new \ref CBData node.
+  ASMJIT_API CBData* newDataNode(const void* data, uint32_t size) noexcept;
+  //! Create a new \ref CBConstPool node.
+  ASMJIT_API CBConstPool* newConstPool() noexcept;
+  //! Create a new \ref CBComment node.
+  ASMJIT_API CBComment* newCommentNode(const char* s, size_t len) noexcept;
 
   // --------------------------------------------------------------------------
   // [Node-Builder]
   // --------------------------------------------------------------------------
 
   //! Add `node` after the current and set current to `node`.
-  ASMJIT_API AsmNode* addNode(AsmNode* node) noexcept;
+  ASMJIT_API CBNode* addNode(CBNode* node) noexcept;
   //! Insert `node` after `ref`.
-  ASMJIT_API AsmNode* addAfter(AsmNode* node, AsmNode* ref) noexcept;
+  ASMJIT_API CBNode* addAfter(CBNode* node, CBNode* ref) noexcept;
   //! Insert `node` before `ref`.
-  ASMJIT_API AsmNode* addBefore(AsmNode* node, AsmNode* ref) noexcept;
+  ASMJIT_API CBNode* addBefore(CBNode* node, CBNode* ref) noexcept;
   //! Remove `node`.
-  ASMJIT_API AsmNode* removeNode(AsmNode* node) noexcept;
+  ASMJIT_API CBNode* removeNode(CBNode* node) noexcept;
   //! Remove multiple nodes.
-  ASMJIT_API void removeNodes(AsmNode* first, AsmNode* last) noexcept;
+  ASMJIT_API void removeNodes(CBNode* first, CBNode* last) noexcept;
 
   //! Get the first node.
-  ASMJIT_INLINE AsmNode* getFirstNode() const noexcept { return _firstNode; }
+  ASMJIT_INLINE CBNode* getFirstNode() const noexcept { return _firstNode; }
   //! Get the last node.
-  ASMJIT_INLINE AsmNode* getLastNode() const noexcept { return _lastNode; }
+  ASMJIT_INLINE CBNode* getLastNode() const noexcept { return _lastNode; }
 
   //! Get current node.
   //!
   //! \note If this method returns null it means that nothing has been
   //! emitted yet.
-  ASMJIT_INLINE AsmNode* getCursor() const noexcept { return _cursor; }
+  ASMJIT_INLINE CBNode* getCursor() const noexcept { return _cursor; }
   //! Set the current node without returning the previous node.
-  ASMJIT_INLINE void _setCursor(AsmNode* node) noexcept { _cursor = node; }
+  ASMJIT_INLINE void _setCursor(CBNode* node) noexcept { _cursor = node; }
   //! Set the current node to `node` and return the previous one.
-  ASMJIT_API AsmNode* setCursor(AsmNode* node) noexcept;
+  ASMJIT_API CBNode* setCursor(CBNode* node) noexcept;
 
   // --------------------------------------------------------------------------
   // [Code-Generation]
@@ -148,7 +148,7 @@ public:
   // [Code-Serialization]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error serialize(CodeGen* dst);
+  ASMJIT_API virtual Error serialize(CodeEmitter* dst);
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -156,56 +156,56 @@ public:
 
   Zone _nodeAllocator;                   //!< Node allocator.
   Zone _dataAllocator;                   //!< Data and string allocator (includes comments).
-  PodVector<AsmLabel*> _labelArray;      //!< AsmLabel array.
+  PodVector<CBLabel*> _labelArray;      //!< CBLabel array.
 
-  AsmNode* _firstNode;                   //!< First node of the current section.
-  AsmNode* _lastNode;                    //!< Last node of the current section.
-  AsmNode* _cursor;                      //!< Current node (cursor).
+  CBNode* _firstNode;                   //!< First node of the current section.
+  CBNode* _lastNode;                    //!< Last node of the current section.
+  CBNode* _cursor;                      //!< Current node (cursor).
 
   uint32_t _nodeFlowId;                  //!< Flow-id assigned to each new node.
   uint32_t _nodeFlags;                   //!< Flags assigned to each new node.
 };
 
 // ============================================================================
-// [asmjit::AsmNode]
+// [asmjit::CBNode]
 // ============================================================================
 
-//! Node (AsmBuilder).
+//! Node (CodeBuilder).
 //!
-//! Every node represents a building-block used by \ref AsmBuilder. It can be
+//! Every node represents a building-block used by \ref CodeBuilder. It can be
 //! instruction, data, label, comment, directive, or any other high-level
 //! representation that can be transformed to the building blocks mentioned.
-//! Every class that inherits \ref AsmBuilder can define its own nodes that it
+//! Every class that inherits \ref CodeBuilder can define its own nodes that it
 //! can lower to basic nodes.
-class AsmNode {
+class CBNode {
 public:
-  ASMJIT_NO_COPY(AsmNode)
+  ASMJIT_NO_COPY(CBNode)
 
   // --------------------------------------------------------------------------
   // [Type]
   // --------------------------------------------------------------------------
 
-  //! Type of \ref AsmNode.
+  //! Type of \ref CBNode.
   ASMJIT_ENUM(NodeType) {
     kNodeNone       = 0,                 //!< Invalid node (internal, don't use).
 
-    // [Basic]
-    kNodeInst       = 1,                 //!< Node is \ref AsmInst or \ref AsmJump.
-    kNodeData       = 2,                 //!< Node is \ref AsmData.
-    kNodeAlign      = 3,                 //!< Node is \ref AsmAlign.
-    kNodeLabel      = 4,                 //!< Node is \ref AsmLabel.
-    kNodeComment    = 5,                 //!< Node is \ref AsmComment.
-    kNodeSentinel   = 6,                 //!< Node is \ref AsmSentinel.
-    kNodeConstPool  = 7,                 //!< Node is \ref AsmConstPool.
+    // [CodeBuilder]
+    kNodeInst       = 1,                 //!< Node is \ref CBInst or \ref CBJump.
+    kNodeData       = 2,                 //!< Node is \ref CBData.
+    kNodeAlign      = 3,                 //!< Node is \ref CBAlign.
+    kNodeLabel      = 4,                 //!< Node is \ref CBLabel.
+    kNodeComment    = 5,                 //!< Node is \ref CBComment.
+    kNodeSentinel   = 6,                 //!< Node is \ref CBSentinel.
+    kNodeConstPool  = 7,                 //!< Node is \ref CBConstPool.
 
-    // [Compiler]
-    kNodeFunc       = 16,                //!< Node is \ref AsmFunc (considered as \ref AsmLabel by \ref AsmBuilder).
-    kNodeFuncExit   = 17,                //!< Node is \ref AsmFuncRet.
-    kNodeCall       = 18,                //!< Node is \ref AsmCall.
-    kNodePushArg    = 19,                //!< Node is \ref AsmPushArg.
-    kNodeHint       = 20,                //!< Node is \ref AsmHint.
+    // [CodeCompiler]
+    kNodeFunc       = 16,                //!< Node is \ref CCFunc (considered as \ref CBLabel by \ref CodeBuilder).
+    kNodeFuncExit   = 17,                //!< Node is \ref CCFuncRet.
+    kNodeCall       = 18,                //!< Node is \ref CCFuncCall.
+    kNodePushArg    = 19,                //!< Node is \ref CCPushArg.
+    kNodeHint       = 20,                //!< Node is \ref CCHint.
 
-    // [User]
+    // [UserDefined]
     kNodeUser       = 32                 //!< First ID of a user-defined node.
   };
 
@@ -214,28 +214,27 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_ENUM(Flags) {
-    //! The node has been translated by the Compiler.
+    //! The node has been translated by the CodeCompiler.
     kFlagIsTranslated = 0x0001,
 
-    //! Whether the node can be safely removed by the `Compiler` in case it's
-    //! unreachable.
+    //! If the node can be safely removed by CodeCompiler in case it's unreachable.
     kFlagIsRemovable = 0x0004,
 
-    //! Whether the node is informative only and can be safely removed.
+    //! If the node is informative only and can be safely removed.
     kFlagIsInformative = 0x0008,
 
-    //! Whether the `AsmInst` is a jump.
+    //! If the `CBInst` is a jump.
     kFlagIsJmp = 0x0010,
-    //! Whether the `AsmInst` is a conditional jump.
+    //! If the `CBInst` is a conditional jump.
     kFlagIsJcc = 0x0020,
 
-    //! Whether the `AsmInst` is an unconditinal jump or conditional jump that is
+    //! If the `CBInst` is an unconditional jump or conditional jump that is
     //! likely to be taken.
     kFlagIsTaken = 0x0040,
 
-    //! Whether the `AsmNode` will return from a function.
+    //! If the `CBNode` will return from a function.
     //!
-    //! This flag is used by both `AsmSentinel` and `AsmFuncRet`.
+    //! This flag is used by both `CBSentinel` and `CCFuncRet`.
     kFlagIsRet = 0x0080,
 
     //! Whether the instruction is special.
@@ -249,29 +248,29 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new \ref AsmNode - always use \ref AsmBuilder to allocate nodes.
-  ASMJIT_INLINE AsmNode(AsmBuilder* ab, uint32_t type) noexcept {
+  //! Create a new \ref CBNode - always use \ref CodeBuilder to allocate nodes.
+  ASMJIT_INLINE CBNode(CodeBuilder* cb, uint32_t type) noexcept {
     _prev = nullptr;
     _next = nullptr;
     _type = static_cast<uint8_t>(type);
     _opCount = 0;
-    _flags = static_cast<uint16_t>(ab->_nodeFlags);
-    _flowId = ab->_nodeFlowId;
+    _flags = static_cast<uint16_t>(cb->_nodeFlags);
+    _flowId = cb->_nodeFlowId;
     _inlineComment = nullptr;
     _workData = nullptr;
     _tokenId = 0;
   }
-  //! SHOULD NEVER BE CALLED - \ref AsmBuilder uses \ref Zone allocator.
-  ASMJIT_INLINE ~AsmNode() noexcept {}
+  //! SHOULD NEVER BE CALLED - \ref CodeBuilder uses \ref Zone allocator.
+  ASMJIT_INLINE ~CBNode() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
   //! Get previous node in the compiler stream.
-  ASMJIT_INLINE AsmNode* getPrev() const noexcept { return _prev; }
+  ASMJIT_INLINE CBNode* getPrev() const noexcept { return _prev; }
   //! Get next node in the compiler stream.
-  ASMJIT_INLINE AsmNode* getNext() const noexcept { return _next; }
+  ASMJIT_INLINE CBNode* getNext() const noexcept { return _next; }
 
   //! Get the node type, see \ref Type.
   ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
@@ -297,20 +296,20 @@ public:
   //! Get whether the node is informative only (comment, hint).
   ASMJIT_INLINE bool isInformative() const noexcept { return hasFlag(kFlagIsInformative); }
 
-  //! Whether the node is `AsmLabel`.
+  //! Whether the node is `CBLabel`.
   ASMJIT_INLINE bool isLabel() const noexcept { return _type == kNodeLabel; }
-  //! Whether the `AsmInst` node is an unconditional jump.
+  //! Whether the `CBInst` node is an unconditional jump.
   ASMJIT_INLINE bool isJmp() const noexcept { return hasFlag(kFlagIsJmp); }
-  //! Whether the `AsmInst` node is a conditional jump.
+  //! Whether the `CBInst` node is a conditional jump.
   ASMJIT_INLINE bool isJcc() const noexcept { return hasFlag(kFlagIsJcc); }
-  //! Whether the `AsmInst` node is a conditional/unconditional jump.
+  //! Whether the `CBInst` node is a conditional/unconditional jump.
   ASMJIT_INLINE bool isJmpOrJcc() const noexcept { return hasFlag(kFlagIsJmp | kFlagIsJcc); }
-  //! Whether the `AsmInst` node is a return.
+  //! Whether the `CBInst` node is a return.
   ASMJIT_INLINE bool isRet() const noexcept { return hasFlag(kFlagIsRet); }
 
-  //! Get whether the node is `AsmInst` and the instruction is special.
+  //! Get whether the node is `CBInst` and the instruction is special.
   ASMJIT_INLINE bool isSpecial() const noexcept { return hasFlag(kFlagIsSpecial); }
-  //! Get whether the node is `AsmInst` and the instruction uses x87-FPU.
+  //! Get whether the node is `CBInst` and the instruction uses x87-FPU.
   ASMJIT_INLINE bool isFp() const noexcept { return hasFlag(kFlagIsFp); }
 
   //! Get flow index.
@@ -346,8 +345,8 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  AsmNode* _prev;                        //!< Previous node.
-  AsmNode* _next;                        //!< Next node.
+  CBNode* _prev;                        //!< Previous node.
+  CBNode* _next;                        //!< Next node.
 
   uint8_t _type;                         //!< Node type, see \ref NodeType.
   uint8_t _opCount;                      //!< Count of operands or zero.
@@ -361,7 +360,7 @@ public:
   //!
   //! Used by some algorithms to mark nodes as visited. If the token is
   //! generated in an incrementing way the visitor can just mark nodes it
-  //! visits and them compare the `AsmNode`s token with its local token.
+  //! visits and them compare the `CBNode`s token with its local token.
   //! If they are equal the node has been visited by exactly this visitor.
   //! Then the visitor doesn't need to clean things up as the next time the
   //! token will be different.
@@ -371,23 +370,23 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmInst]
+// [asmjit::CBInst]
 // ============================================================================
 
-//! Instruction (AsmBuilder).
+//! Instruction (CodeBuilder).
 //!
 //! Wraps an instruction with its options and operands.
-class AsmInst : public AsmNode {
+class CBInst : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmInst)
+  ASMJIT_NO_COPY(CBInst)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmInst` instance.
-  ASMJIT_INLINE AsmInst(AsmBuilder* ab, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
-    : AsmNode(ab, kNodeInst) {
+  //! Create a new `CBInst` instance.
+  ASMJIT_INLINE CBInst(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+    : CBNode(cb, kNodeInst) {
 
     orFlags(kFlagIsRemovable);
     _instId = static_cast<uint16_t>(instId);
@@ -400,8 +399,8 @@ public:
     _updateMemOp();
   }
 
-  //! Destroy the `AsmInst` instance.
-  ASMJIT_INLINE ~AsmInst() noexcept {}
+  //! Destroy the `CBInst` instance.
+  ASMJIT_INLINE ~CBInst() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -499,61 +498,61 @@ Update:
 };
 
 // ============================================================================
-// [asmjit::AsmJump]
+// [asmjit::CBJump]
 // ============================================================================
 
 //! Asm jump (conditional or direct).
 //!
-//! Extension of `AsmInst` node, which stores more information about the jump.
-class AsmJump : public AsmInst {
+//! Extension of `CBInst` node, which stores more information about the jump.
+class CBJump : public CBInst {
 public:
-  ASMJIT_NO_COPY(AsmJump)
+  ASMJIT_NO_COPY(CBJump)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE AsmJump(AsmBuilder* ab, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
-    : AsmInst(ab, instId, options, opArray, opCount),
+  ASMJIT_INLINE CBJump(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+    : CBInst(cb, instId, options, opArray, opCount),
       _target(nullptr),
       _jumpNext(nullptr) {}
-  ASMJIT_INLINE ~AsmJump() noexcept {}
+  ASMJIT_INLINE ~CBJump() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE AsmLabel* getTarget() const noexcept { return _target; }
-  ASMJIT_INLINE AsmJump* getJumpNext() const noexcept { return _jumpNext; }
+  ASMJIT_INLINE CBLabel* getTarget() const noexcept { return _target; }
+  ASMJIT_INLINE CBJump* getJumpNext() const noexcept { return _jumpNext; }
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  AsmLabel* _target;                     //!< Target node.
-  AsmJump* _jumpNext;                    //!< Next jump to the same target in a single linked-list.
+  CBLabel* _target;                     //!< Target node.
+  CBJump* _jumpNext;                    //!< Next jump to the same target in a single linked-list.
 };
 
 // ============================================================================
-// [asmjit::AsmData]
+// [asmjit::CBData]
 // ============================================================================
 
-//! Asm data (AsmBuilder).
+//! Asm data (CodeBuilder).
 //!
 //! Wraps `.data` directive. The node contains data that will be placed at the
 //! node's position in the assembler stream. The data is considered to be RAW;
 //! no analysis nor byte-order conversion is performed on RAW data.
-class AsmData : public AsmNode {
+class CBData : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmData)
+  ASMJIT_NO_COPY(CBData)
   enum { kInlineBufferSize = 12 };
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmData` instance.
-  ASMJIT_INLINE AsmData(AsmBuilder* ab, void* data, uint32_t size) noexcept : AsmNode(ab, kNodeData) {
+  //! Create a new `CBData` instance.
+  ASMJIT_INLINE CBData(CodeBuilder* cb, void* data, uint32_t size) noexcept : CBNode(cb, kNodeData) {
     if (size <= kInlineBufferSize) {
       if (data) ::memcpy(_buf, data, size);
     }
@@ -563,8 +562,8 @@ public:
     _size = size;
   }
 
-  //! Destroy the `AsmData` instance.
-  ASMJIT_INLINE ~AsmData() noexcept {}
+  //! Destroy the `CBData` instance.
+  ASMJIT_INLINE ~CBData() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -591,27 +590,27 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmAlign]
+// [asmjit::CBAlign]
 // ============================================================================
 
-//! Align directive (AsmBuilder).
+//! Align directive (CodeBuilder).
 //!
 //! Wraps `.align` directive.
-class AsmAlign : public AsmNode {
+class CBAlign : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmAlign)
+  ASMJIT_NO_COPY(CBAlign)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmAlign` instance.
-  ASMJIT_INLINE AsmAlign(AsmBuilder* ab, uint32_t mode, uint32_t alignment) noexcept
-    : AsmNode(ab, kNodeAlign),
+  //! Create a new `CBAlign` instance.
+  ASMJIT_INLINE CBAlign(CodeBuilder* cb, uint32_t mode, uint32_t alignment) noexcept
+    : CBNode(cb, kNodeAlign),
       _mode(mode),
       _alignment(alignment) {}
-  //! Destroy the `AsmAlign` instance.
-  ASMJIT_INLINE ~AsmAlign() noexcept {}
+  //! Destroy the `CBAlign` instance.
+  ASMJIT_INLINE ~CBAlign() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -636,26 +635,26 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmLabel]
+// [asmjit::CBLabel]
 // ============================================================================
 
-//! Label (AsmBuilder).
-class AsmLabel : public AsmNode {
+//! Label (CodeBuilder).
+class CBLabel : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmLabel)
+  ASMJIT_NO_COPY(CBLabel)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmLabel` instance.
-  ASMJIT_INLINE AsmLabel(AsmBuilder* ab, uint32_t id = kInvalidValue) noexcept
-    : AsmNode(ab, kNodeLabel),
+  //! Create a new `CBLabel` instance.
+  ASMJIT_INLINE CBLabel(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
+    : CBNode(cb, kNodeLabel),
       _id(id),
       _numRefs(0),
       _from(nullptr) {}
-  //! Destroy the `AsmLabel` instance.
-  ASMJIT_INLINE ~AsmLabel() noexcept {}
+  //! Destroy the `CBLabel` instance.
+  ASMJIT_INLINE ~CBLabel() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -667,7 +666,7 @@ public:
   ASMJIT_INLINE Label getLabel() const noexcept { return Label(_id); }
 
   //! Get first jmp instruction.
-  ASMJIT_INLINE AsmJump* getFrom() const noexcept { return _from; }
+  ASMJIT_INLINE CBJump* getFrom() const noexcept { return _from; }
 
   //! Get number of jumps to this target.
   ASMJIT_INLINE uint32_t getNumRefs() const noexcept { return _numRefs; }
@@ -685,75 +684,75 @@ public:
 
   uint32_t _id;                          //!< Label id.
   uint32_t _numRefs;                     //!< Count of jumps here.
-  AsmJump* _from;                        //!< Linked-list of nodes that can jump here.
+  CBJump* _from;                        //!< Linked-list of nodes that can jump here.
 };
 
 // ============================================================================
-// [asmjit::AsmComment]
+// [asmjit::CBComment]
 // ============================================================================
 
-//! Comment (AsmBuilder).
-class AsmComment : public AsmNode {
+//! Comment (CodeBuilder).
+class CBComment : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmComment)
+  ASMJIT_NO_COPY(CBComment)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmComment` instance.
-  ASMJIT_INLINE AsmComment(AsmBuilder* ab, const char* comment) noexcept : AsmNode(ab, kNodeComment) {
+  //! Create a new `CBComment` instance.
+  ASMJIT_INLINE CBComment(CodeBuilder* cb, const char* comment) noexcept : CBNode(cb, kNodeComment) {
     orFlags(kFlagIsRemovable | kFlagIsInformative);
     _inlineComment = comment;
   }
 
-  //! Destroy the `AsmComment` instance.
-  ASMJIT_INLINE ~AsmComment() noexcept {}
+  //! Destroy the `CBComment` instance.
+  ASMJIT_INLINE ~CBComment() noexcept {}
 };
 
 // ============================================================================
-// [asmjit::AsmSentinel]
+// [asmjit::CBSentinel]
 // ============================================================================
 
-//! Sentinel (AsmBuilder).
+//! Sentinel (CodeBuilder).
 //!
-//! Sentinel is a marker that is completely ignored by the code-generator.
-class AsmSentinel : public AsmNode {
+//! Sentinel is a marker that is completely ignored by the code builder.
+class CBSentinel : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmSentinel)
+  ASMJIT_NO_COPY(CBSentinel)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmSentinel` instance.
-  ASMJIT_INLINE AsmSentinel(AsmBuilder* ab) noexcept : AsmNode(ab, kNodeSentinel) {
+  //! Create a new `CBSentinel` instance.
+  ASMJIT_INLINE CBSentinel(CodeBuilder* cb) noexcept : CBNode(cb, kNodeSentinel) {
     orFlags(kFlagIsRet);
   }
 
-  //! Destroy the `AsmSentinel` instance.
-  ASMJIT_INLINE ~AsmSentinel() noexcept {}
+  //! Destroy the `CBSentinel` instance.
+  ASMJIT_INLINE ~CBSentinel() noexcept {}
 };
 
 // ============================================================================
-// [asmjit::AsmConstPool]
+// [asmjit::CBConstPool]
 // ============================================================================
 
-class AsmConstPool : public AsmLabel {
+class CBConstPool : public CBLabel {
 public:
-  ASMJIT_NO_COPY(AsmConstPool)
+  ASMJIT_NO_COPY(CBConstPool)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmConstPool` instance.
-  ASMJIT_INLINE AsmConstPool(AsmBuilder* ab, uint32_t id = kInvalidValue) noexcept
-    : AsmLabel(ab, id),
-      _constPool(&ab->_dataAllocator) {}
+  //! Create a new `CBConstPool` instance.
+  ASMJIT_INLINE CBConstPool(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
+    : CBLabel(cb, id),
+      _constPool(&cb->_dataAllocator) {}
 
-  //! Destroy the `AsmConstPool` instance.
-  ASMJIT_INLINE ~AsmConstPool() noexcept {}
+  //! Destroy the `CBConstPool` instance.
+  ASMJIT_INLINE ~CBConstPool() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Interface]
@@ -783,4 +782,4 @@ public:
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER
-#endif // _ASMJIT_BASE_ASMBUILDER_H
+#endif // _ASMJIT_BASE_CODEBUILDER_H

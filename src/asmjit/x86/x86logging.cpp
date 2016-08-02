@@ -262,11 +262,24 @@ Error X86Formatter::formatInstruction(
     out.appendString(i == 0 ? " " : ", ");
     formatOperand(out, logOptions, op);
 
-    // Support AVX-512 op-mask.
-    if (i == 0 && !opMask.isNone()) {
-      out.appendString("{ ");
-      formatOperand(out, logOptions, opMask);
-      out.appendChar('}');
+    // Support AVX-512 {k}{z}.
+    if (i == 0) {
+      if (options & CodeEmitter::kOptionHasOpMask) {
+        out.appendString(" {");
+        formatOperand(out, logOptions, opMask);
+        out.appendChar('}');
+
+        if (options & X86Inst::kOptionEvexZero)
+          out.appendString("{z}");
+      }
+      else if (options & X86Inst::kOptionEvexZero) {
+        out.appendString(" {z}");
+      }
+    }
+
+    // Support AVX-512 {1tox}.
+    if (op.isMem() && (options & X86Inst::kOptionEvex1ToX)) {
+      out.appendString(" {1tox}");
     }
   }
 

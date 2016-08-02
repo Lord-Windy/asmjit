@@ -105,12 +105,12 @@ ASMJIT_ENUM(ErrorCode) {
   //! The object is not initialized.
   kErrorNotInitialized,
 
-  //! Code holder can't have attached more than one \ref Assembler at a time.
+  //! CodeHolder can't have attached more than one \ref Assembler at a time.
   kErrorSlotOccupied,
 
   //! No code generated.
   //!
-  //! Returned by runtime if the code-generator contains no code.
+  //! Returned by runtime if the \ref CodeHolder contains no code.
   kErrorNoCodeGenerated,
 
   //! Code generated is larger than allowed.
@@ -175,7 +175,7 @@ ASMJIT_ENUM(ErrorCode) {
   //! of bounds.
   kErrorIllegalDisplacement,
 
-  //! A variable has been assigned more than once to a function argument (Compiler).
+  //! A variable has been assigned more than once to a function argument (CodeCompiler).
   kErrorOverlappedArgs,
 
   //! Count of AsmJit error codes.

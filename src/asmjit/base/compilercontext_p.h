@@ -13,7 +13,7 @@
 
 // [Dependencies]
 #include "../base/bitutils.h"
-#include "../base/compiler.h"
+#include "../base/codecompiler.h"
 #include "../base/containers.h"
 #include "../base/zone.h"
 
@@ -41,7 +41,7 @@ struct RACell {
 // [asmjit::RAData]
 // ============================================================================
 
-//! Register allocator's (RA) data associated with each \ref AsmNode.
+//! Register allocator's (RA) data associated with each \ref CBNode.
 struct RAData {
   ASMJIT_INLINE RAData(uint32_t tiedTotal) noexcept
     : liveness(nullptr),
@@ -66,18 +66,17 @@ struct RAState {};
 
 //! \internal
 //!
-//! Code generation context is the logic behind `Compiler`. The context is
-//! used to compile the code stored in `Compiler`.
+//! Register allocator used by CodeCompiler.
 struct RAContext {
   ASMJIT_NO_COPY(RAContext)
 
-  typedef void (ASMJIT_CDECL* TraceNodeFunc)(RAContext* self, AsmNode* node_, const char* prefix);
+  typedef void (ASMJIT_CDECL* TraceNodeFunc)(RAContext* self, CBNode* node_, const char* prefix);
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  RAContext(Compiler* compiler);
+  RAContext(CodeCompiler* compiler);
   virtual ~RAContext();
 
   // --------------------------------------------------------------------------
@@ -92,22 +91,22 @@ struct RAContext {
   // --------------------------------------------------------------------------
 
   //! Get compiler.
-  ASMJIT_INLINE Compiler* getCompiler() const { return _compiler; }
+  ASMJIT_INLINE CodeCompiler* getCompiler() const { return _compiler; }
 
   //! Get function.
-  ASMJIT_INLINE AsmFunc* getFunc() const { return _func; }
+  ASMJIT_INLINE CCFunc* getFunc() const { return _func; }
   //! Get stop node.
-  ASMJIT_INLINE AsmNode* getStop() const { return _stop; }
+  ASMJIT_INLINE CBNode* getStop() const { return _stop; }
 
   //! Get start of the current scope.
-  ASMJIT_INLINE AsmNode* getStart() const { return _start; }
+  ASMJIT_INLINE CBNode* getStart() const { return _start; }
   //! Get end of the current scope.
-  ASMJIT_INLINE AsmNode* getEnd() const { return _end; }
+  ASMJIT_INLINE CBNode* getEnd() const { return _end; }
 
   //! Get extra block.
-  ASMJIT_INLINE AsmNode* getExtraBlock() const { return _extraBlock; }
+  ASMJIT_INLINE CBNode* getExtraBlock() const { return _extraBlock; }
   //! Set extra block.
-  ASMJIT_INLINE void setExtraBlock(AsmNode* node) { _extraBlock = node; }
+  ASMJIT_INLINE void setExtraBlock(CBNode* node) { _extraBlock = node; }
 
   // --------------------------------------------------------------------------
   // [Error]
@@ -201,8 +200,8 @@ struct RAContext {
   // --------------------------------------------------------------------------
 
   //! Add unreachable-flow data to the unreachable flow list.
-  ASMJIT_INLINE Error addUnreachableNode(AsmNode* node) {
-    PodList<AsmNode*>::Link* link = _tmpAllocator.allocT<PodList<AsmNode*>::Link>();
+  ASMJIT_INLINE Error addUnreachableNode(CBNode* node) {
+    PodList<CBNode*>::Link* link = _tmpAllocator.allocT<PodList<CBNode*>::Link>();
     if (!link) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
     link->setValue(node);
@@ -220,8 +219,8 @@ struct RAContext {
 
   //! Add returning node (i.e. node that returns and where liveness analysis
   //! should start).
-  ASMJIT_INLINE Error addReturningNode(AsmNode* node) {
-    PodList<AsmNode*>::Link* link = _tmpAllocator.allocT<PodList<AsmNode*>::Link>();
+  ASMJIT_INLINE Error addReturningNode(CBNode* node) {
+    PodList<CBNode*>::Link* link = _tmpAllocator.allocT<PodList<CBNode*>::Link>();
     if (!link) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
     link->setValue(node);
@@ -231,8 +230,8 @@ struct RAContext {
   }
 
   //! Add jump-flow data to the jcc flow list.
-  ASMJIT_INLINE Error addJccNode(AsmNode* node) {
-    PodList<AsmNode*>::Link* link = _tmpAllocator.allocT<PodList<AsmNode*>::Link>();
+  ASMJIT_INLINE Error addJccNode(CBNode* node) {
+    PodList<CBNode*>::Link* link = _tmpAllocator.allocT<PodList<CBNode*>::Link>();
     if (!link) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
     link->setValue(node);
@@ -262,7 +261,7 @@ struct RAContext {
   // --------------------------------------------------------------------------
 
   virtual Error annotate() = 0;
-  virtual Error formatInlineComment(StringBuilder& dst, AsmNode* node);
+  virtual Error formatInlineComment(StringBuilder& dst, CBNode* node);
 
   // --------------------------------------------------------------------------
   // [Translate]
@@ -281,15 +280,15 @@ struct RAContext {
   // [Compile]
   // --------------------------------------------------------------------------
 
-  virtual Error compile(AsmFunc* func);
+  virtual Error compile(CCFunc* func);
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  CodeHolder* _holder;                   //!< Code holder (shortcut).
-  Compiler* _compiler;                   //!< Compiler.
-  AsmFunc* _func;                        //!< Function being processed.
+  CodeHolder* _code;                     //!< CodeHolder (shortcut).
+  CodeCompiler* _compiler;               //!< CodeCompiler.
+  CCFunc* _func;                         //!< Function being processed.
 
   Zone _tmpAllocator;                    //!< RA temporary allocator.
   TraceNodeFunc _traceNode;              //!< Only non-null if ASMJIT_TRACE is enabled.
@@ -302,15 +301,15 @@ struct RAContext {
   //! doesn't use, it just needs `TiedReg` array.
   uint32_t _varMapToVaListOffset;
 
-  AsmNode* _start;                       //!< Start of the current active scope.
-  AsmNode* _end;                         //!< End of the current active scope.
+  CBNode* _start;                        //!< Start of the current active scope.
+  CBNode* _end;                          //!< End of the current active scope.
 
-  AsmNode* _extraBlock;                  //!< Node that is used to insert extra code after the function body.
-  AsmNode* _stop;                        //!< Stop node.
+  CBNode* _extraBlock;                   //!< Node that is used to insert extra code after the function body.
+  CBNode* _stop;                         //!< Stop node.
 
-  PodList<AsmNode*> _unreachableList;    //!< Unreachable nodes.
-  PodList<AsmNode*> _returningList;      //!< Returning nodes.
-  PodList<AsmNode*> _jccList;            //!< Jump nodes.
+  PodList<CBNode*> _unreachableList;     //!< Unreachable nodes.
+  PodList<CBNode*> _returningList;       //!< Returning nodes.
+  PodList<CBNode*> _jccList;             //!< Jump nodes.
 
   PodVector<VirtReg*> _contextVd;        //!< All variables used by the current function.
 
@@ -332,7 +331,7 @@ struct RAContext {
   uint32_t _memAllTotal;                 //!< Count of bytes used by variables and stack after alignment.
 
   uint32_t _annotationLength;            //!< Default length of an annotated instruction.
-  RAState* _state;                      //!< Current RA state.
+  RAState* _state;                       //!< Current RA state.
 };
 
 //! \}

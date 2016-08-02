@@ -168,7 +168,7 @@ ASMJIT_ENUM(FuncFlags) {
   //! adjust the stack (like "and zsp, -Alignment").
   kFuncFlagIsStackAdjusted = 0x00000008,
 
-  //! Whether the function is finished using `Compiler::endFunc()`.
+  //! Whether the function is finished using `CodeCompiler::endFunc()`.
   kFuncFlagIsFinished = 0x80000000,
 
   //! Whether to emit `leave` instead of two instructions in case that the

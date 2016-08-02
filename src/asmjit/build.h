@@ -13,7 +13,7 @@
 // ============================================================================
 
 // AsmJit is by default compiled only for a host processor for the purpose of
-// JIT code generation. Both Assembler and Compiler code generators are compiled
+// JIT code generation. Both Assembler and CodeCompiler emitters are compiled
 // by default. Preprocessor macros can be used to change the default behavior.
 
 // External Config File
@@ -64,11 +64,11 @@
 // ---------------------
 //
 // Flags can be defined to disable standard features. These are handy especially
-// when building asmjit statically and some features are not needed or unwanted
-// (like Compiler).
+// when building AsmJit statically and some features are not needed or unwanted
+// (like CodeCompiler).
 //
 // AsmJit features are enabled by default.
-// #define ASMJIT_DISABLE_COMPILER   // Disable Compiler (completely).
+// #define ASMJIT_DISABLE_COMPILER   // Disable CodeCompiler (completely).
 // #define ASMJIT_DISABLE_LOGGING    // Disable Logger and Formatter (completely).
 // #define ASMJIT_DISABLE_TEXT       // Disable everything that contains text
 //                                   // representation (instructions, errors, ...).

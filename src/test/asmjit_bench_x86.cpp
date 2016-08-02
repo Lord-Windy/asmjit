@@ -63,7 +63,7 @@ static double mbps(uint32_t time, size_t outputSize) {
 static void benchX86(uint32_t arch) {
   using namespace asmjit;
 
-  CodeHolder holder;
+  CodeHolder code;
   Performance perf;
 
   X86Assembler a;
@@ -84,13 +84,13 @@ static void benchX86(uint32_t arch) {
     asmOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      holder.setArchId(arch);
-      holder.attach(&a);
+      code.setArchId(arch);
+      code.attach(&a);
 
       asmtest::generateOpcodes(a);
-      asmOutputSize += holder.getCodeSize();
+      asmOutputSize += code.getCodeSize();
 
-      holder.reset(false); // Detaches `a`.
+      code.reset(false); // Detaches `a`.
     }
     perf.end();
   }
@@ -99,7 +99,13 @@ static void benchX86(uint32_t arch) {
     "X86Assembler", archName, perf.best, mbps(perf.best, asmOutputSize));
 
   // --------------------------------------------------------------------------
-  // [Bench - Compiler]
+  // [Bench - CodeBuilder]
+  // --------------------------------------------------------------------------
+
+  // TODO:
+
+  // --------------------------------------------------------------------------
+  // [Bench - CodeCompiler]
   // --------------------------------------------------------------------------
 
   perf.reset();
@@ -107,14 +113,14 @@ static void benchX86(uint32_t arch) {
     cmpOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      holder.setArchId(arch);
-      holder.attach(&c);
+      code.setArchId(arch);
+      code.attach(&c);
 
       asmtest::generateAlphaBlend(c);
       c.finalize();
-      cmpOutputSize += holder.getCodeSize();
+      cmpOutputSize += code.getCodeSize();
 
-      holder.reset(false); // Detaches `c`.
+      code.reset(false); // Detaches `c`.
     }
     perf.end();
   }

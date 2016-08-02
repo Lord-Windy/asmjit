@@ -242,7 +242,7 @@ function decomposeOpCode(opcode) {
       l     : m[5],
       w     : m[6],
       ew    : m[7],
-      en    : m[7]
+      en    : m[8]
     };
   }
   else {

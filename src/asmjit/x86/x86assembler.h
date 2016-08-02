@@ -167,14 +167,14 @@ ASMJIT_ENUM(X86AsmLevel) {
   template<typename Int2, typename Int3> \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, Int2 o2, Int3 o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Imm(o2), Utils::asInt(o3)); }
 
+#define INST_5x(NAME, ID, T0, T1, T2, T3, T4) \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4); }
+
 #define INST_5i(NAME, ID, T0, T1, T2, T3, T4) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4); } \
   /*! \overload */ \
   template<typename Int> \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, Int o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); }
-
-#define INST_5x(NAME, ID, T0, T1, T2, T3, T4) \
-  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4); }
 
 #define INST_6x(NAME, ID, T0, T1, T2, T3, T4, T5) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4, const T5& o5) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4, o5); }
@@ -215,7 +215,6 @@ struct X86EmitCommons {
   typedef X86Gp ZSI;
 
   typedef X86Xmm XMM0;
-  typedef X86Ymm YMM0;
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -344,9 +343,9 @@ struct X86EmitCommons {
 
   //! Force 3-byte VEX prefix (AVX+).
   ASMJIT_INLINE This& vex3() noexcept { THIS()->addOptions(X86Inst::kOptionVex3); return *THIS(); }
-
   //! Force 4-byte EVEX prefix (AVX512+).
   ASMJIT_INLINE This& evex() noexcept { THIS()->addOptions(X86Inst::kOptionEvex); return *THIS(); }
+
   //! Use zeroing instead of merging (AVX512+).
   ASMJIT_INLINE This& z() noexcept { THIS()->addOptions(X86Inst::kOptionEvexZero); return *THIS(); }
   //! Broadcast one element to all other elements (AVX512+).
@@ -2109,269 +2108,269 @@ struct X86EmitCommons {
   INST_4i(vfixupimmss, Vfixupimmss, X86Xmm, X86Xmm, X86Xmm, Imm)          //      AVX512F{kz|sae}
   INST_4i(vfixupimmss, Vfixupimmss, X86Xmm, X86Xmm, X86Mem, Imm)          //      AVX512F{kz|sae}
   INST_3x(vfmadd132pd, Vfmadd132pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd132pd, Vfmadd132pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd132pd, Vfmadd132pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd132pd, Vfmadd132pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd132pd, Vfmadd132pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd132pd, Vfmadd132pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd132ps, Vfmadd132ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd132sd, Vfmadd132sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd132sd, Vfmadd132sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd132ss, Vfmadd132ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd132ss, Vfmadd132ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd213pd, Vfmadd213pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd213ps, Vfmadd213ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd213sd, Vfmadd213sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd213sd, Vfmadd213sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd213ss, Vfmadd213ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd213ss, Vfmadd213ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd231pd, Vfmadd231pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd231ps, Vfmadd231ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmadd231sd, Vfmadd231sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd231sd, Vfmadd231sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd231ss, Vfmadd231ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmadd231ss, Vfmadd231ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub132pd, Vfmsub132pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub132ps, Vfmsub132ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub132sd, Vfmsub132sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub132sd, Vfmsub132sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub132ss, Vfmsub132ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub132ss, Vfmsub132ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub213pd, Vfmsub213pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub213ps, Vfmsub213ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub213sd, Vfmsub213sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub213sd, Vfmsub213sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub213ss, Vfmsub213ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub213ss, Vfmsub213ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub231pd, Vfmsub231pd, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Ymm, X86Ymm, X86Ymm)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Ymm, X86Ymm, X86Mem)               // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Zmm, X86Zmm, X86Zmm)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub231ps, Vfmsub231ps, X86Zmm, X86Zmm, X86Mem)               // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsub231sd, Vfmsub231sd, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub231sd, Vfmsub231sd, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub231ss, Vfmsub231ss, X86Xmm, X86Xmm, X86Xmm)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsub231ss, Vfmsub231ss, X86Xmm, X86Xmm, X86Mem)               // FMA4 AVX512F{kz|er}
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Xmm, X86Xmm, X86Xmm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Xmm, X86Xmm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Ymm, X86Ymm, X86Ymm)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Ymm, X86Ymm, X86Mem)         // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Zmm, X86Zmm, X86Zmm)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Zmm, X86Zmm, X86Mem)         // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd132sd, Vfnmadd132sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd132sd, Vfnmadd132sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd132ss, Vfnmadd132ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd132ss, Vfnmadd132ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd213sd, Vfnmadd213sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd213sd, Vfnmadd213sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd213ss, Vfnmadd213ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd213ss, Vfnmadd213ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmadd231sd, Vfnmadd231sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd231sd, Vfnmadd231sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd231ss, Vfnmadd231ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmadd231ss, Vfnmadd231ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub132sd, Vfnmsub132sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub132sd, Vfnmsub132sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub132ss, Vfnmsub132ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub132ss, Vfnmsub132ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub213sd, Vfnmsub213sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub213sd, Vfnmsub213sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub213ss, Vfnmsub213ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub213ss, Vfnmsub213ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b64}-VL
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b64}
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Ymm, X86Ymm, X86Ymm)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Ymm, X86Ymm, X86Mem)             // FMA4 AVX512F{kz|b32}-VL
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Zmm, X86Zmm, X86Zmm)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Zmm, X86Zmm, X86Mem)             // FMA4 AVX512F{kz|er|b32}
-  INST_3x(vfnmsub231sd, Vfnmsub231sd, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub231sd, Vfnmsub231sd, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub231ss, Vfnmsub231ss, X86Xmm, X86Xmm, X86Xmm)             // FMA4 AVX512F{kz|er}
-  INST_3x(vfnmsub231ss, Vfnmsub231ss, X86Xmm, X86Xmm, X86Mem)             // FMA4 AVX512F{kz|er}
+  INST_3x(vfmadd132pd, Vfmadd132pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd132pd, Vfmadd132pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd132pd, Vfmadd132pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd132pd, Vfmadd132pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd132pd, Vfmadd132pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd132ps, Vfmadd132ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd132sd, Vfmadd132sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd132sd, Vfmadd132sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd132ss, Vfmadd132ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd132ss, Vfmadd132ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd213pd, Vfmadd213pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd213ps, Vfmadd213ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd213sd, Vfmadd213sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd213sd, Vfmadd213sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd213ss, Vfmadd213ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd213ss, Vfmadd213ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd231pd, Vfmadd231pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd231ps, Vfmadd231ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmadd231sd, Vfmadd231sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd231sd, Vfmadd231sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd231ss, Vfmadd231ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmadd231ss, Vfmadd231ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub132pd, Vfmaddsub132pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmaddsub132ps, Vfmaddsub132ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub213pd, Vfmaddsub213pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmaddsub213ps, Vfmaddsub213ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub231pd, Vfmaddsub231pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmaddsub231ps, Vfmaddsub231ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub132pd, Vfmsub132pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub132ps, Vfmsub132ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub132sd, Vfmsub132sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub132sd, Vfmsub132sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub132ss, Vfmsub132ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub132ss, Vfmsub132ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub213pd, Vfmsub213pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub213ps, Vfmsub213ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub213sd, Vfmsub213sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub213sd, Vfmsub213sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub213ss, Vfmsub213ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub213ss, Vfmsub213ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub231pd, Vfmsub231pd, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Ymm, X86Ymm, X86Ymm)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Ymm, X86Ymm, X86Mem)               // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Zmm, X86Zmm, X86Zmm)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub231ps, Vfmsub231ps, X86Zmm, X86Zmm, X86Mem)               // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsub231sd, Vfmsub231sd, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub231sd, Vfmsub231sd, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub231ss, Vfmsub231ss, X86Xmm, X86Xmm, X86Xmm)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsub231ss, Vfmsub231ss, X86Xmm, X86Xmm, X86Mem)               // FMA3 AVX512F{kz|er}
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd132pd, Vfmsubadd132pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsubadd132ps, Vfmsubadd132ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd213pd, Vfmsubadd213pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsubadd213ps, Vfmsubadd213ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd231pd, Vfmsubadd231pd, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Xmm, X86Xmm, X86Xmm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Xmm, X86Xmm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Ymm, X86Ymm, X86Ymm)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Ymm, X86Ymm, X86Mem)         // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Zmm, X86Zmm, X86Zmm)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfmsubadd231ps, Vfmsubadd231ps, X86Zmm, X86Zmm, X86Mem)         // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd132pd, Vfnmadd132pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd132ps, Vfnmadd132ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd132sd, Vfnmadd132sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd132sd, Vfnmadd132sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd132ss, Vfnmadd132ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd132ss, Vfnmadd132ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd213pd, Vfnmadd213pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd213ps, Vfnmadd213ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd213sd, Vfnmadd213sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd213sd, Vfnmadd213sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd213ss, Vfnmadd213ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd213ss, Vfnmadd213ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd231pd, Vfnmadd231pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd231ps, Vfnmadd231ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmadd231sd, Vfnmadd231sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd231sd, Vfnmadd231sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd231ss, Vfnmadd231ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmadd231ss, Vfnmadd231ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub132pd, Vfnmsub132pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub132ps, Vfnmsub132ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub132sd, Vfnmsub132sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub132sd, Vfnmsub132sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub132ss, Vfnmsub132ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub132ss, Vfnmsub132ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub213pd, Vfnmsub213pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub213ps, Vfnmsub213ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub213sd, Vfnmsub213sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub213sd, Vfnmsub213sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub213ss, Vfnmsub213ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub213ss, Vfnmsub213ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b64}-VL
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub231pd, Vfnmsub231pd, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b64}
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Ymm, X86Ymm, X86Ymm)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Ymm, X86Ymm, X86Mem)             // FMA3 AVX512F{kz|b32}-VL
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Zmm, X86Zmm, X86Zmm)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub231ps, Vfnmsub231ps, X86Zmm, X86Zmm, X86Mem)             // FMA3 AVX512F{kz|er|b32}
+  INST_3x(vfnmsub231sd, Vfnmsub231sd, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub231sd, Vfnmsub231sd, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub231ss, Vfnmsub231ss, X86Xmm, X86Xmm, X86Xmm)             // FMA3 AVX512F{kz|er}
+  INST_3x(vfnmsub231ss, Vfnmsub231ss, X86Xmm, X86Xmm, X86Mem)             // FMA3 AVX512F{kz|er}
   INST_3i(vfpclasspd, Vfpclasspd, X86KReg, X86Xmm, Imm)                   //      AVX512DQ{k|b64}-VL
   INST_3i(vfpclasspd, Vfpclasspd, X86KReg, X86Mem, Imm)                   //      AVX512DQ{k|b64} AVX512DQ{k|b64}-VL
   INST_3i(vfpclasspd, Vfpclasspd, X86KReg, X86Ymm, Imm)                   //      AVX512DQ{k|b64}-VL
@@ -5165,6 +5164,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 };
 
 #undef THIS
+#undef THIS_C
 #undef INST_0x
 #undef INST_1x
 #undef INST_1i
@@ -5179,6 +5179,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 #undef INST_4i
 #undef INST_4ii
 #undef INST_5x
+#undef INST_5i
 #undef INST_6x
 
 // ============================================================================
@@ -5300,7 +5301,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 //! (that is mostly equal to the final code size, if called after the code
 //! generation) and `getCodeSize()` returns the final code size with possible
 //! trampolines. The `takeCode()` method can be used to take the internal buffer
-//! and reset the code generator, but the buffer returned has to be freed manually
+//! and reset the code emitter, but the buffer returned has to be freed manually
 //! in such case.
 //!
 //! Machine code can be executed only in memory that is marked executable. This
@@ -5407,7 +5408,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 //!
 //! If you need more abstraction for generating assembler code and you want
 //! to hide calling conventions between 32-bit and 64-bit operating systems,
-//! look at `Compiler` class that is designed for higher level code
+//! look at `CodeCompiler` class that is designed for higher level code
 //! generation.
 //!
 //! Advanced Code Generation
@@ -5439,7 +5440,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 //! own registers allocator. X86 architecture contains 8 general purpose
 //! registers, 8 Mm registers and 8 XMM/YMM/XMM registers. X64 architecture
 //! extends the count of GP registers and XMM/YMM/ZMM registers to 16. AVX-512
-//! architecture extends XMM/YMM/ZMM SIMD registers to 32.
+//! architecture extends XMM/YMM/ZMM SIMD registers to 32 with EVEX prefix.
 //!
 //! To create a general purpose register operand from register index use
 //! `gpb_lo()`, `gpb_hi()`, `gpw()`, `gpd()`, `gpq()`. To create registers of
@@ -5458,24 +5459,29 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API X86Assembler(CodeHolder* holder = nullptr) noexcept;
+  ASMJIT_API X86Assembler(CodeHolder* code = nullptr) noexcept;
   ASMJIT_API virtual ~X86Assembler() noexcept;
 
   // --------------------------------------------------------------------------
   // [Events]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error onAttach(CodeHolder* holder) noexcept override;
-  ASMJIT_API virtual Error onDetach(CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error onAttach(CodeHolder* code) noexcept override;
+  ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Code-Generation]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
+  // NOTE: X86Assembler uses _privateData to store 'address-override' bit that
+  // is used to decide whether to emit address-override (67H) prefix based on
+  // the memory BASE+INDEX registers. It's either `kX86MemInfo_67H_X86` or
+  // `kX86MemInfo_67H_X64`.
+  ASMJIT_INLINE void _setAddressOverrideMask(uint32_t m) noexcept { _privateData = m; }
+  ASMJIT_INLINE uint32_t _getAddressOverrideMask() const noexcept { return _privateData; }
 
-  ASMJIT_API virtual Error _emit(
-    uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) override;
+  ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
+  ASMJIT_API virtual Error _emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) override;
 
   // --------------------------------------------------------------------------
   // [Members]

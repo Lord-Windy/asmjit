@@ -172,10 +172,10 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(void*);
   INFO("");
 
-  INFO("Size of base types:");
-  DUMP_TYPE(asmjit::AsmBuilder);
+  INFO("Size of core classes:");
   DUMP_TYPE(asmjit::Assembler);
-  DUMP_TYPE(asmjit::CodeGen);
+  DUMP_TYPE(asmjit::CodeBuilder);
+  DUMP_TYPE(asmjit::CodeEmitter);
   DUMP_TYPE(asmjit::CodeHolder);
   DUMP_TYPE(asmjit::CodeHolder::SectionEntry);
   DUMP_TYPE(asmjit::CodeHolder::LabelEntry);
@@ -185,7 +185,7 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(asmjit::Zone);
   INFO("");
 
-  INFO("Size of Operand:");
+  INFO("Size of core operands:");
   DUMP_TYPE(asmjit::Operand);
   DUMP_TYPE(asmjit::Reg);
   DUMP_TYPE(asmjit::Mem);
@@ -194,18 +194,18 @@ static void dumpSizeOf(void) {
   INFO("");
 
 #if !defined(ASMJIT_DISABLE_COMPILER)
-  INFO("SizeOf Compiler:");
-  DUMP_TYPE(asmjit::Compiler);
-  DUMP_TYPE(asmjit::AsmNode);
-  DUMP_TYPE(asmjit::AsmInst);
-  DUMP_TYPE(asmjit::AsmJump);
-  DUMP_TYPE(asmjit::AsmData);
-  DUMP_TYPE(asmjit::AsmAlign);
-  DUMP_TYPE(asmjit::AsmLabel);
-  DUMP_TYPE(asmjit::AsmComment);
-  DUMP_TYPE(asmjit::AsmSentinel);
-  DUMP_TYPE(asmjit::AsmFunc);
-  DUMP_TYPE(asmjit::AsmCall);
+  INFO("SizeOf CodeCompiler:");
+  DUMP_TYPE(asmjit::CodeCompiler);
+  DUMP_TYPE(asmjit::CBNode);
+  DUMP_TYPE(asmjit::CBInst);
+  DUMP_TYPE(asmjit::CBJump);
+  DUMP_TYPE(asmjit::CBData);
+  DUMP_TYPE(asmjit::CBAlign);
+  DUMP_TYPE(asmjit::CBLabel);
+  DUMP_TYPE(asmjit::CBComment);
+  DUMP_TYPE(asmjit::CBSentinel);
+  DUMP_TYPE(asmjit::CCFunc);
+  DUMP_TYPE(asmjit::CCFuncCall);
   DUMP_TYPE(asmjit::FuncDecl);
   DUMP_TYPE(asmjit::FuncInOut);
   DUMP_TYPE(asmjit::FuncPrototype);

@@ -5,15 +5,15 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _ASMJIT_BASE_COMPILER_H
-#define _ASMJIT_BASE_COMPILER_H
+#ifndef _ASMJIT_BASE_CODECOMPILER_H
+#define _ASMJIT_BASE_CODECOMPILER_H
 
 #include "../build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
-#include "../base/asmbuilder.h"
 #include "../base/assembler.h"
+#include "../base/codebuilder.h"
 #include "../base/constpool.h"
 #include "../base/containers.h"
 #include "../base/func.h"
@@ -54,7 +54,7 @@ ASMJIT_ENUM(ConstScope) {
 // [asmjit::VirtReg]
 // ============================================================================
 
-//! Virtual register data (Compiler).
+//! Virtual register data (CodeCompiler).
 struct VirtReg {
   //! A state of a virtual register (used during register allocation).
   ASMJIT_ENUM(State) {
@@ -209,7 +209,7 @@ struct VirtReg {
 // [asmjit::TiedReg]
 // ============================================================================
 
-//! Tied register (Compiler)
+//! Tied register (CodeCompiler)
 //!
 //! Tied register is used to describe one ore more register operands that share
 //! the same virtual register. Tied register contains all the data that is
@@ -346,13 +346,13 @@ struct TiedReg {
 };
 
 // ============================================================================
-// [asmjit::AsmHint]
+// [asmjit::CCHint]
 // ============================================================================
 
-//! Hint for register allocator (Compiler).
-class AsmHint : public AsmNode {
+//! Hint for register allocator (CodeCompiler).
+class CCHint : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmHint)
+  ASMJIT_NO_COPY(CCHint)
 
   //! Hint type.
   ASMJIT_ENUM(Hint) {
@@ -372,16 +372,16 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmHint` instance.
-  ASMJIT_INLINE AsmHint(AsmBuilder* ab, VirtReg* vreg, uint32_t hint, uint32_t value) noexcept : AsmNode(ab, kNodeHint) {
+  //! Create a new `CCHint` instance.
+  ASMJIT_INLINE CCHint(CodeBuilder* cb, VirtReg* vreg, uint32_t hint, uint32_t value) noexcept : CBNode(cb, kNodeHint) {
     orFlags(kFlagIsRemovable | kFlagIsInformative);
     _vreg = vreg;
     _hint = hint;
     _value = value;
   }
 
-  //! Destroy the `AsmHint` instance.
-  ASMJIT_INLINE ~AsmHint() noexcept {}
+  //! Destroy the `CCHint` instance.
+  ASMJIT_INLINE ~CCHint() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -413,23 +413,23 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmFunc]
+// [asmjit::CCFunc]
 // ============================================================================
 
-//! Function entry (Compiler).
-class AsmFunc : public AsmLabel {
+//! Function entry (CodeCompiler).
+class CCFunc : public CBLabel {
 public:
-  ASMJIT_NO_COPY(AsmFunc)
+  ASMJIT_NO_COPY(CCFunc)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmFunc` instance.
+  //! Create a new `CCFunc` instance.
   //!
-  //! Always use `Compiler::addFunc()` to create \ref AsmFunc.
-  ASMJIT_INLINE AsmFunc(AsmBuilder* ab) noexcept
-    : AsmLabel(ab),
+  //! Always use `CodeCompiler::addFunc()` to create \ref CCFunc.
+  ASMJIT_INLINE CCFunc(CodeBuilder* cb) noexcept
+    : CBLabel(cb),
       _exitNode(nullptr),
       _decl(nullptr),
       _end(nullptr),
@@ -446,20 +446,20 @@ public:
     _type = kNodeFunc;
   }
 
-  //! Destroy the `AsmFunc` instance.
-  ASMJIT_INLINE ~AsmFunc() noexcept {}
+  //! Destroy the `CCFunc` instance.
+  ASMJIT_INLINE ~CCFunc() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get function exit `AsmLabel`.
-  ASMJIT_INLINE AsmLabel* getExitNode() const noexcept { return _exitNode; }
+  //! Get function exit `CBLabel`.
+  ASMJIT_INLINE CBLabel* getExitNode() const noexcept { return _exitNode; }
   //! Get function exit label.
   ASMJIT_INLINE Label getExitLabel() const noexcept { return _exitNode->getLabel(); }
 
   //! Get the function end sentinel.
-  ASMJIT_INLINE AsmSentinel* getEnd() const noexcept { return _end; }
+  ASMJIT_INLINE CBSentinel* getEnd() const noexcept { return _end; }
   //! Get function declaration.
   ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
 
@@ -577,8 +577,8 @@ public:
   // --------------------------------------------------------------------------
 
   FuncDecl* _decl;                       //!< Function declaration.
-  AsmLabel* _exitNode;                   //!< Function exit.
-  AsmSentinel* _end;                     //!< Function end.
+  CBLabel* _exitNode;                   //!< Function exit.
+  CBSentinel* _end;                     //!< Function end.
 
   VirtReg** _args;                       //!< Arguments array as `VirtReg`.
 
@@ -597,27 +597,27 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmFuncRet]
+// [asmjit::CCFuncRet]
 // ============================================================================
 
 //! AIR function return.
-class AsmFuncRet : public AsmNode {
+class CCFuncRet : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmFuncRet)
+  ASMJIT_NO_COPY(CCFuncRet)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmFuncRet` instance.
-  ASMJIT_INLINE AsmFuncRet(AsmBuilder* ab, const Operand_& o0, const Operand_& o1) noexcept : AsmNode(ab, kNodeFuncExit) {
+  //! Create a new `CCFuncRet` instance.
+  ASMJIT_INLINE CCFuncRet(CodeBuilder* cb, const Operand_& o0, const Operand_& o1) noexcept : CBNode(cb, kNodeFuncExit) {
     orFlags(kFlagIsRet);
     _ret[0].copyFrom(o0);
     _ret[1].copyFrom(o1);
   }
 
-  //! Destroy the `AsmFuncRet` instance.
-  ASMJIT_INLINE ~AsmFuncRet() noexcept {}
+  //! Destroy the `CCFuncRet` instance.
+  ASMJIT_INLINE ~CCFuncRet() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -642,21 +642,21 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmCall]
+// [asmjit::CCFuncCall]
 // ============================================================================
 
-//! Function call (Compiler).
-class AsmCall : public AsmInst {
+//! Function call (CodeCompiler).
+class CCFuncCall : public CBInst {
 public:
-  ASMJIT_NO_COPY(AsmCall)
+  ASMJIT_NO_COPY(CCFuncCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmCall` instance.
-  ASMJIT_INLINE AsmCall(AsmBuilder* ab, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
-    : AsmInst(ab, instId, options, opArray, opCount),
+  //! Create a new `CCFuncCall` instance.
+  ASMJIT_INLINE CCFuncCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+    : CBInst(cb, instId, options, opArray, opCount),
       _decl(nullptr),
       _args(nullptr) {
 
@@ -666,8 +666,8 @@ public:
     orFlags(kFlagIsRemovable);
   }
 
-  //! Destroy the `AsmCall` instance.
-  ASMJIT_INLINE ~AsmCall() noexcept {}
+  //! Destroy the `CCFuncCall` instance.
+  ASMJIT_INLINE ~CCFuncCall() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -713,21 +713,21 @@ public:
 };
 
 // ============================================================================
-// [asmjit::AsmPushArg]
+// [asmjit::CCPushArg]
 // ============================================================================
 
-//! Push argument before a function call (Compiler).
-class AsmPushArg : public AsmNode {
+//! Push argument before a function call (CodeCompiler).
+class CCPushArg : public CBNode {
 public:
-  ASMJIT_NO_COPY(AsmPushArg)
+  ASMJIT_NO_COPY(CCPushArg)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `AsmPushArg` instance.
-  ASMJIT_INLINE AsmPushArg(AsmBuilder* ab, AsmCall* call, VirtReg* src, VirtReg* cvt) noexcept
-    : AsmNode(ab, kNodePushArg),
+  //! Create a new `CCPushArg` instance.
+  ASMJIT_INLINE CCPushArg(CodeBuilder* cb, CCFuncCall* call, VirtReg* src, VirtReg* cvt) noexcept
+    : CBNode(cb, kNodePushArg),
       _call(call),
       _src(src),
       _cvt(cvt),
@@ -735,15 +735,15 @@ public:
     orFlags(kFlagIsRemovable);
   }
 
-  //! Destroy the `AsmPushArg` instance.
-  ASMJIT_INLINE ~AsmPushArg() noexcept {}
+  //! Destroy the `CCPushArg` instance.
+  ASMJIT_INLINE ~CCPushArg() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
   //! Get the associated function-call.
-  ASMJIT_INLINE AsmCall* getCall() const noexcept { return _call; }
+  ASMJIT_INLINE CCFuncCall* getCall() const noexcept { return _call; }
   //! Get source variable.
   ASMJIT_INLINE VirtReg* getSrcReg() const noexcept { return _src; }
   //! Get conversion variable.
@@ -753,49 +753,51 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  AsmCall* _call;                        //!< Associated `AsmCall`.
+  CCFuncCall* _call;                        //!< Associated `CCFuncCall`.
   VirtReg* _src;                         //!< Source variable.
   VirtReg* _cvt;                         //!< Temporary variable used for conversion (or null).
   uint32_t _args;                        //!< Affected arguments bit-array.
 };
 
 // ============================================================================
-// [asmjit::Compiler]
+// [asmjit::CodeCompiler]
 // ============================================================================
 
-//! Code-generator that uses virtual registers and performs register allocation.
+//! Code emitter that uses virtual registers and performs register allocation.
 //!
 //! Compiler is a high-level code-generation tool that provides register
 //! allocation and automatic handling of function calling conventions. It was
-//! primarily designed for merging multiple parts of asm code into a function
-//! without worrying about registers and function calling conventions. Compiler
-//! can be used, with a minimum effort, to handle 32-bit and 64-bit code at
-//! the same time.
+//! primarily designed for merging multiple parts of code into a function
+//! without worrying about registers and function calling conventions.
 //!
-//! Compiler is based on `AsmBuilder` and contains all the features it provides.
-//! It means that the code it stores can be modified (removed, added, injected)
-//! and analyzed. When the code is finalized the compiler can serialize the
-//! code into the `Assembler`.
-class ASMJIT_VIRTAPI Compiler : public AsmBuilder {
+//! CodeCompiler can be used, with a minimum effort, to handle 32-bit and 64-bit
+//! code at the same time.
+//!
+//! CodeCompiler is based on CodeBuilder and contains all the features it
+//! provides. It means that the code it stores can be modified (removed, added,
+//! injected) and analyzed. When the code is finalized the compiler can emit
+//! the code into an Assembler to translate the abstract representation into a
+//! machine code.
+class ASMJIT_VIRTAPI CodeCompiler : public CodeBuilder {
 public:
-  ASMJIT_NO_COPY(Compiler)
-  typedef AsmBuilder Base;
+  ASMJIT_NO_COPY(CodeCompiler)
+  typedef CodeBuilder Base;
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `Compiler` instance.
-  ASMJIT_API Compiler() noexcept;
-  //! Destroy the `Compiler` instance.
-  ASMJIT_API virtual ~Compiler() noexcept;
+  //! Create a new `CodeCompiler` instance.
+  ASMJIT_API CodeCompiler() noexcept;
+  //! Destroy the `CodeCompiler` instance.
+  ASMJIT_API virtual ~CodeCompiler() noexcept;
 
   // --------------------------------------------------------------------------
   // [Events]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Error onAttach(CodeHolder* holder) noexcept override;
-  ASMJIT_API virtual Error onDetach(CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error onAttach(CodeHolder* code) noexcept override;
+  ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Compiler Features]
@@ -830,17 +832,17 @@ public:
 
   //! \internal
   //!
-  //! Create a new `AsmHint`.
-  ASMJIT_API AsmHint* newHintNode(Reg& reg, uint32_t hint, uint32_t value) noexcept;
+  //! Create a new `CCHint`.
+  ASMJIT_API CCHint* newHintNode(Reg& reg, uint32_t hint, uint32_t value) noexcept;
 
   // --------------------------------------------------------------------------
   // [Func]
   // --------------------------------------------------------------------------
 
   //! Add a function `node` to the stream.
-  ASMJIT_API AsmFunc* addFunc(AsmFunc* func);
+  ASMJIT_API CCFunc* addFunc(CCFunc* func);
   //! Get current function.
-  ASMJIT_INLINE AsmFunc* getFunc() const noexcept { return _func; }
+  ASMJIT_INLINE CCFunc* getFunc() const noexcept { return _func; }
 
   // --------------------------------------------------------------------------
   // [Hint]
@@ -877,7 +879,7 @@ public:
     return _vRegArray[index];
   }
 
-  //! Get an array of all virtual registers managed by the Compiler.
+  //! Get an array of all virtual registers managed by CodeCompiler.
   ASMJIT_INLINE const PodVector<VirtReg*>& getVirtRegArray() const noexcept { return _vRegArray; }
 
   //! Alloc a virtual register `reg`.
@@ -935,17 +937,17 @@ public:
 
   //! Processing token generator.
   //!
-  //! Used to get a unique token that is then used to process `AsmNode`s. See
-  //! `Compiler::_getUniqueToken()` for more details.
+  //! Used to get a unique token that is then used to process `CBNode`s. See
+  //! `CodeCompiler::_getUniqueToken()` for more details.
   uint32_t _tokenGenerator;
 
-  AsmFunc* _func;                        //!< Current function.
+  CCFunc* _func;                        //!< Current function.
 
   Zone _vRegAllocator;                   //!< Allocates \ref VirtReg objects.
   PodVector<VirtReg*> _vRegArray;        //!< Stores array of \ref VirtReg pointers.
 
-  AsmConstPool* _localConstPool;         //!< Local constant pool, flushed at the end of each function.
-  AsmConstPool* _globalConstPool;        //!< Global constant pool, flushed at the end of the compilation.
+  CBConstPool* _localConstPool;         //!< Local constant pool, flushed at the end of each function.
+  CBConstPool* _globalConstPool;        //!< Global constant pool, flushed at the end of the compilation.
 };
 
 //! \}
@@ -957,4 +959,4 @@ public:
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER
-#endif // _ASMJIT_BASE_COMPILER_H
+#endif // _ASMJIT_BASE_CODECOMPILER_H

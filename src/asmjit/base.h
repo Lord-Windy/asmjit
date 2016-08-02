@@ -12,14 +12,16 @@
 #include "./build.h"
 
 #include "./base/archinfo.h"
-#include "./base/asmbuilder.h"
 #include "./base/assembler.h"
 #include "./base/bitutils.h"
-#include "./base/codegen.h"
+#include "./base/codebuilder.h"
+#include "./base/codecompiler.h"
+#include "./base/codeemitter.h"
 #include "./base/codeholder.h"
 #include "./base/constpool.h"
 #include "./base/containers.h"
 #include "./base/cpuinfo.h"
+#include "./base/func.h"
 #include "./base/globals.h"
 #include "./base/logging.h"
 #include "./base/operand.h"
@@ -29,12 +31,6 @@
 #include "./base/utils.h"
 #include "./base/vmem.h"
 #include "./base/zone.h"
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-#include "./base/asmbuilder.h"
-#include "./base/compiler.h"
-#include "./base/func.h"
-#endif // !ASMJIT_DISABLE_COMPILER
 
 // [Guard]
 #endif // _ASMJIT_BASE_H
