@@ -18,18 +18,15 @@
 namespace asmjit {
 
 //! Zero size block used by `Zone` that doesn't have any memory allocated.
-static const Zone::Block Zone_zeroBlock = {
-  nullptr, nullptr, nullptr, nullptr, { 0 }
-};
+static const Zone::Block Zone_zeroBlock = { nullptr, nullptr, nullptr, nullptr, { 0 } };
 
 // ============================================================================
 // [asmjit::Zone - Construction / Destruction]
 // ============================================================================
 
-Zone::Zone(size_t blockSize) noexcept {
-  _block = const_cast<Zone::Block*>(&Zone_zeroBlock);
-  _blockSize = blockSize;
-}
+Zone::Zone(size_t blockSize) noexcept
+  : _block(const_cast<Zone::Block*>(&Zone_zeroBlock)),
+    _blockSize(blockSize) {}
 
 Zone::~Zone() noexcept {
   reset(true);
@@ -54,10 +51,10 @@ void Zone::reset(bool releaseMemory) noexcept {
       Block* prev = cur->prev;
       ASMJIT_FREE(cur);
       cur = prev;
-    } while (cur != nullptr);
+    } while (cur);
 
     cur = next;
-    while (cur != nullptr) {
+    while (cur) {
       next = cur->next;
       ASMJIT_FREE(cur);
       cur = next;
@@ -66,7 +63,7 @@ void Zone::reset(bool releaseMemory) noexcept {
     _block = const_cast<Zone::Block*>(&Zone_zeroBlock);
   }
   else {
-    while (cur->prev != nullptr)
+    while (cur->prev)
       cur = cur->prev;
 
     cur->pos = cur->data;
@@ -91,19 +88,17 @@ void* Zone::_alloc(size_t size) noexcept {
   // a new one. If there is a `next` block it's completely unused, we don't have
   // to check for remaining bytes.
   Block* next = curBlock->next;
-  if (next != nullptr && next->getBlockSize() >= size) {
+  if (next && next->getBlockSize() >= size) {
     next->pos = next->data + size;
     _block = next;
     return static_cast<void*>(next->data);
   }
 
   // Prevent arithmetic overflow.
-  if (blockSize > ~static_cast<size_t>(0) - sizeof(Block))
-    return nullptr;
+  if (blockSize > ~static_cast<size_t>(0) - sizeof(Block)) return nullptr;
 
   Block* newBlock = static_cast<Block*>(ASMJIT_ALLOC(sizeof(Block) - sizeof(void*) + blockSize));
-  if (newBlock == nullptr)
-    return nullptr;
+  if (!newBlock) return nullptr;
 
   newBlock->pos = newBlock->data + size;
   newBlock->end = newBlock->data + blockSize;
@@ -117,7 +112,7 @@ void* Zone::_alloc(size_t size) noexcept {
     // Does only happen if there is a next block, but the requested memory
     // can't fit into it. In this case a new buffer is allocated and inserted
     // between the current block and the next one.
-    if (next != nullptr) {
+    if (next) {
       newBlock->next = next;
       next->prev = newBlock;
     }
@@ -129,41 +124,29 @@ void* Zone::_alloc(size_t size) noexcept {
 
 void* Zone::allocZeroed(size_t size) noexcept {
   void* p = alloc(size);
-  if (p != nullptr)
-    ::memset(p, 0, size);
+  if (p) ::memset(p, 0, size);
   return p;
 }
 
 void* Zone::dup(const void* data, size_t size) noexcept {
-  if (data == nullptr)
-    return nullptr;
-
-  if (size == 0)
-    return nullptr;
+  if (!data || size == 0) return nullptr;
 
   void* m = alloc(size);
-  if (m == nullptr)
-    return nullptr;
+  if (!m) return nullptr;
 
   ::memcpy(m, data, size);
   return m;
 }
 
 char* Zone::sdup(const char* str) noexcept {
-  if (str == nullptr)
-    return nullptr;
+  size_t len;
+  if (!str || (len = ::strlen(str)) == 0) return nullptr;
 
-  size_t len = ::strlen(str);
-  if (len == 0)
-    return nullptr;
-
-  // Include NULL terminator and limit string length.
-  if (++len > 256)
-    len = 256;
+  // Include null terminator and limit the string length.
+  if (++len > 256) len = 256;
 
   char* m = static_cast<char*>(alloc(len));
-  if (m == nullptr)
-    return nullptr;
+  if (!m) return nullptr;
 
   ::memcpy(m, str, len);
   m[len - 1] = '\0';
@@ -171,8 +154,7 @@ char* Zone::sdup(const char* str) noexcept {
 }
 
 char* Zone::sformat(const char* fmt, ...) noexcept {
-  if (fmt == nullptr)
-    return nullptr;
+  if (!fmt) return nullptr;
 
   char buf[512];
   size_t len;

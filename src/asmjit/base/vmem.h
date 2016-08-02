@@ -9,6 +9,7 @@
 #define _ASMJIT_BASE_VMEM_H
 
 // [Dependencies]
+#include "../base/globals.h"
 #include "../base/utils.h"
 
 // [Api-Begin]
@@ -69,7 +70,7 @@ struct VMemUtil {
   //!
   //! Pages are readable/writeable, but they are not guaranteed to be
   //! executable unless 'canExecute' is true. Returns the address of
-  //! allocated memory, or `nullptr` on failure.
+  //! allocated memory, or null on failure.
   static ASMJIT_API void* alloc(size_t length, size_t* allocated, uint32_t flags) noexcept;
   //! Free memory allocated by `alloc()`.
   static ASMJIT_API Error release(void* addr, size_t length) noexcept;
@@ -90,7 +91,7 @@ struct VMemUtil {
 //! Reference implementation of memory manager that uses `VMemUtil` to allocate
 //! chunks of virtual memory and bit arrays to manage it.
 class VMemMgr {
- public:
+public:
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
@@ -123,30 +124,19 @@ class VMemMgr {
 
 #if ASMJIT_OS_WINDOWS
   //! Get the handle of the process memory manager is bound to.
-  ASMJIT_INLINE HANDLE getProcessHandle() const noexcept {
-    return _hProcess;
-  }
+  ASMJIT_INLINE HANDLE getProcessHandle() const noexcept { return _hProcess; }
 #endif // ASMJIT_OS_WINDOWS
 
   //! Get how many bytes are currently allocated.
-  ASMJIT_INLINE size_t getAllocatedBytes() const noexcept {
-    return _allocatedBytes;
-  }
-
+  ASMJIT_INLINE size_t getAllocatedBytes() const noexcept { return _allocatedBytes; }
   //! Get how many bytes are currently used.
-  ASMJIT_INLINE size_t getUsedBytes() const noexcept {
-    return _usedBytes;
-  }
+  ASMJIT_INLINE size_t getUsedBytes() const noexcept { return _usedBytes; }
 
   //! Get whether to keep allocated memory after the `VMemMgr` is destroyed.
   //!
   //! \sa \ref setKeepVirtualMemory.
-  ASMJIT_INLINE bool getKeepVirtualMemory() const noexcept {
-    return _keepVirtualMemory;
-  }
-
-  //! Set whether to keep allocated memory after memory manager is
-  //! destroyed.
+  ASMJIT_INLINE bool getKeepVirtualMemory() const noexcept { return _keepVirtualMemory; }
+  //! Set whether to keep allocated memory after the memory manager is destroyed.
   //!
   //! This method is usable when patching code of remote process. You need to
   //! allocate process memory, store generated assembler into it and patch the
@@ -157,9 +147,7 @@ class VMemMgr {
   //! NOTE: Memory allocated with kVMemAllocPermanent is always kept.
   //!
   //! \sa \ref getKeepVirtualMemory.
-  ASMJIT_INLINE void setKeepVirtualMemory(bool keepVirtualMemory) noexcept {
-    _keepVirtualMemory = keepVirtualMemory;
-  }
+  ASMJIT_INLINE void setKeepVirtualMemory(bool val) noexcept { _keepVirtualMemory = val; }
 
   // --------------------------------------------------------------------------
   // [Alloc / Release]
@@ -171,10 +159,8 @@ class VMemMgr {
   //! can quitly ignore type of allocation. This is mainly for AsmJit to memory
   //! manager that allocated memory will be never freed.
   ASMJIT_API void* alloc(size_t size, uint32_t type = kVMemAllocFreeable) noexcept;
-
   //! Free previously allocated memory at a given `address`.
   ASMJIT_API Error release(void* p) noexcept;
-
   //! Free extra memory allocated with `p`.
   ASMJIT_API Error shrink(void* p, size_t used) noexcept;
 
@@ -183,25 +169,16 @@ class VMemMgr {
   // --------------------------------------------------------------------------
 
 #if ASMJIT_OS_WINDOWS
-  //! Process passed to `VirtualAllocEx` and `VirtualFree`.
-  HANDLE _hProcess;
+  HANDLE _hProcess;                      //!< Process passed to `VirtualAllocEx` and `VirtualFree`.
 #endif // ASMJIT_OS_WINDOWS
+  Lock _lock;                            //!< Lock to enable thread-safe functionality.
 
-  //! Lock to enable thread-safe functionality.
-  Lock _lock;
+  size_t _blockSize;                     //!< Default block size.
+  size_t _blockDensity;                  //!< Default block density.
+  bool _keepVirtualMemory;               //!< Keep virtual memory after destroyed.
 
-  //! Default block size.
-  size_t _blockSize;
-  //! Default block density.
-  size_t _blockDensity;
-
-  // Whether to keep virtual memory after destroy.
-  bool _keepVirtualMemory;
-
-  //! How many bytes are currently allocated.
-  size_t _allocatedBytes;
-  //! How many bytes are currently used.
-  size_t _usedBytes;
+  size_t _allocatedBytes;                //!< How many bytes are currently allocated.
+  size_t _usedBytes;                     //!< How many bytes are currently used.
 
   //! \internal
   //! \{

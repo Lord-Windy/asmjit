@@ -20,7 +20,7 @@ namespace asmjit {
 // ============================================================================
 
 #if !defined(ASMJIT_DISABLE_TEXT)
-static const char errorMessages[] = {
+static const char errorMessages[] =
   "Ok\0"
   "No heap memory\0"
   "No virtual memory\0"
@@ -28,16 +28,23 @@ static const char errorMessages[] = {
   "Invalid state\0"
   "Invalid architecture\0"
   "Not initialized\0"
+  "Slot occupied\0"
   "No code generated\0"
   "Code too large\0"
+  "Invalid label\0"
+  "Label index overflow\0"
   "Label already bound\0"
   "Unknown instruction\0"
   "Illegal instruction\0"
+  "Illegal register type\0"
+  "Invalid register's physical id\0"
+  "Invalid register's virtual id\0"
+  "Illegal use of a low 8-bit GPB register\0"
+  "Illegal use of a 64-bit GPQ register in 32-bit mode\0"
   "Illegal addressing\0"
   "Illegal displacement\0"
   "Overlapped arguments\0"
-  "Unknown error\0"
-};
+  "Unknown error\0";
 
 static const char* findPackedString(const char* p, uint32_t id, uint32_t maxId) noexcept {
   uint32_t i = 0;

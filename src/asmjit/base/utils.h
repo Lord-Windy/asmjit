@@ -30,9 +30,7 @@ namespace asmjit {
 //! \internal
 //! \{
 template<size_t Size, int IsSigned>
-struct IntTraitsPrivate {
-  // Let it fail if not specialized!
-};
+struct IntTraitsPrivate {}; // Let it fail if not specialized!
 
 template<> struct IntTraitsPrivate<1, 0> { typedef int     IntType; typedef int8_t  SignedType; typedef uint8_t  UnsignedType; };
 template<> struct IntTraitsPrivate<1, 1> { typedef int     IntType; typedef int8_t  SignedType; typedef uint8_t  UnsignedType; };
@@ -50,15 +48,13 @@ template<> struct IntTraitsPrivate<8, 1> { typedef int64_t IntType; typedef int6
 template<typename T>
 struct IntTraits {
   enum {
-    kIsSigned = static_cast<T>(~static_cast<T>(0)) < static_cast<T>(0),
+    kIsSigned   = static_cast<T>(~static_cast<T>(0)) < static_cast<T>(0),
     kIsUnsigned = !kIsSigned,
-
-    kIs8Bit = sizeof(T) == 1,
-    kIs16Bit = sizeof(T) == 2,
-    kIs32Bit = sizeof(T) == 4,
-    kIs64Bit = sizeof(T) == 8,
-
-    kIsIntPtr = sizeof(T) == sizeof(intptr_t)
+    kIs8Bit     = sizeof(T) == 1,
+    kIs16Bit    = sizeof(T) == 2,
+    kIs32Bit    = sizeof(T) == 4,
+    kIs64Bit    = sizeof(T) == 8,
+    kIsIntPtr   = sizeof(T) == sizeof(intptr_t)
   };
 
   typedef typename IntTraitsPrivate<sizeof(T), kIsSigned>::IntType IntType;
@@ -67,18 +63,12 @@ struct IntTraits {
 
   //! Get a minimum value of `T`.
   static ASMJIT_INLINE T minValue() noexcept {
-    if (kIsSigned)
-      return static_cast<T>((~static_cast<UnsignedType>(0) >> 1) + static_cast<UnsignedType>(1));
-    else
-      return static_cast<T>(0);
+    return kIsSigned ? T((~static_cast<UnsignedType>(0) >> 1) + static_cast<UnsignedType>(1)) : T(0);
   }
 
   //! Get a maximum value of `T`.
   static ASMJIT_INLINE T maxValue() noexcept {
-    if (kIsSigned)
-      return static_cast<T>(~static_cast<UnsignedType>(0) >> 1);
-    else
-      return ~static_cast<T>(0);
+    return kIsSigned ? T(~static_cast<UnsignedType>(0) >> 1) : ~T(0);
   }
 };
 
@@ -87,6 +77,12 @@ struct IntTraits {
 // ============================================================================
 // [asmjit::Utils]
 // ============================================================================
+
+#if ASMJIT_ARCH_LE
+# define ASMJIT_PACK32_4x8(a, b, c, d) ((a) + ((b) << 8) + ((c) << 16) + ((d) << 24))
+#else
+# define ASMJIT_PACK32_4x8(a, b, c, d) ((d) + ((c) << 8) + ((b) << 16) + ((a) << 24))
+#endif
 
 //! AsmJit utilities - integer, string, etc...
 struct Utils {
@@ -120,17 +116,9 @@ struct Utils {
   // [Pack / Unpack]
   // --------------------------------------------------------------------------
 
-  //! Pack two 8-bit integer and one 16-bit integer into a 32-bit integer as it
-  //! is an array of `{b0,b1,w2}`.
-  static ASMJIT_INLINE uint32_t pack32_2x8_1x16(uint32_t b0, uint32_t b1, uint32_t w2) noexcept {
-    return ASMJIT_ARCH_LE ? b0 + (b1 << 8) + (w2 << 16)
-                          : (b0 << 24) + (b1 << 16) + w2;
-  }
-
   //! Pack four 8-bit integer into a 32-bit integer as it is an array of `{b0,b1,b2,b3}`.
   static ASMJIT_INLINE uint32_t pack32_4x8(uint32_t b0, uint32_t b1, uint32_t b2, uint32_t b3) noexcept {
-    return ASMJIT_ARCH_LE ? b0 + (b1 << 8) + (b2 << 16) + (b3 << 24)
-                          : (b0 << 24) + (b1 << 16) + (b2 << 8) + b3;
+    return ASMJIT_PACK32_4x8(b0, b1, b2, b3);
   }
 
   //! Pack two 32-bit integer into a 64-bit integer as it is an array of `{u0,u1}`.
@@ -179,9 +167,9 @@ struct Utils {
   // [AsInt]
   // --------------------------------------------------------------------------
 
-  //! Map an integer `x` of type `T` to an `int` or `int64_t`, depending on the
-  //! type. Used internally by AsmJit to dispatch an argument that can be an
-  //! arbitrary integer type into a function that accepts either `int` or
+  //! Map an integer `x` of type `T` to `int` or `int64_t` depending on the
+  //! type. Used internally by AsmJit to dispatch arguments that can be of
+  //! arbitrary integer type into a function argument that is either `int` or
   //! `int64_t`.
   template<typename T>
   static ASMJIT_INLINE typename IntTraits<T>::IntType asInt(T x) noexcept {
@@ -1321,13 +1309,8 @@ struct AutoLock {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE AutoLock(Lock& target) noexcept : _target(target) {
-    _target.lock();
-  }
-
-  ASMJIT_INLINE ~AutoLock() noexcept {
-    _target.unlock();
-  }
+  ASMJIT_INLINE AutoLock(Lock& target) noexcept : _target(target) { _target.lock(); }
+  ASMJIT_INLINE ~AutoLock() noexcept { _target.unlock(); }
 
   // --------------------------------------------------------------------------
   // [Members]

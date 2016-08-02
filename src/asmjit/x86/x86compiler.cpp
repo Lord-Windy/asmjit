@@ -9,10 +9,9 @@
 
 // [Guard]
 #include "../build.h"
-#if !defined(ASMJIT_DISABLE_COMPILER) && (defined(ASMJIT_BUILD_X86) || defined(ASMJIT_BUILD_X64))
+#if !defined(ASMJIT_DISABLE_COMPILER) && defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
-#include "../base/containers.h"
 #include "../base/utils.h"
 #include "../x86/x86assembler.h"
 #include "../x86/x86compiler.h"
@@ -33,111 +32,75 @@ namespace asmjit {
 #else
 #define ASMJIT_ASSERT_OPERAND(op) \
   do { \
-    if (op.isVar() || op.isLabel()) { \
+    if (op.isReg() || op.isLabel()) { \
       ASMJIT_ASSERT(op.getId() != kInvalidValue); \
     } \
   } while(0)
 #endif
 
 // ============================================================================
-// [asmjit::X86VarInfo]
+// [asmjit::X86TypeData]
 // ============================================================================
 
-#define F(flag) VarInfo::kFlag##flag
-const VarInfo _x86VarInfo[] = {
-  { kVarTypeInt8    , 1 , kX86RegClassGp , kX86RegTypeGpbLo, 0              , "gpb" },
-  { kVarTypeUInt8   , 1 , kX86RegClassGp , kX86RegTypeGpbLo, 0              , "gpb" },
-  { kVarTypeInt16   , 2 , kX86RegClassGp , kX86RegTypeGpw  , 0              , "gpw" },
-  { kVarTypeUInt16  , 2 , kX86RegClassGp , kX86RegTypeGpw  , 0              , "gpw" },
-  { kVarTypeInt32   , 4 , kX86RegClassGp , kX86RegTypeGpd  , 0              , "gpd" },
-  { kVarTypeUInt32  , 4 , kX86RegClassGp , kX86RegTypeGpd  , 0              , "gpd" },
-  { kVarTypeInt64   , 8 , kX86RegClassGp , kX86RegTypeGpq  , 0              , "gpq" },
-  { kVarTypeUInt64  , 8 , kX86RegClassGp , kX86RegTypeGpq  , 0              , "gpq" },
-  { kVarTypeIntPtr  , 0 , kX86RegClassGp , 0               , 0              , ""    }, // Abstract.
-  { kVarTypeUIntPtr , 0 , kX86RegClassGp , 0               , 0              , ""    }, // Abstract.
-  { kVarTypeFp32    , 4 , kX86RegClassFp , kX86RegTypeFp   , F(SP)          , "fp"  },
-  { kVarTypeFp64    , 8 , kX86RegClassFp , kX86RegTypeFp   , F(DP)          , "fp"  },
-  { kX86VarTypeMm   , 8 , kX86RegClassMm , kX86RegTypeMm   , 0     | F(SIMD), "mm"  },
-  { kX86VarTypeK    , 8 , kX86RegClassK  , kX86RegTypeK    , 0              , "k"   },
-  { kX86VarTypeXmm  , 16, kX86RegClassXyz, kX86RegTypeXmm  , 0     | F(SIMD), "xmm" },
-  { kX86VarTypeXmmSs, 4 , kX86RegClassXyz, kX86RegTypeXmm  , F(SP)          , "xmm" },
-  { kX86VarTypeXmmPs, 16, kX86RegClassXyz, kX86RegTypeXmm  , F(SP) | F(SIMD), "xmm" },
-  { kX86VarTypeXmmSd, 8 , kX86RegClassXyz, kX86RegTypeXmm  , F(DP)          , "xmm" },
-  { kX86VarTypeXmmPd, 16, kX86RegClassXyz, kX86RegTypeXmm  , F(DP) | F(SIMD), "xmm" },
-  { kX86VarTypeYmm  , 32, kX86RegClassXyz, kX86RegTypeYmm  , 0     | F(SIMD), "ymm" },
-  { kX86VarTypeYmmPs, 32, kX86RegClassXyz, kX86RegTypeYmm  , F(SP) | F(SIMD), "ymm" },
-  { kX86VarTypeYmmPd, 32, kX86RegClassXyz, kX86RegTypeYmm  , F(DP) | F(SIMD), "ymm" },
-  { kX86VarTypeZmm  , 64, kX86RegClassXyz, kX86RegTypeZmm  , 0     | F(SIMD), "zmm" },
-  { kX86VarTypeZmmPs, 64, kX86RegClassXyz, kX86RegTypeZmm  , F(SP) | F(SIMD), "zmm" },
-  { kX86VarTypeZmmPd, 64, kX86RegClassXyz, kX86RegTypeZmm  , F(DP) | F(SIMD), "zmm" }
+#define INVALID_TYPE() {{ 0, 0, 0, 0 }}
+#define SIGNATURE_OF(REG_TYPE) {{          \
+  uint8_t(Operand::kOpReg),                \
+  uint8_t(REG_TYPE),                       \
+  uint8_t(X86RegTraits<REG_TYPE>::kClass), \
+  uint8_t(X86RegTraits<REG_TYPE>::kSize)   \
+}}
+
+#define F(FLAG) VirtType::kFlag##FLAG    // Type-Flags.
+#define U kInvalidValue                  // Unsupported.
+
+const X86TypeData _x86TypeData = {
+  {// Signature                       , Type-Id              , Sz, Type-Flags        , Type-Name
+    { SIGNATURE_OF(X86Reg::kRegGpbLo), VirtType::kIdI8      , 1 , 0                 , "gp.i8"   }, // #0
+    { SIGNATURE_OF(X86Reg::kRegGpbLo), VirtType::kIdU8      , 1 , 0                 , "gp.u8"   }, // #1
+    { SIGNATURE_OF(X86Reg::kRegGpw)  , VirtType::kIdI16     , 2 , 0                 , "gp.i16"  }, // #2
+    { SIGNATURE_OF(X86Reg::kRegGpw)  , VirtType::kIdU16     , 2 , 0                 , "gp.u16"  }, // #3
+    { SIGNATURE_OF(X86Reg::kRegGpd)  , VirtType::kIdI32     , 4 , 0                 , "gp.i32"  }, // #4
+    { SIGNATURE_OF(X86Reg::kRegGpd)  , VirtType::kIdU32     , 4 , 0                 , "gp.u32"  }, // #5
+    { SIGNATURE_OF(X86Reg::kRegGpq)  , VirtType::kIdI64     , 8 , 0                 , "gp.i64"  }, // #6
+    { SIGNATURE_OF(X86Reg::kRegGpq)  , VirtType::kIdU64     , 8 , 0                 , "gp.u64"  }, // #7
+    { INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #8
+    { INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #9
+  //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #10
+  //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #11
+    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF32     , 4 , 0                 , "fp"      }, // #10
+    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF64     , 8 , 0                 , "fp"      }, // #11
+    { SIGNATURE_OF(X86Reg::kRegK)    , VirtType::kIdX86K    , 8 , 0                 , "k"       }, // #12
+    { SIGNATURE_OF(X86Reg::kRegMm)   , VirtType::kIdX86Mm   , 8 , F(Vector)         , "mm"      }, // #13
+    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86Xmm  , 16, F(Vector)         , "xmm"     }, // #14
+    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmSs, 4 , 0         | F(F32), "xmm.ss"  }, // #15
+    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmSd, 8 , 0         | F(F64), "xmm.sd"  }, // #16
+    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmPs, 16, F(Vector) | F(F32), "xmm.ps"  }, // #17
+    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmPd, 16, F(Vector) | F(F64), "xmm.pd"  }, // #18
+    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86Ymm  , 32, F(Vector)         , "ymm"     }, // #19
+    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86YmmPs, 32, F(Vector) | F(F32), "ymm.ps"  }, // #20
+    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86YmmPd, 32, F(Vector) | F(F64), "ymm.pd"  }, // #21
+    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86Zmm  , 64, F(Vector)         , "zmm"     }, // #22
+    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86ZmmPs, 64, F(Vector) | F(F32), "zmm.ps"  }, // #23
+    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86ZmmPd, 64, F(Vector) | F(F64), "zmm.pd"  }  // #24
+  },
+
+  //#0, #1, #2, #3, #4, #5, #6, #7, #8, #9,#10,#11,#12,#13,#14,#15,#16,#17,#18,#19,#20,#21,#22,#23,#24
+  //I8, U8,I16,U16,I32,U32,I64,U64,PXX,UXX,F32,F64, K , MM,XMM,XSS,XSD,XPS,XPD,YMM,YPS,YPD,ZMM,ZPS,ZPD
+  { 0 , 1 , 2 , 3 , 4 , 5 , U , U , 4 , 5 , 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 }, // IdMapX86.
+  { 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 6 , 7 , 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 }  // IdMapX64.
 };
+
+#undef U
 #undef F
 
-#if defined(ASMJIT_BUILD_X86)
-const uint8_t _x86VarMapping[kX86VarTypeCount] = {
-  /* 00: kVarTypeInt8     */ kVarTypeInt8,
-  /* 01: kVarTypeUInt8    */ kVarTypeUInt8,
-  /* 02: kVarTypeInt16    */ kVarTypeInt16,
-  /* 03: kVarTypeUInt16   */ kVarTypeUInt16,
-  /* 04: kVarTypeInt32    */ kVarTypeInt32,
-  /* 05: kVarTypeUInt32   */ kVarTypeUInt32,
-  /* 06: kVarTypeInt64    */ kInvalidVar,     // Invalid in 32-bit mode.
-  /* 07: kVarTypeUInt64   */ kInvalidVar,     // Invalid in 32-bit mode.
-  /* 08: kVarTypeIntPtr   */ kVarTypeInt32,   // Remapped to Int32.
-  /* 09: kVarTypeUIntPtr  */ kVarTypeUInt32,  // Remapped to UInt32.
-  /* 10: kVarTypeFp32     */ kVarTypeFp32,
-  /* 11: kVarTypeFp64     */ kVarTypeFp64,
-  /* 12: kX86VarTypeMm    */ kX86VarTypeMm,
-  /* 13: kX86VarTypeK     */ kX86VarTypeK,
-  /* 14: kX86VarTypeXmm   */ kX86VarTypeXmm,
-  /* 15: kX86VarTypeXmmSs */ kX86VarTypeXmmSs,
-  /* 16: kX86VarTypeXmmPs */ kX86VarTypeXmmPs,
-  /* 17: kX86VarTypeXmmSd */ kX86VarTypeXmmSd,
-  /* 18: kX86VarTypeXmmPd */ kX86VarTypeXmmPd,
-  /* 19: kX86VarTypeYmm   */ kX86VarTypeYmm,
-  /* 20: kX86VarTypeYmmPs */ kX86VarTypeYmmPs,
-  /* 21: kX86VarTypeYmmPd */ kX86VarTypeYmmPd,
-  /* 22: kX86VarTypeZmm   */ kX86VarTypeZmm,
-  /* 23: kX86VarTypeZmmPs */ kX86VarTypeZmmPs,
-  /* 24: kX86VarTypeZmmPd */ kX86VarTypeZmmPd
-};
-#endif // ASMJIT_BUILD_X86
-
-#if defined(ASMJIT_BUILD_X64)
-const uint8_t _x64VarMapping[kX86VarTypeCount] = {
-  /* 00: kVarTypeInt8     */ kVarTypeInt8,
-  /* 01: kVarTypeUInt8    */ kVarTypeUInt8,
-  /* 02: kVarTypeInt16    */ kVarTypeInt16,
-  /* 03: kVarTypeUInt16   */ kVarTypeUInt16,
-  /* 04: kVarTypeInt32    */ kVarTypeInt32,
-  /* 05: kVarTypeUInt32   */ kVarTypeUInt32,
-  /* 06: kVarTypeInt64    */ kVarTypeInt64,
-  /* 07: kVarTypeUInt64   */ kVarTypeUInt64,
-  /* 08: kVarTypeIntPtr   */ kVarTypeInt64,   // Remapped to Int64.
-  /* 09: kVarTypeUIntPtr  */ kVarTypeUInt64,  // Remapped to UInt64.
-  /* 10: kVarTypeFp32     */ kVarTypeFp32,
-  /* 11: kVarTypeFp64     */ kVarTypeFp64,
-  /* 12: kX86VarTypeMm    */ kX86VarTypeMm,
-  /* 13: kX86VarTypeK     */ kX86VarTypeK,
-  /* 14: kX86VarTypeXmm   */ kX86VarTypeXmm,
-  /* 15: kX86VarTypeXmmSs */ kX86VarTypeXmmSs,
-  /* 16: kX86VarTypeXmmPs */ kX86VarTypeXmmPs,
-  /* 17: kX86VarTypeXmmSd */ kX86VarTypeXmmSd,
-  /* 18: kX86VarTypeXmmPd */ kX86VarTypeXmmPd,
-  /* 19: kX86VarTypeYmm   */ kX86VarTypeYmm,
-  /* 20: kX86VarTypeYmmPs */ kX86VarTypeYmmPs,
-  /* 21: kX86VarTypeYmmPd */ kX86VarTypeYmmPd,
-  /* 22: kX86VarTypeZmm   */ kX86VarTypeZmm,
-  /* 23: kX86VarTypeZmmPs */ kX86VarTypeZmmPs,
-  /* 24: kX86VarTypeZmmPd */ kX86VarTypeZmmPd
-};
-#endif // ASMJIT_BUILD_X64
+#undef INVALID_TYPE
+#undef SIGNATURE_OF
 
 // ============================================================================
 // [asmjit::X86CallNode - Arg / Ret]
 // ============================================================================
 
-bool X86CallNode::_setArg(uint32_t i, const Operand& op) noexcept {
+bool X86CallNode::_setArg(uint32_t i, const Operand_& op) noexcept {
   if ((i & ~kFuncArgHi) >= _x86Decl.getNumArgs())
     return false;
 
@@ -145,7 +108,7 @@ bool X86CallNode::_setArg(uint32_t i, const Operand& op) noexcept {
   return true;
 }
 
-bool X86CallNode::_setRet(uint32_t i, const Operand& op) noexcept {
+bool X86CallNode::_setRet(uint32_t i, const Operand_& op) noexcept {
   if (i >= 2)
     return false;
 
@@ -157,431 +120,216 @@ bool X86CallNode::_setRet(uint32_t i, const Operand& op) noexcept {
 // [asmjit::X86Compiler - Construction / Destruction]
 // ============================================================================
 
-X86Compiler::X86Compiler(X86Assembler* assembler) noexcept
-  : Compiler(),
-    zax(NoInit),
-    zcx(NoInit),
-    zdx(NoInit),
-    zbx(NoInit),
-    zsp(NoInit),
-    zbp(NoInit),
-    zsi(NoInit),
-    zdi(NoInit) {
+X86Compiler::X86Compiler(CodeHolder* holder) noexcept : Compiler() {
+  zax.reset();
+  zcx.reset();
+  zdx.reset();
+  zbx.reset();
+  zsp.reset();
+  zbp.reset();
+  zsi.reset();
+  zdi.reset();
 
-  _regCount.reset();
-  zax = x86::noGpReg;
-  zcx = x86::noGpReg;
-  zdx = x86::noGpReg;
-  zbx = x86::noGpReg;
-  zsp = x86::noGpReg;
-  zbp = x86::noGpReg;
-  zsi = x86::noGpReg;
-  zdi = x86::noGpReg;
-
-  if (assembler != nullptr)
-    attach(assembler);
+  if (holder)
+    holder->attach(this);
 }
-
-X86Compiler::~X86Compiler() noexcept {
-  reset(true);
-}
+X86Compiler::~X86Compiler() noexcept {}
 
 // ============================================================================
-// [asmjit::X86Compiler - Attach / Reset]
+// [asmjit::X86Compiler - Events]
 // ============================================================================
 
-Error X86Compiler::attach(Assembler* assembler) noexcept {
-  ASMJIT_ASSERT(assembler != nullptr);
+Error X86Compiler::onAttach(CodeHolder* holder) noexcept {
+  uint32_t archId = holder->getArchId();
 
-  if (_assembler != nullptr)
-    return kErrorInvalidState;
+  const uint32_t* idMap = nullptr;
+  const X86Gp* gpRegs = nullptr;
 
-  uint32_t arch = assembler->getArch();
-  switch (arch) {
-#if defined(ASMJIT_BUILD_X86)
-    case kArchX86:
-      _targetVarMapping = _x86VarMapping;
-      break;
-#endif // ASMJIT_BUILD_X86
-
-#if defined(ASMJIT_BUILD_X64)
-    case kArchX64:
-      _targetVarMapping = _x64VarMapping;
-      break;
-#endif // ASMJIT_BUILD_X64
-
+  switch (archId) {
+    case ArchInfo::kIdX86: idMap = _x86TypeData.idMapX86; gpRegs = x86OpData.gpd; break;
+    case ArchInfo::kIdX64: idMap = _x86TypeData.idMapX64; gpRegs = x86OpData.gpq; break;
     default:
-      return kErrorInvalidArch;
+      return DebugUtils::errored(kErrorInvalidArch);
   }
 
-  assembler->_attached(this);
-
-  _arch = static_cast<uint8_t>(arch);
-  _regSize = static_cast<uint8_t>(assembler->getRegSize());
-  _regCount = static_cast<X86Assembler*>(assembler)->getRegCount();
+  _archInfo = holder->getArchInfo();
+  _typeIdMap = idMap;
   _finalized = false;
 
-  zax = static_cast<X86Assembler*>(assembler)->zax;
-  zcx = static_cast<X86Assembler*>(assembler)->zcx;
-  zdx = static_cast<X86Assembler*>(assembler)->zdx;
-  zbx = static_cast<X86Assembler*>(assembler)->zbx;
-  zsp = static_cast<X86Assembler*>(assembler)->zsp;
-  zbp = static_cast<X86Assembler*>(assembler)->zbp;
-  zsi = static_cast<X86Assembler*>(assembler)->zsi;
-  zdi = static_cast<X86Assembler*>(assembler)->zdi;
-
-  return kErrorOk;
+  ::memcpy(&zax, gpRegs, sizeof(Operand) * 8);
+  return Base::onAttach(holder);
 }
 
-void X86Compiler::reset(bool releaseMemory) noexcept {
-  Compiler::reset(releaseMemory);
-
-  _regCount.reset();
-  zax = x86::noGpReg;
-  zcx = x86::noGpReg;
-  zdx = x86::noGpReg;
-  zbx = x86::noGpReg;
-  zsp = x86::noGpReg;
-  zbp = x86::noGpReg;
-  zsi = x86::noGpReg;
-  zdi = x86::noGpReg;
+Error X86Compiler::onDetach(CodeHolder* holder) noexcept {
+  for (uint32_t i = 0; i < 8; i++)
+    (static_cast<Operand*>(&zax))[i].reset();
+  return Base::onDetach(holder);
 }
 
 // ============================================================================
 // [asmjit::X86Compiler - Finalize]
 // ============================================================================
 
-Error X86Compiler::finalize() noexcept {
-  X86Assembler* assembler = getAssembler();
-  if (assembler == nullptr)
-    return kErrorOk;
+Error X86Compiler::finalize() {
+  if (_lastError) return _lastError;
 
   // Flush the global constant pool.
-  if (_globalConstPoolLabel.isInitialized()) {
-    embedConstPool(_globalConstPoolLabel, _globalConstPool);
-
-    _globalConstPoolLabel.reset();
-    _globalConstPool.reset();
+  if (_globalConstPool) {
+    addNode(_globalConstPool);
+    _globalConstPool = nullptr;
   }
 
-  if (_firstNode == nullptr)
-    return kErrorOk;
+  AsmNode* node = _firstNode;
+  if (!node) return kErrorOk;
 
-  X86Context context(this);
-  Error error = kErrorOk;
-
-  HLNode* node = _firstNode;
-  HLNode* start;
+  Error err = kErrorOk;
+  X86Context ctx(this);
 
   // Find all functions and use the `X86Context` to translate/emit them.
   do {
-    start = node;
     _resetTokenGenerator();
+    if (node->getType() == AsmNode::kNodeFunc) {
+      X86FuncNode* func = static_cast<X86FuncNode*>(node);
+      node = func->getEnd();
 
-    if (node->getType() == HLNode::kTypeFunc) {
-      node = static_cast<X86FuncNode*>(start)->getEnd();
-      error = context.compile(static_cast<X86FuncNode*>(start));
-
-      if (error != kErrorOk)
-        break;
+      err = ctx.compile(func);
+      if (err != kErrorOk) break;
     }
 
     do {
       node = node->getNext();
-    } while (node != nullptr && node->getType() != HLNode::kTypeFunc);
+    } while (node && node->getType() != AsmNode::kNodeFunc);
 
-    error = context.serialize(assembler, start, node);
-    context.cleanup();
-    context.reset(false);
+    ctx.cleanup();
+    ctx.reset(false);
 
-    if (error != kErrorOk)
+    if (err != kErrorOk)
       break;
-  } while (node != nullptr);
+  } while (node);
 
-  reset(false);
-  return error;
+  if (_holder->_cgAsm) {
+    return serialize(_holder->_cgAsm);
+  }
+  else {
+    X86Assembler a(_holder);
+    return serialize(&a);
+  }
 }
 
 // ============================================================================
 // [asmjit::X86Compiler - Inst]
 // ============================================================================
 
-//! Get compiler instruction item size without operands assigned.
-static ASMJIT_INLINE size_t X86Compiler_getInstSize(uint32_t code) noexcept {
-  return Utils::inInterval<uint32_t>(code, _kX86InstIdJbegin, _kX86InstIdJend) ? sizeof(HLJump) : sizeof(HLInst);
-}
+Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) {
+  uint32_t options = getOptions() | getGlobalOptions();
+  const char* inlineComment = getInlineComment();
 
-static HLInst* X86Compiler_newInst(X86Compiler* self, void* p, uint32_t code, uint32_t options, Operand* opList, uint32_t opCount) noexcept {
-  if (Utils::inInterval<uint32_t>(code, _kX86InstIdJbegin, _kX86InstIdJend)) {
-    HLJump* node = new(p) HLJump(self, code, options, opList, opCount);
-    HLLabel* jTarget = nullptr;
+  uint32_t opCount = static_cast<uint32_t>(!o0.isNone()) +
+                     static_cast<uint32_t>(!o1.isNone()) +
+                     static_cast<uint32_t>(!o2.isNone()) +
+                     static_cast<uint32_t>(!o3.isNone()) ;
 
-    if ((options & kInstOptionUnfollow) == 0) {
-      if (opList[0].isLabel())
-        jTarget = self->getHLLabel(static_cast<Label&>(opList[0]));
-      else
-        options |= kInstOptionUnfollow;
+  // Handle failure and rare cases first.
+  const uint32_t kErrorsAndSpecialCases =
+    kOptionMaybeFailureCase | // CodeGen in error state.
+    kOptionStrictValidation | // Strict validation.
+    kOptionHasOp4           | // Has 5th operand (o4, indexed from zero).
+    kOptionHasOp5           ; // Has 6th operand (o5, indexed from zero).
+
+  if (ASMJIT_UNLIKELY(options & kErrorsAndSpecialCases)) {
+    // Don't do anything if we are in error state.
+    if (_lastError) return _lastError;
+
+    // Count 5th and 6th operands.
+    if (options & kOptionHasOp4) opCount = 5;
+    if (options & kOptionHasOp5) opCount = 6;
+
+    // Strict validation.
+    if (options & kOptionStrictValidation) {
+      Operand opArray[] = {
+        Operand(o0),
+        Operand(o1),
+        Operand(o2),
+        Operand(o3),
+        Operand(_op4),
+        Operand(_op5)
+      };
+
+      Error err = X86Inst::validate(getArchId(), instId, options, _opMask, opArray, opCount);
+      if (err) return setLastError(err);
+
+      // Clear it as it must be enabled explicitly on assembler side.
+      options &= ~kOptionStrictValidation;
     }
+  }
 
-    node->orFlags(code == kX86InstIdJmp ? HLNode::kFlagIsJmp | HLNode::kFlagIsTaken : HLNode::kFlagIsJcc);
+  resetOptions();
+  resetInlineComment();
+
+  // decide between `AsmInst` and `AsmJump`.
+  if (Utils::inInterval<uint32_t>(instId, X86Inst::_kIdJbegin, X86Inst::_kIdJend)) {
+    AsmJump* node = _nodeAllocator.allocT<AsmJump>(sizeof(AsmJump) + opCount * sizeof(Operand));
+    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(AsmJump));
+
+    if (ASMJIT_UNLIKELY(!node))
+      return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+    if (opCount > 0) opArray[0].copyFrom(o0);
+    if (opCount > 1) opArray[1].copyFrom(o1);
+    if (opCount > 2) opArray[2].copyFrom(o2);
+    if (opCount > 3) opArray[3].copyFrom(o3);
+    if (opCount > 4) opArray[4].copyFrom(_op4);
+    if (opCount > 5) opArray[5].copyFrom(_op5);
+    new(node) AsmJump(this, instId, options, opArray, opCount);
+
+    AsmLabel* jTarget = nullptr;
+    if (!(options & kOptionUnfollow)) {
+      if (opArray[0].isLabel()) {
+        Error err = getAsmLabel(&jTarget, static_cast<Label&>(opArray[0]));
+        if (err) return setLastError(err);
+      }
+      else {
+        options |= kOptionUnfollow;
+      }
+    }
+    node->setOptions(options);
+
+    node->orFlags(instId == X86Inst::kIdJmp ? AsmNode::kFlagIsJmp | AsmNode::kFlagIsTaken : AsmNode::kFlagIsJcc);
     node->_target = jTarget;
     node->_jumpNext = nullptr;
 
     if (jTarget) {
-      node->_jumpNext = static_cast<HLJump*>(jTarget->_from);
+      node->_jumpNext = static_cast<AsmJump*>(jTarget->_from);
       jTarget->_from = node;
       jTarget->addNumRefs();
     }
 
     // The 'jmp' is always taken, conditional jump can contain hint, we detect it.
-    if (code == kX86InstIdJmp)
-      node->orFlags(HLNode::kFlagIsTaken);
-    else if (options & kInstOptionTaken)
-      node->orFlags(HLNode::kFlagIsTaken);
+    if (instId == X86Inst::kIdJmp)
+      node->orFlags(AsmNode::kFlagIsTaken);
+    else if (options & X86Inst::kOptionTaken)
+      node->orFlags(AsmNode::kFlagIsTaken);
 
-    node->addOptions(options);
-    return node;
+    addNode(node);
+    return kErrorOk;
   }
   else {
-    HLInst* node = new(p) HLInst(self, code, options, opList, opCount);
-    node->addOptions(options);
-    return node;
+    AsmInst* node = _nodeAllocator.allocT<AsmInst>(sizeof(AsmInst) + opCount * sizeof(Operand));
+    Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(AsmInst));
+
+    if (ASMJIT_UNLIKELY(!node))
+      return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+    if (opCount > 0) opArray[0].copyFrom(o0);
+    if (opCount > 1) opArray[1].copyFrom(o1);
+    if (opCount > 2) opArray[2].copyFrom(o2);
+    if (opCount > 3) opArray[3].copyFrom(o3);
+    if (opCount > 4) opArray[4].copyFrom(_op4);
+    if (opCount > 5) opArray[5].copyFrom(_op5);
+
+    addNode(new(node) AsmInst(this, instId, options, opArray, opCount));
+    return kErrorOk;
   }
-}
-
-HLInst* X86Compiler::newInst(uint32_t code) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), nullptr, 0);
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::newInst(uint32_t code, const Operand& o0) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size + 1 * sizeof(Operand)));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  {
-    Operand* opList = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(inst) + size);
-    opList[0] = o0;
-    ASMJIT_ASSERT_OPERAND(o0);
-    return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), opList, 1);
-  }
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::newInst(uint32_t code, const Operand& o0, const Operand& o1) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size + 2 * sizeof(Operand)));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  {
-    Operand* opList = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(inst) + size);
-    opList[0] = o0;
-    opList[1] = o1;
-    ASMJIT_ASSERT_OPERAND(o0);
-    ASMJIT_ASSERT_OPERAND(o1);
-    return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), opList, 2);
-  }
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::newInst(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size + 3 * sizeof(Operand)));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  {
-    Operand* opList = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(inst) + size);
-    opList[0] = o0;
-    opList[1] = o1;
-    opList[2] = o2;
-    ASMJIT_ASSERT_OPERAND(o0);
-    ASMJIT_ASSERT_OPERAND(o1);
-    ASMJIT_ASSERT_OPERAND(o2);
-    return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), opList, 3);
-  }
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::newInst(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size + 4 * sizeof(Operand)));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  {
-    Operand* opList = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(inst) + size);
-    opList[0] = o0;
-    opList[1] = o1;
-    opList[2] = o2;
-    opList[3] = o3;
-    ASMJIT_ASSERT_OPERAND(o0);
-    ASMJIT_ASSERT_OPERAND(o1);
-    ASMJIT_ASSERT_OPERAND(o2);
-    ASMJIT_ASSERT_OPERAND(o3);
-    return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), opList, 4);
-  }
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::newInst(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3, const Operand& o4) noexcept {
-  size_t size = X86Compiler_getInstSize(code);
-  HLInst* inst = static_cast<HLInst*>(_zoneAllocator.alloc(size + 5 * sizeof(Operand)));
-
-  if (inst == nullptr)
-    goto _NoMemory;
-
-  {
-    Operand* opList = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(inst) + size);
-    opList[0] = o0;
-    opList[1] = o1;
-    opList[2] = o2;
-    opList[3] = o3;
-    opList[4] = o4;
-    ASMJIT_ASSERT_OPERAND(o0);
-    ASMJIT_ASSERT_OPERAND(o1);
-    ASMJIT_ASSERT_OPERAND(o2);
-    ASMJIT_ASSERT_OPERAND(o3);
-    ASMJIT_ASSERT_OPERAND(o4);
-    return X86Compiler_newInst(this, inst, code, getInstOptionsAndReset(), opList, 5);
-  }
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
-}
-
-HLInst* X86Compiler::emit(uint32_t code) noexcept {
-  HLInst* node = newInst(code);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0) noexcept {
-  HLInst* node = newInst(code, o0);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1) noexcept {
-  HLInst* node = newInst(code, o0, o1);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2) noexcept {
-  HLInst* node = newInst(code, o0, o1, o2);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3) noexcept {
-  HLInst* node = newInst(code, o0, o1, o2, o3);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3, const Operand& o4) noexcept {
-  HLInst* node = newInst(code, o0, o1, o2, o3, o4);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, int o0_) noexcept {
-  Imm o0(o0_);
-  HLInst* node = newInst(code, o0);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, uint64_t o0_) noexcept {
-  Imm o0(o0_);
-  HLInst* node = newInst(code, o0);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, int o1_) noexcept {
-  Imm o1(o1_);
-  HLInst* node = newInst(code, o0, o1);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, uint64_t o1_) noexcept {
-  Imm o1(o1_);
-  HLInst* node = newInst(code, o0, o1);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, int o2_) noexcept {
-  Imm o2(o2_);
-  HLInst* node = newInst(code, o0, o1, o2);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, uint64_t o2_) noexcept {
-  Imm o2(o2_);
-  HLInst* node = newInst(code, o0, o1, o2);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, int o3_) noexcept {
-  Imm o3(o3_);
-  HLInst* node = newInst(code, o0, o1, o2, o3);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
-}
-
-HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, uint64_t o3_) noexcept {
-  Imm o3(o3_);
-  HLInst* node = newInst(code, o0, o1, o2, o3);
-  if (node == nullptr)
-    return nullptr;
-  return static_cast<HLInst*>(addNode(node));
 }
 
 // ============================================================================
@@ -589,23 +337,27 @@ HLInst* X86Compiler::emit(uint32_t code, const Operand& o0, const Operand& o1, c
 // ============================================================================
 
 X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
-  X86FuncNode* func = newNode<X86FuncNode>();
-  Error error;
+  Error err;
 
-  if (func == nullptr)
-    goto _NoMemory;
+  X86FuncNode* func = newNodeT<X86FuncNode>();
+  if (!func) goto _NoMemory;
+
+  err = registerLabelNode(func);
+  if (ASMJIT_UNLIKELY(err)) {
+    // TODO: Calls setLastError, maybe rethink noexcept?
+    setLastError(err);
+    return nullptr;
+  }
 
   // Create helper nodes.
-  func->_entryNode = newLabelNode();
+  func->_end = newNodeT<AsmSentinel>();
   func->_exitNode = newLabelNode();
-  func->_end = newNode<HLSentinel>();
-
-  if (func->_entryNode == nullptr || func->_exitNode == nullptr || func->_end == nullptr)
-    goto _NoMemory;
+  if (!func->_exitNode || !func->_end) goto _NoMemory;
 
   // Function prototype.
-  if ((error = func->_x86Decl.setPrototype(p)) != kErrorOk) {
-    setLastError(error);
+  err = func->_x86Decl.setPrototype(p);
+  if (err != kErrorOk) {
+    setLastError(err);
     return nullptr;
   }
 
@@ -616,47 +368,49 @@ X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
   func->_spillZoneSize = static_cast<uint16_t>(func->_x86Decl.getSpillZoneSize());
 
   // Expected/Required stack alignment.
-  func->_expectedStackAlignment = getRuntime()->getStackAlignment();
+  func->_naturalStackAlignment = _archInfo.getNaturalStackAlignment();
   func->_requiredStackAlignment = 0;
 
   // Allocate space for function arguments.
   func->_args = nullptr;
   if (func->getNumArgs() != 0) {
-    func->_args = _zoneAllocator.allocT<VarData*>(func->getNumArgs() * sizeof(VarData*));
-    if (func->_args == nullptr)
-      goto _NoMemory;
-    ::memset(func->_args, 0, func->getNumArgs() * sizeof(VarData*));
+    func->_args = _nodeAllocator.allocT<VirtReg*>(func->getNumArgs() * sizeof(VirtReg*));
+    if (!func->_args) goto _NoMemory;
+
+    ::memset(func->_args, 0, func->getNumArgs() * sizeof(VirtReg*));
   }
 
   return func;
 
 _NoMemory:
-  setLastError(kErrorNoHeapMemory);
+  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   return nullptr;
 }
 
-X86FuncNode* X86Compiler::addFunc(const FuncPrototype& p) noexcept {
+X86FuncNode* X86Compiler::addFunc(const FuncPrototype& p) {
   X86FuncNode* func = newFunc(p);
 
-  if (func == nullptr) {
-    setLastError(kErrorNoHeapMemory);
+  if (!func) {
+    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
     return nullptr;
   }
 
   return static_cast<X86FuncNode*>(addFunc(func));
 }
 
-HLSentinel* X86Compiler::endFunc() noexcept {
+AsmSentinel* X86Compiler::endFunc() {
   X86FuncNode* func = getFunc();
-  ASMJIT_ASSERT(func != nullptr);
+  if (!func) {
+    // TODO:
+    return nullptr;
+  }
 
-  // Add local constant pool at the end of the function (if exist).
+  // Add the local constant pool at the end of the function (if exist).
   setCursor(func->getExitNode());
 
-  if (_localConstPoolLabel.isInitialized()) {
-    embedConstPool(_localConstPoolLabel, _localConstPool);
-    _localConstPoolLabel.reset();
-    _localConstPool.reset();
+  if (_localConstPool) {
+    addNode(_localConstPool);
+    _localConstPool = nullptr;
   }
 
   // Finalize.
@@ -671,38 +425,40 @@ HLSentinel* X86Compiler::endFunc() noexcept {
 // [asmjit::X86Compiler - Ret]
 // ============================================================================
 
-HLRet* X86Compiler::newRet(const Operand& o0, const Operand& o1) noexcept {
-  HLRet* node = newNode<HLRet>(o0, o1);
-  if (node == nullptr)
-    goto _NoMemory;
+AsmFuncRet* X86Compiler::newRet(const Operand_& o0, const Operand_& o1) noexcept {
+  AsmFuncRet* node = newNodeT<AsmFuncRet>(o0, o1);
+  if (!node) {
+    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    return nullptr;
+  }
   return node;
-
-_NoMemory:
-  setLastError(kErrorNoHeapMemory);
-  return nullptr;
 }
 
-HLRet* X86Compiler::addRet(const Operand& o0, const Operand& o1) noexcept {
-  HLRet* node = newRet(o0, o1);
-  if (node == nullptr)
-    return node;
-  return static_cast<HLRet*>(addNode(node));
+AsmFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept {
+  AsmFuncRet* node = newRet(o0, o1);
+  if (!node) return nullptr;
+  return static_cast<AsmFuncRet*>(addNode(node));
 }
 
 // ============================================================================
 // [asmjit::X86Compiler - Call]
 // ============================================================================
 
-X86CallNode* X86Compiler::newCall(const Operand& o0, const FuncPrototype& p) noexcept {
-  X86CallNode* node = newNode<X86CallNode>(o0);
-  Error error;
+X86CallNode* X86Compiler::newCall(const Operand_& o0, const FuncPrototype& p) noexcept {
+  Error err;
   uint32_t nArgs;
 
-  if (node == nullptr)
+  X86CallNode* node = _nodeAllocator.allocT<X86CallNode>(sizeof(X86CallNode) + sizeof(Operand));
+  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CallNode));
+
+  if (ASMJIT_UNLIKELY(!node))
     goto _NoMemory;
 
-  if ((error = node->_x86Decl.setPrototype(p)) != kErrorOk) {
-    setLastError(error);
+  opArray[0].copyFrom(o0);
+  new (node) X86CallNode(this, X86Inst::kIdCall, 0, opArray, 1);
+
+  if ((err = node->_x86Decl.setPrototype(p)) != kErrorOk) {
+    setLastError(err);
     return nullptr;
   }
 
@@ -710,22 +466,20 @@ X86CallNode* X86Compiler::newCall(const Operand& o0, const FuncPrototype& p) noe
   if ((nArgs = p.getNumArgs()) == 0)
     return node;
 
-  node->_args = static_cast<Operand*>(_zoneAllocator.alloc(nArgs * sizeof(Operand)));
-  if (node->_args == nullptr)
-    goto _NoMemory;
+  node->_args = static_cast<Operand*>(_nodeAllocator.alloc(nArgs * sizeof(Operand)));
+  if (!node->_args) goto _NoMemory;
 
   ::memset(node->_args, 0, nArgs * sizeof(Operand));
   return node;
 
 _NoMemory:
-  setLastError(kErrorNoHeapMemory);
+  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   return nullptr;
 }
 
-X86CallNode* X86Compiler::addCall(const Operand& o0, const FuncPrototype& p) noexcept {
+X86CallNode* X86Compiler::addCall(const Operand_& o0, const FuncPrototype& p) noexcept {
   X86CallNode* node = newCall(o0, p);
-  if (node == nullptr)
-    return nullptr;
+  if (!node) return nullptr;
   return static_cast<X86CallNode*>(addNode(node));
 }
 
@@ -733,78 +487,79 @@ X86CallNode* X86Compiler::addCall(const Operand& o0, const FuncPrototype& p) noe
 // [asmjit::X86Compiler - Vars]
 // ============================================================================
 
-Error X86Compiler::setArg(uint32_t argIndex, const Var& var) noexcept {
+Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
   X86FuncNode* func = getFunc();
 
-  if (func == nullptr)
-    return kErrorInvalidArgument;
+  if (!func)
+    return setLastError(DebugUtils::errored(kErrorInvalidState));
 
-  if (!isVarValid(var))
-    return kErrorInvalidState;
+  if (!isVirtRegValid(r))
+    return setLastError(DebugUtils::errored(kErrorInvalidVirtId));
 
-  VarData* vd = getVd(var);
-  func->setArg(argIndex, vd);
+  VirtReg* vr = getVirtReg(r);
+  func->setArg(argIndex, vr);
 
   return kErrorOk;
 }
 
-Error X86Compiler::_newVar(Var* var, uint32_t vType, const char* name) noexcept {
-  ASMJIT_ASSERT(vType < kX86VarTypeCount);
-  vType = _targetVarMapping[vType];
-  ASMJIT_ASSERT(vType != kInvalidVar);
+Error X86Compiler::_newReg(Reg& reg, uint32_t typeId, const char* name) {
+  ASMJIT_ASSERT(typeId < VirtType::kIdCount);
+  typeId = _typeIdMap[typeId];
 
-  // The assertion won't be compiled in release build, however, we want to check
-  // this anyway.
-  if (vType == kInvalidVar) {
-    static_cast<X86Var*>(var)->reset();
-    return kErrorInvalidArgument;
+  // There is currently only one case this could happen - an attempt to
+  // use a 64-bit register (GPQ) when generating for a 32-bit target.
+  if (!VirtType::isValidTypeId(typeId)) {
+    reg.reset();
+    return setLastError(DebugUtils::errored(kErrorIllegalUseOfGpq));
   }
 
-  const VarInfo& vInfo = _x86VarInfo[vType];
-  VarData* vd = _newVd(vInfo, name);
+  const VirtType& typeInfo = _x86TypeData.typeInfo[typeId];
+  VirtReg* vreg = newVirtReg(typeInfo, name);
 
-  if (vd == nullptr) {
-    static_cast<X86Var*>(var)->reset();
-    return getLastError();
+  if (!vreg) {
+    static_cast<X86Reg&>(reg).reset();
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  var->_init_packed_op_sz_w0_id(Operand::kTypeVar, vInfo.getSize(), vInfo.getRegType() << 8, vd->getId());
-  var->_vreg.vType = vType;
+  reg._initReg(typeInfo.getSignature(), vreg->getId());
+  reg._reg.typeId = typeId;
   return kErrorOk;
 }
 
-Error X86Compiler::_newVar(Var* var, uint32_t vType, const char* fmt, va_list ap) noexcept {
-  char name[64];
+Error X86Compiler::_newReg(Reg& r, uint32_t typeId, const char* fmt, va_list ap) {
+  char name[256];
 
   vsnprintf(name, ASMJIT_ARRAY_SIZE(name), fmt, ap);
   name[ASMJIT_ARRAY_SIZE(name) - 1] = '\0';
-  return _newVar(var, vType, name);
+  return _newReg(r, typeId, name);
 }
 
 // ============================================================================
 // [asmjit::X86Compiler - Stack]
 // ============================================================================
 
-Error X86Compiler::_newStack(BaseMem* mem, uint32_t size, uint32_t alignment, const char* name) noexcept {
+Error X86Compiler::_newStack(Mem& m, uint32_t size, uint32_t alignment, const char* name) {
   if (size == 0)
-    return kErrorInvalidArgument;
+    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
 
   if (alignment > 64)
     alignment = 64;
 
-  VarInfo vi = { kInvalidVar, 0, kInvalidReg , kInvalidReg, 0, "" };
-  VarData* vd = _newVd(vi, name);
+  VirtType typeInfo = { {{ 0, 0, 0, 0 }}, kInvalidValue, 0, 0, "" };
+  VirtReg* vreg = newVirtReg(typeInfo, name);
 
-  if (vd == nullptr) {
-    static_cast<X86Mem*>(mem)->reset();
-    return getLastError();
+  if (!vreg) {
+    m.reset();
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  vd->_size = size;
-  vd->_isStack = true;
-  vd->_alignment = static_cast<uint8_t>(alignment);
+  vreg->_size = size;
+  vreg->_isStack = true;
+  vreg->_alignment = static_cast<uint8_t>(alignment);
 
-  static_cast<X86Mem*>(mem)->_init(kMemTypeStackIndex, vd->getId(), 0, 0);
+  // Set the memory operand to GPD/GPQ and its ID to vreg.
+  m = X86Mem(Init, zax.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
+
   return kErrorOk;
 }
 
@@ -812,43 +567,26 @@ Error X86Compiler::_newStack(BaseMem* mem, uint32_t size, uint32_t alignment, co
 // [asmjit::X86Compiler - Const]
 // ============================================================================
 
-Error X86Compiler::_newConst(BaseMem* mem, uint32_t scope, const void* data, size_t size) noexcept {
-  Error error = kErrorOk;
-  size_t offset;
+Error X86Compiler::_newConst(Mem& m, uint32_t scope, const void* data, size_t size) {
+  AsmConstPool** pPool;
+  if (scope == kConstScopeLocal)
+    pPool = &_localConstPool;
+  else if (scope == kConstScopeGlobal)
+    pPool = &_globalConstPool;
+  else
+    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
 
-  Label* dstLabel;
-  ConstPool* dstPool;
+  if (!*pPool && !(*pPool = newConstPool()))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
-  if (scope == kConstScopeLocal) {
-    dstLabel = &_localConstPoolLabel;
-    dstPool = &_localConstPool;
-  }
-  else if (scope == kConstScopeGlobal) {
-    dstLabel = &_globalConstPoolLabel;
-    dstPool = &_globalConstPool;
-  }
-  else {
-    error = kErrorInvalidArgument;
-    goto _OnError;
-  }
+  AsmConstPool* pool = *pPool;
+  size_t off;
 
-  error = dstPool->add(data, size, offset);
-  if (error != kErrorOk)
-    goto _OnError;
+  Error err = pool->add(data, size, off);
+  if (err != kErrorOk) return setLastError(err);
 
-  if (dstLabel->getId() == kInvalidValue) {
-    *dstLabel = newLabel();
-    if (!dstLabel->isInitialized()) {
-      error = kErrorNoHeapMemory;
-      goto _OnError;
-    }
-  }
-
-  *static_cast<X86Mem*>(mem) = x86::ptr(*dstLabel, static_cast<int32_t>(offset), static_cast<uint32_t>(size));
+  static_cast<X86Mem&>(m) = x86::ptr(pool->getLabel(), static_cast<int32_t>(off), static_cast<uint32_t>(size));
   return kErrorOk;
-
-_OnError:
-  return error;
 }
 
 } // asmjit namespace
@@ -857,4 +595,4 @@ _OnError:
 #include "../apiend.h"
 
 // [Guard]
-#endif // !ASMJIT_DISABLE_COMPILER && (ASMJIT_BUILD_X86 || ASMJIT_BUILD_X64)
+#endif // !ASMJIT_DISABLE_COMPILER && ASMJIT_BUILD_X86

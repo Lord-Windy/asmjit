@@ -37,6 +37,7 @@
 // [CLang]
 #if ASMJIT_CC_CLANG
 # pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wundefined-inline"
 # pragma clang diagnostic ignored "-Wunnamed-type-template-args"
 #endif // ASMJIT_CC_CLANG
 

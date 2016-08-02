@@ -12,13 +12,12 @@
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
+#include "../base/asmbuilder.h"
 #include "../base/assembler.h"
-#include "../base/compilerfunc.h"
 #include "../base/constpool.h"
 #include "../base/containers.h"
-#include "../base/hlstream.h"
+#include "../base/func.h"
 #include "../base/operand.h"
-#include "../base/podvector.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
 
@@ -31,34 +30,13 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-struct VarAttr;
-struct VarData;
-struct VarMap;
-struct VarState;
+struct VirtReg;
+struct TiedReg;
+struct RAState;
+struct RACell;
 
 //! \addtogroup asmjit_base
 //! \{
-
-// ============================================================================
-// [asmjit::CompilerFeatures]
-// ============================================================================
-
-ASMJIT_ENUM(CompilerFeatures) {
-  //! Schedule instructions so they can be executed faster (`Compiler` only).
-  //!
-  //! Default `false` - has to be explicitly enabled as the scheduler needs
-  //! some time to run.
-  //!
-  //! X86/X64 Specific
-  //! ----------------
-  //!
-  //! If scheduling is enabled AsmJit will try to reorder instructions to
-  //! minimize the dependency chain. Scheduler always runs after the registers
-  //! are allocated so it doesn't change count of register allocs/spills.
-  //!
-  //! This feature is highly experimental and untested.
-  kCompilerFeatureEnableScheduler = 0
-};
 
 // ============================================================================
 // [asmjit::ConstScope]
@@ -73,74 +51,735 @@ ASMJIT_ENUM(ConstScope) {
 };
 
 // ============================================================================
-// [asmjit::VarInfo]
+// [asmjit::VirtReg]
 // ============================================================================
 
-struct VarInfo {
-  // ============================================================================
-  // [Flags]
-  // ============================================================================
-
-  //! \internal
-  //!
-  //! Variable flags.
-  ASMJIT_ENUM(Flags) {
-    //! Variable contains one or more single-precision floating point.
-    kFlagSP = 0x10,
-    //! Variable contains one or more double-precision floating point.
-    kFlagDP = 0x20,
-    //! Variable is a vector, contains packed data.
-    kFlagSIMD = 0x80
+//! Virtual register data (Compiler).
+struct VirtReg {
+  //! A state of a virtual register (used during register allocation).
+  ASMJIT_ENUM(State) {
+    kStateNone = 0,                      //!< Not allocated, not used.
+    kStateReg = 1,                       //!< Allocated in register.
+    kStateMem = 2                        //!< Allocated in memory or spilled.
   };
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get type id.
-  ASMJIT_INLINE uint32_t getTypeId() const noexcept { return _typeId; }
-  //! Get type name.
-  ASMJIT_INLINE const char* getTypeName() const noexcept { return _typeName; }
+  //! Get the virtual-register id.
+  ASMJIT_INLINE uint32_t getId() const noexcept { return _id; }
 
-  //! Get register size in bytes.
-  ASMJIT_INLINE uint32_t getSize() const noexcept { return _size; }
-  //! Get variable class, see \ref RegClass.
-  ASMJIT_INLINE uint32_t getRegClass() const noexcept { return _regClass; }
-  //! Get register type, see `X86RegType`.
-  ASMJIT_INLINE uint32_t getRegType() const noexcept { return _regType; }
-  //! Get type flags, see `VarFlag`.
-  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
+  //! Get if the virtual-register has a local id.
+  ASMJIT_INLINE bool hasLocalId() const { return _localId != kInvalidValue; }
+  //! Get virtual-register's local-id (used by RA).
+  ASMJIT_INLINE uint32_t getLocalId() const noexcept { return _localId; }
+  //! Set virtual-register's local id.
+  ASMJIT_INLINE void setLocalId(uint32_t localId) { _localId = localId; }
+  //! Reset virtual-register's local id.
+  ASMJIT_INLINE void resetLocalId() { _localId = kInvalidValue; }
+
+  //! Get virtual-register's name.
+  ASMJIT_INLINE const char* getName() const noexcept { return _name; }
+  //! Get virtual-register's size.
+  ASMJIT_INLINE uint32_t getSize() const { return _size; }
+  //! Get virtual-register's alignment.
+  ASMJIT_INLINE uint32_t getAlignment() const { return _alignment; }
+
+  ASMJIT_INLINE uint32_t getSignature() const { return _regInfo.signature; }
+  //! Get a physical register type.
+  ASMJIT_INLINE uint32_t getRegType() const { return _regInfo.regType; }
+  //! Get a physical register class.
+  ASMJIT_INLINE uint32_t getRegClass() const { return _regInfo.regClass; }
+  //! Get a virtual type.
+  ASMJIT_INLINE uint32_t getTypeId() const { return _typeId; }
+
+  //! Get the virtual-register  priority, used by compiler to decide which variable to spill.
+  ASMJIT_INLINE uint32_t getPriority() const { return _priority; }
+  //! Set the virtual-register  priority.
+  ASMJIT_INLINE void setPriority(uint32_t priority) {
+    ASMJIT_ASSERT(priority <= 0xFF);
+    _priority = static_cast<uint8_t>(priority);
+  }
+
+  //! Get variable state, only used by `RAContext`.
+  ASMJIT_INLINE uint32_t getState() const { return _state; }
+  //! Set variable state, only used by `RAContext`.
+  ASMJIT_INLINE void setState(uint32_t state) {
+    ASMJIT_ASSERT(state <= 0xFF);
+    _state = static_cast<uint8_t>(state);
+  }
+
+  //! Get register index.
+  ASMJIT_INLINE uint32_t getPhysId() const { return _physId; }
+  //! Set register index.
+  ASMJIT_INLINE void setPhysId(uint32_t physId) {
+    ASMJIT_ASSERT(physId <= kInvalidReg);
+    _physId = static_cast<uint8_t>(physId);
+  }
+  //! Reset register index.
+  ASMJIT_INLINE void resetPhysId() {
+    _physId = static_cast<uint8_t>(kInvalidReg);
+  }
+
+  //! Get home registers mask.
+  ASMJIT_INLINE uint32_t getHomeMask() const { return _homeMask; }
+  //! Add a home register index to the home registers mask.
+  ASMJIT_INLINE void addHomeId(uint32_t physId) { _homeMask |= Utils::mask(physId); }
+
+  //! Get whether the VirtReg is only memory allocated on the stack.
+  ASMJIT_INLINE bool isStack() const { return static_cast<bool>(_isStack); }
+  //! Get whether the variable is a function argument passed through memory.
+  ASMJIT_INLINE bool isMemArg() const { return static_cast<bool>(_isMemArg); }
+
+  //! Get variable content can be calculated by a simple instruction.
+  ASMJIT_INLINE bool isCalculated() const { return static_cast<bool>(_isCalculated); }
+  //! Get whether to save variable when it's unused (spill).
+  ASMJIT_INLINE bool saveOnUnuse() const { return static_cast<bool>(_saveOnUnuse); }
+
+  //! Get whether the variable was changed.
+  ASMJIT_INLINE bool isModified() const { return static_cast<bool>(_modified); }
+  //! Set whether the variable was changed.
+  ASMJIT_INLINE void setModified(bool modified) { _modified = modified; }
+
+  //! Get home memory offset.
+  ASMJIT_INLINE int32_t getMemOffset() const { return _memOffset; }
+  //! Set home memory offset.
+  ASMJIT_INLINE void setMemOffset(int32_t offset) { _memOffset = offset; }
+
+  //! Get home memory cell.
+  ASMJIT_INLINE RACell* getMemCell() const { return _memCell; }
+  //! Set home memory cell.
+  ASMJIT_INLINE void setMemCell(RACell* cell) { _memCell = cell; }
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Variable type id.
-  uint8_t _typeId;
-  //! Variable and register size (in bytes).
-  uint8_t _size;
-  //! Register class, see `RegClass`.
-  uint8_t _regClass;
-  //! Register type the variable is mapped to.
-  uint8_t _regType;
+  uint32_t _id;                          //!< Virtual-register id.
+  uint32_t _localId;                     //!< Virtual-register local-id (used by RA).
+  const char* _name;                     //!< Virtual-register name.
 
-  //! Variable info flags, see \ref Flags.
-  uint32_t _flags;
+  Operand::RegInfo _regInfo;             //!< Register info & signature.
 
-  //! Variable type name.
-  char _typeName[8];
+  uint32_t _typeId;                      //!< Virtual type-id.
+  uint8_t _priority;                     //!< Allocation priority.
+
+  uint8_t _state;                        //!< Variable state (connected with actual `RAState)`.
+  uint8_t _physId;                       //!< Actual register index (only used by `RAContext)`, during translate.
+
+  uint8_t _isStack : 1;                  //!< Whether the variable is only used as memory allocated on the stack.
+  uint8_t _isMemArg : 1;                 //!< Whether the variable is a function argument passed through memory.
+
+  //! Whether variable content can be calculated by a simple instruction.
+  //!
+  //! This is used mainly by MMX and SSE2 code. This flag indicates that
+  //! register allocator should never reserve memory for this variable, because
+  //! the content can be generated by a single instruction (for example PXOR).
+  uint8_t _isCalculated : 1;
+  uint8_t _saveOnUnuse : 1;              //!< Save on unuse (at end of the variable scope).
+  uint8_t _modified : 1;                 //!< Whether variable was changed (connected with actual `RAState)`.
+  uint8_t _reserved0 : 3;                //!< \internal
+  uint8_t _alignment;                    //!< Variable's natural alignment.
+
+  uint32_t _size;                        //!< Variable size.
+  uint32_t _homeMask;                    //!< Mask of all registers variable has been allocated to.
+
+  int32_t _memOffset;                    //!< Home memory offset.
+  RACell* _memCell;                      //!< Home memory cell, used by `RAContext` (initially nullptr).
+
+  // --------------------------------------------------------------------------
+  // [Members - Temporary Usage]
+  // --------------------------------------------------------------------------
+
+  // These variables are only used during register allocation. They are
+  // initialized by init() phase and reset by cleanup() phase.
+
+  //! Temporary link to TiedReg* used by the `RAContext` used in
+  //! various phases, but always set back to nullptr when finished.
+  //!
+  //! This temporary data is designed to be used by algorithms that need to
+  //! store some data into variables themselves during compilation. But it's
+  //! expected that after variable is compiled & translated the data is set
+  //! back to zero/null. Initial value is nullptr.
+  TiedReg* _tied;
+};
+
+// ============================================================================
+// [asmjit::TiedReg]
+// ============================================================================
+
+//! Tied register (Compiler)
+//!
+//! Tied register is used to describe one ore more register operands that share
+//! the same virtual register. Tied register contains all the data that is
+//! essential for register allocation.
+struct TiedReg {
+  //! Flags.
+  ASMJIT_ENUM(Flags) {
+    kRReg        = 0x00000001U,          //!< Register read.
+    kWReg        = 0x00000002U,          //!< Register write.
+    kXReg        = 0x00000003U,          //!< Register read-write.
+
+    kRMem        = 0x00000004U,          //!< Memory read.
+    kWMem        = 0x00000008U,          //!< Memory write.
+    kXMem        = 0x0000000CU,          //!< Memory read-write.
+
+    kRDecide     = 0x00000010U,          //!< RA can decide between reg/mem read.
+    kWDecide     = 0x00000020U,          //!< RA can decide between reg/mem write.
+    kXDecide     = 0x00000030U,          //!< RA can decide between reg/mem read-write.
+
+    kRConv       = 0x00000040U,          //!< Variable is converted to other type/class on the input.
+    kWConv       = 0x00000080U,          //!< Variable is converted from other type/class on the output.
+    kXConv       = 0x000000C0U,          //!< Combination of `kRConv` and `kWConv`.
+
+    kRFunc       = 0x00000100U,          //!< Function argument passed in register.
+    kWFunc       = 0x00000200U,          //!< Function return value passed into register.
+    kXFunc       = 0x00000300U,          //!< Function argument and return value.
+    kRCall       = 0x00000400U,          //!< Function call operand.
+
+    kSpill       = 0x00000800U,          //!< Variable should be spilled.
+    kUnuse       = 0x00001000U,          //!< Variable should be unused at the end of the instruction/node.
+
+    kRAll        = kRReg | kRMem | kRDecide | kRFunc | kRCall, //!< All in-flags.
+    kWAll        = kWReg | kWMem | kWDecide | kWFunc,          //!< All out-flags.
+
+    kRDone       = 0x00400000U,          //!< Already allocated on the input.
+    kWDone       = 0x00800000U,          //!< Already allocated on the output.
+
+    kX86GpbLo    = 0x10000000U,
+    kX86GpbHi    = 0x20000000U,
+    kX86Fld4     = 0x40000000U,
+    kX86Fld8     = 0x80000000U
+  };
+
+  // --------------------------------------------------------------------------
+  // [Setup]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE void setup(VirtReg* vreg, uint32_t flags = 0, uint32_t inRegs = 0, uint32_t allocableRegs = 0) noexcept {
+    this->vreg = vreg;
+    this->flags = flags;
+    this->refCount = 0;
+    this->inPhysId = kInvalidReg;
+    this->outPhysId = kInvalidReg;
+    this->reserved = 0;
+    this->inRegs = inRegs;
+    this->allocableRegs = allocableRegs;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get whether the variable has to be allocated in a specific input register.
+  ASMJIT_INLINE uint32_t hasInPhysId() const { return inPhysId != kInvalidReg; }
+  //! Get whether the variable has to be allocated in a specific output register.
+  ASMJIT_INLINE uint32_t hasOutPhysId() const { return outPhysId != kInvalidReg; }
+
+  //! Set the input register index.
+  ASMJIT_INLINE void setInPhysId(uint32_t index) { inPhysId = static_cast<uint8_t>(index); }
+  //! Set the output register index.
+  ASMJIT_INLINE void setOutPhysId(uint32_t index) { outPhysId = static_cast<uint8_t>(index); }
+
+  // --------------------------------------------------------------------------
+  // [Operator Overload]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE TiedReg& operator=(const TiedReg& other) {
+    ::memcpy(this, &other, sizeof(TiedReg));
+    return *this;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  //! Pointer to the associated \ref VirtReg.
+  VirtReg* vreg;
+  //! Linked register flags.
+  uint32_t flags;
+
+  union {
+    struct {
+      //! How many times the variable is used by the instruction/node.
+      uint8_t refCount;
+      //! Input register index or `kInvalidReg` if it's not given.
+      //!
+      //! Even if the input register index is not given (i.e. it may by any
+      //! register), register allocator should assign an index that will be
+      //! used to persist a variable into this specific index. It's helpful
+      //! in situations where one variable has to be allocated in multiple
+      //! registers to determine the register which will be persistent.
+      uint8_t inPhysId;
+      //! Output register index or `kInvalidReg` if it's not given.
+      //!
+      //! Typically `kInvalidReg` if variable is only used on input.
+      uint8_t outPhysId;
+      //! \internal
+      uint8_t reserved;
+    };
+
+    //! \internal
+    //!
+    //! Packed data #0.
+    uint32_t packed;
+  };
+
+  //! Mandatory input registers.
+  //!
+  //! Mandatory input registers are required by the instruction even if
+  //! there are duplicates. This schema allows us to allocate one variable
+  //! in one or more register when needed. Required mostly by instructions
+  //! that have implicit register operands (imul, cpuid, ...) and function
+  //! call.
+  uint32_t inRegs;
+
+  //! Allocable input registers.
+  //!
+  //! Optional input registers is a mask of all allocable registers for a given
+  //! variable where we have to pick one of them. This mask is usually not used
+  //! when _inRegs is set. If both masks are used then the register
+  //! allocator tries first to find an intersection between these and allocates
+  //! an extra slot if not found.
+  uint32_t allocableRegs;
+};
+
+// ============================================================================
+// [asmjit::AsmHint]
+// ============================================================================
+
+//! Hint for register allocator (Compiler).
+class AsmHint : public AsmNode {
+public:
+  ASMJIT_NO_COPY(AsmHint)
+
+  //! Hint type.
+  ASMJIT_ENUM(Hint) {
+    //! Alloc to physical reg.
+    kHintAlloc = 0,
+    //! Spill to memory.
+    kHintSpill = 1,
+    //! Save if modified.
+    kHintSave = 2,
+    //! Save if modified and mark it as unused.
+    kHintSaveAndUnuse = 3,
+    //! Mark as unused.
+    kHintUnuse = 4
+  };
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `AsmHint` instance.
+  ASMJIT_INLINE AsmHint(AsmBuilder* ab, VirtReg* vreg, uint32_t hint, uint32_t value) noexcept : AsmNode(ab, kNodeHint) {
+    orFlags(kFlagIsRemovable | kFlagIsInformative);
+    _vreg = vreg;
+    _hint = hint;
+    _value = value;
+  }
+
+  //! Destroy the `AsmHint` instance.
+  ASMJIT_INLINE ~AsmHint() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get variable.
+  ASMJIT_INLINE VirtReg* getVReg() const noexcept { return _vreg; }
+
+  //! Get hint it, see \ref Hint.
+  ASMJIT_INLINE uint32_t getHint() const noexcept { return _hint; }
+  //! Set hint it, see \ref Hint.
+  ASMJIT_INLINE void setHint(uint32_t hint) noexcept { _hint = hint; }
+
+  //! Get hint value.
+  ASMJIT_INLINE uint32_t getValue() const noexcept { return _value; }
+  //! Set hint value.
+  ASMJIT_INLINE void setValue(uint32_t value) noexcept { _value = value; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  //! Variable.
+  VirtReg* _vreg;
+  //! Hint id.
+  uint32_t _hint;
+  //! Value.
+  uint32_t _value;
+};
+
+// ============================================================================
+// [asmjit::AsmFunc]
+// ============================================================================
+
+//! Function entry (Compiler).
+class AsmFunc : public AsmLabel {
+public:
+  ASMJIT_NO_COPY(AsmFunc)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `AsmFunc` instance.
+  //!
+  //! Always use `Compiler::addFunc()` to create \ref AsmFunc.
+  ASMJIT_INLINE AsmFunc(AsmBuilder* ab) noexcept
+    : AsmLabel(ab),
+      _exitNode(nullptr),
+      _decl(nullptr),
+      _end(nullptr),
+      _args(nullptr),
+      _funcHints(Utils::mask(kFuncHintNaked)),
+      _funcFlags(0),
+      _naturalStackAlignment(0),
+      _requiredStackAlignment(0),
+      _redZoneSize(0),
+      _spillZoneSize(0),
+      _argStackSize(0),
+      _memStackSize(0),
+      _callStackSize(0) {
+    _type = kNodeFunc;
+  }
+
+  //! Destroy the `AsmFunc` instance.
+  ASMJIT_INLINE ~AsmFunc() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get function exit `AsmLabel`.
+  ASMJIT_INLINE AsmLabel* getExitNode() const noexcept { return _exitNode; }
+  //! Get function exit label.
+  ASMJIT_INLINE Label getExitLabel() const noexcept { return _exitNode->getLabel(); }
+
+  //! Get the function end sentinel.
+  ASMJIT_INLINE AsmSentinel* getEnd() const noexcept { return _end; }
+  //! Get function declaration.
+  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
+
+  //! Get arguments count.
+  ASMJIT_INLINE uint32_t getNumArgs() const noexcept { return _decl->getNumArgs(); }
+  //! Get arguments list.
+  ASMJIT_INLINE VirtReg** getArgs() const noexcept { return _args; }
+
+  //! Get argument at `i`.
+  ASMJIT_INLINE VirtReg* getArg(uint32_t i) const noexcept {
+    ASMJIT_ASSERT(i < getNumArgs());
+    return _args[i];
+  }
+
+  //! Set argument at `i`.
+  ASMJIT_INLINE void setArg(uint32_t i, VirtReg* vreg) noexcept {
+    ASMJIT_ASSERT(i < getNumArgs());
+    _args[i] = vreg;
+  }
+
+  //! Reset argument at `i`.
+  ASMJIT_INLINE void resetArg(uint32_t i) noexcept {
+    ASMJIT_ASSERT(i < getNumArgs());
+    _args[i] = nullptr;
+  }
+
+  //! Get function hints.
+  ASMJIT_INLINE uint32_t getFuncHints() const noexcept { return _funcHints; }
+  //! Get function flags.
+  ASMJIT_INLINE uint32_t getFuncFlags() const noexcept { return _funcFlags; }
+
+  //! Get whether the _funcFlags has `flag`
+  ASMJIT_INLINE bool hasFuncFlag(uint32_t flag) const noexcept { return (_funcFlags & flag) != 0; }
+  //! Set function `flag`.
+  ASMJIT_INLINE void addFuncFlags(uint32_t flags) noexcept { _funcFlags |= flags; }
+  //! Clear function `flag`.
+  ASMJIT_INLINE void clearFuncFlags(uint32_t flags) noexcept { _funcFlags &= ~flags; }
+
+  //! Get whether the function is naked.
+  ASMJIT_INLINE bool isNaked() const noexcept { return hasFuncFlag(kFuncFlagIsNaked); }
+  //! Get whether the function is also a caller.
+  ASMJIT_INLINE bool isCaller() const noexcept { return hasFuncFlag(kFuncFlagIsCaller); }
+  //! Get whether the required stack alignment is lower than expected one,
+  //! thus it has to be aligned manually.
+  ASMJIT_INLINE bool isStackMisaligned() const noexcept { return hasFuncFlag(kFuncFlagIsStackMisaligned); }
+  //! Get whether the stack pointer is adjusted inside function prolog/epilog.
+  ASMJIT_INLINE bool isStackAdjusted() const noexcept { return hasFuncFlag(kFuncFlagIsStackAdjusted); }
+
+  //! Get whether the function is finished.
+  ASMJIT_INLINE bool isFinished() const noexcept { return hasFuncFlag(kFuncFlagIsFinished); }
+
+  //! Get expected stack alignment.
+  ASMJIT_INLINE uint32_t getNaturalStackAlignment() const noexcept { return _naturalStackAlignment; }
+  //! Set expected stack alignment.
+  ASMJIT_INLINE void setNaturalStackAlignment(uint32_t alignment) noexcept { _naturalStackAlignment = alignment; }
+
+  //! Get required stack alignment.
+  ASMJIT_INLINE uint32_t getRequiredStackAlignment() const noexcept { return _requiredStackAlignment; }
+  //! Set required stack alignment.
+  ASMJIT_INLINE void setRequiredStackAlignment(uint32_t alignment) noexcept { _requiredStackAlignment = alignment; }
+
+  //! Update required stack alignment so it's not lower than expected
+  //! stack alignment.
+  ASMJIT_INLINE void updateRequiredStackAlignment() noexcept {
+    if (_requiredStackAlignment <= _naturalStackAlignment) {
+      _requiredStackAlignment = _naturalStackAlignment;
+      clearFuncFlags(kFuncFlagIsStackMisaligned);
+    }
+    else {
+      addFuncFlags(kFuncFlagIsStackMisaligned);
+    }
+  }
+
+  //! Get red-zone size.
+  ASMJIT_INLINE uint32_t getRedZoneSize() const noexcept { return _redZoneSize; }
+  //! set red-zone size.
+  ASMJIT_INLINE void setRedZoneSize(uint32_t s) noexcept { _redZoneSize = static_cast<uint16_t>(s); }
+
+  //! Get spill-zone size.
+  ASMJIT_INLINE uint32_t getSpillZoneSize() const noexcept { return _spillZoneSize; }
+  //! Set spill-zone size.
+  ASMJIT_INLINE void setSpillZoneSize(uint32_t s) noexcept { _spillZoneSize = static_cast<uint16_t>(s); }
+
+  //! Get stack size used by function arguments.
+  ASMJIT_INLINE uint32_t getArgStackSize() const noexcept { return _argStackSize; }
+  //! Get stack size used by variables and memory allocated on the stack.
+  ASMJIT_INLINE uint32_t getMemStackSize() const noexcept { return _memStackSize; }
+
+  //! Get stack size used by function calls.
+  ASMJIT_INLINE uint32_t getCallStackSize() const noexcept { return _callStackSize; }
+  //! Merge stack size used by function call with `s`.
+  ASMJIT_INLINE void mergeCallStackSize(uint32_t s) noexcept { if (_callStackSize < s) _callStackSize = s; }
+
+  // --------------------------------------------------------------------------
+  // [Hints]
+  // --------------------------------------------------------------------------
+
+  //! Set function hint.
+  ASMJIT_INLINE void setHint(uint32_t hint, uint32_t value) noexcept {
+    ASMJIT_ASSERT(hint <= 31);
+    ASMJIT_ASSERT(value <= 1);
+
+    _funcHints &= ~(1     << hint);
+    _funcHints |=  (value << hint);
+  }
+
+  //! Get function hint.
+  ASMJIT_INLINE uint32_t getHint(uint32_t hint) const noexcept {
+    ASMJIT_ASSERT(hint <= 31);
+    return (_funcHints >> hint) & 0x1;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  FuncDecl* _decl;                       //!< Function declaration.
+  AsmLabel* _exitNode;                   //!< Function exit.
+  AsmSentinel* _end;                     //!< Function end.
+
+  VirtReg** _args;                       //!< Arguments array as `VirtReg`.
+
+  uint32_t _funcHints;                   //!< Function hints;
+  uint32_t _funcFlags;                   //!< Function flags.
+
+  uint32_t _naturalStackAlignment;       //!< Natural stack alignment (OS/ABI).
+  uint32_t _requiredStackAlignment;      //!< Required stack alignment.
+
+  uint16_t _redZoneSize;                 //!< Red-zone size (AMD64-ABI).
+  uint16_t _spillZoneSize;               //!< Spill-zone size (WIN64-ABI).
+
+  uint32_t _argStackSize;                //!< Stack size needed for function arguments.
+  uint32_t _memStackSize;                //!< Stack size needed for all variables and memory allocated on the stack.
+  uint32_t _callStackSize;               //!< Stack size needed to call other functions.
+};
+
+// ============================================================================
+// [asmjit::AsmFuncRet]
+// ============================================================================
+
+//! AIR function return.
+class AsmFuncRet : public AsmNode {
+public:
+  ASMJIT_NO_COPY(AsmFuncRet)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `AsmFuncRet` instance.
+  ASMJIT_INLINE AsmFuncRet(AsmBuilder* ab, const Operand_& o0, const Operand_& o1) noexcept : AsmNode(ab, kNodeFuncExit) {
+    orFlags(kFlagIsRet);
+    _ret[0].copyFrom(o0);
+    _ret[1].copyFrom(o1);
+  }
+
+  //! Destroy the `AsmFuncRet` instance.
+  ASMJIT_INLINE ~AsmFuncRet() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get the first return operand.
+  ASMJIT_INLINE Operand& getFirst() noexcept { return static_cast<Operand&>(_ret[0]); }
+  //! \overload
+  ASMJIT_INLINE const Operand& getFirst() const noexcept { return static_cast<const Operand&>(_ret[0]); }
+
+  //! Get the second return operand.
+  ASMJIT_INLINE Operand& getSecond() noexcept { return static_cast<Operand&>(_ret[1]); }
+   //! \overload
+  ASMJIT_INLINE const Operand& getSecond() const noexcept { return static_cast<const Operand&>(_ret[1]); }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  //! Return operands.
+  Operand_ _ret[2];
+};
+
+// ============================================================================
+// [asmjit::AsmCall]
+// ============================================================================
+
+//! Function call (Compiler).
+class AsmCall : public AsmInst {
+public:
+  ASMJIT_NO_COPY(AsmCall)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `AsmCall` instance.
+  ASMJIT_INLINE AsmCall(AsmBuilder* ab, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+    : AsmInst(ab, instId, options, opArray, opCount),
+      _decl(nullptr),
+      _args(nullptr) {
+
+    _type = kNodeCall;
+    _ret[0].reset();
+    _ret[1].reset();
+    orFlags(kFlagIsRemovable);
+  }
+
+  //! Destroy the `AsmCall` instance.
+  ASMJIT_INLINE ~AsmCall() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get function declaration.
+  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
+
+  //! Get target operand.
+  ASMJIT_INLINE Operand& getTarget() noexcept { return static_cast<Operand&>(_opArray[0]); }
+  //! \overload
+  ASMJIT_INLINE const Operand& getTarget() const noexcept { return static_cast<const Operand&>(_opArray[0]); }
+
+  //! Get return at `i`.
+  ASMJIT_INLINE Operand& getRet(uint32_t i = 0) noexcept {
+    ASMJIT_ASSERT(i < 2);
+    return static_cast<Operand&>(_ret[i]);
+  }
+  //! \overload
+  ASMJIT_INLINE const Operand& getRet(uint32_t i = 0) const noexcept {
+    ASMJIT_ASSERT(i < 2);
+    return static_cast<const Operand&>(_ret[i]);
+  }
+
+  //! Get argument at `i`.
+  ASMJIT_INLINE Operand& getArg(uint32_t i) noexcept {
+    ASMJIT_ASSERT(i < kFuncArgCountLoHi);
+    return static_cast<Operand&>(_args[i]);
+  }
+  //! \overload
+  ASMJIT_INLINE const Operand& getArg(uint32_t i) const noexcept {
+    ASMJIT_ASSERT(i < kFuncArgCountLoHi);
+    return static_cast<const Operand&>(_args[i]);
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  FuncDecl* _decl;                       //!< Function declaration.
+  Operand_ _ret[2];                      //!< Return.
+  Operand_* _args;                       //!< Arguments.
+};
+
+// ============================================================================
+// [asmjit::AsmPushArg]
+// ============================================================================
+
+//! Push argument before a function call (Compiler).
+class AsmPushArg : public AsmNode {
+public:
+  ASMJIT_NO_COPY(AsmPushArg)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `AsmPushArg` instance.
+  ASMJIT_INLINE AsmPushArg(AsmBuilder* ab, AsmCall* call, VirtReg* src, VirtReg* cvt) noexcept
+    : AsmNode(ab, kNodePushArg),
+      _call(call),
+      _src(src),
+      _cvt(cvt),
+      _args(0) {
+    orFlags(kFlagIsRemovable);
+  }
+
+  //! Destroy the `AsmPushArg` instance.
+  ASMJIT_INLINE ~AsmPushArg() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get the associated function-call.
+  ASMJIT_INLINE AsmCall* getCall() const noexcept { return _call; }
+  //! Get source variable.
+  ASMJIT_INLINE VirtReg* getSrcReg() const noexcept { return _src; }
+  //! Get conversion variable.
+  ASMJIT_INLINE VirtReg* getCvtReg() const noexcept { return _cvt; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  AsmCall* _call;                        //!< Associated `AsmCall`.
+  VirtReg* _src;                         //!< Source variable.
+  VirtReg* _cvt;                         //!< Temporary variable used for conversion (or null).
+  uint32_t _args;                        //!< Affected arguments bit-array.
 };
 
 // ============================================================================
 // [asmjit::Compiler]
 // ============================================================================
 
-//! Compiler interface.
+//! Code-generator that uses virtual registers and performs register allocation.
 //!
-//! \sa Assembler.
-class ASMJIT_VIRTAPI Compiler : public ExternalTool {
- public:
+//! Compiler is a high-level code-generation tool that provides register
+//! allocation and automatic handling of function calling conventions. It was
+//! primarily designed for merging multiple parts of asm code into a function
+//! without worrying about registers and function calling conventions. Compiler
+//! can be used, with a minimum effort, to handle 32-bit and 64-bit code at
+//! the same time.
+//!
+//! Compiler is based on `AsmBuilder` and contains all the features it provides.
+//! It means that the code it stores can be modified (removed, added, injected)
+//! and analyzed. When the code is finalized the compiler can serialize the
+//! code into the `Assembler`.
+class ASMJIT_VIRTAPI Compiler : public AsmBuilder {
+public:
   ASMJIT_NO_COPY(Compiler)
+  typedef AsmBuilder Base;
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -152,37 +791,15 @@ class ASMJIT_VIRTAPI Compiler : public ExternalTool {
   ASMJIT_API virtual ~Compiler() noexcept;
 
   // --------------------------------------------------------------------------
-  // [Reset]
+  // [Events]
   // --------------------------------------------------------------------------
 
-  //! \override
-  ASMJIT_API virtual void reset(bool releaseMemory) noexcept;
+  ASMJIT_API virtual Error onAttach(CodeHolder* holder) noexcept override;
+  ASMJIT_API virtual Error onDetach(CodeHolder* holder) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Compiler Features]
   // --------------------------------------------------------------------------
-
-  //! Get code-generator features.
-  ASMJIT_INLINE uint32_t getFeatures() const noexcept {
-    return _features;
-  }
-  //! Set code-generator features.
-  ASMJIT_INLINE void setFeatures(uint32_t features) noexcept {
-    _features = features;
-  }
-
-  //! Get code-generator `feature`.
-  ASMJIT_INLINE bool hasFeature(uint32_t feature) const noexcept {
-    ASMJIT_ASSERT(feature < 32);
-    return (_features & (1 << feature)) != 0;
-  }
-
-  //! Set code-generator `feature` to `value`.
-  ASMJIT_INLINE void setFeature(uint32_t feature, bool value) noexcept {
-    ASMJIT_ASSERT(feature < 32);
-    feature = static_cast<uint32_t>(value) << feature;
-    _features = (_features & ~feature) | feature;
-  }
 
   //! Get maximum look ahead.
   ASMJIT_INLINE uint32_t getMaxLookAhead() const noexcept {
@@ -200,274 +817,96 @@ class ASMJIT_VIRTAPI Compiler : public ExternalTool {
   //! \internal
   //!
   //! Reset the token-id generator.
-  ASMJIT_INLINE void _resetTokenGenerator() noexcept {
-    _tokenGenerator = 0;
-  }
+  ASMJIT_INLINE void _resetTokenGenerator() noexcept { _tokenGenerator = 0; }
 
   //! \internal
   //!
   //! Generate a new unique token id.
-  ASMJIT_INLINE uint32_t _generateUniqueToken() noexcept {
-    return ++_tokenGenerator;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Instruction Options]
-  // --------------------------------------------------------------------------
-
-  //! Get options of the next instruction.
-  ASMJIT_INLINE uint32_t getInstOptions() const noexcept {
-    return _instOptions;
-  }
-  //! Set options of the next instruction.
-  ASMJIT_INLINE void setInstOptions(uint32_t instOptions) noexcept {
-    _instOptions = instOptions;
-  }
-
-  //! Get options of the next instruction and reset them.
-  ASMJIT_INLINE uint32_t getInstOptionsAndReset() {
-    uint32_t instOptions = _instOptions;
-    _instOptions = 0;
-    return instOptions;
-  };
+  ASMJIT_INLINE uint32_t _generateUniqueToken() noexcept { return ++_tokenGenerator; }
 
   // --------------------------------------------------------------------------
   // [Node-Factory]
   // --------------------------------------------------------------------------
 
   //! \internal
-  template<typename T>
-  ASMJIT_INLINE T* newNode() noexcept {
-    void* p = _zoneAllocator.alloc(sizeof(T));
-    return new(p) T(this);
-  }
-
-  //! \internal
-  template<typename T, typename P0>
-  ASMJIT_INLINE T* newNode(P0 p0) noexcept {
-    void* p = _zoneAllocator.alloc(sizeof(T));
-    return new(p) T(this, p0);
-  }
-
-  //! \internal
-  template<typename T, typename P0, typename P1>
-  ASMJIT_INLINE T* newNode(P0 p0, P1 p1) noexcept {
-    void* p = _zoneAllocator.alloc(sizeof(T));
-    return new(p) T(this, p0, p1);
-  }
-
-  //! \internal
-  template<typename T, typename P0, typename P1, typename P2>
-  ASMJIT_INLINE T* newNode(P0 p0, P1 p1, P2 p2) noexcept {
-    void* p = _zoneAllocator.alloc(sizeof(T));
-    return new(p) T(this, p0, p1, p2);
-  }
-
-  //! \internal
   //!
-  //! Create a new `HLData` node.
-  ASMJIT_API HLData* newDataNode(const void* data, uint32_t size) noexcept;
-
-  //! \internal
-  //!
-  //! Create a new `HLAlign` node.
-  ASMJIT_API HLAlign* newAlignNode(uint32_t alignMode, uint32_t offset) noexcept;
-
-  //! \internal
-  //!
-  //! Create a new `HLLabel` node.
-  ASMJIT_API HLLabel* newLabelNode() noexcept;
-
-  //! \internal
-  //!
-  //! Create a new `HLComment`.
-  ASMJIT_API HLComment* newCommentNode(const char* str) noexcept;
-
-  //! \internal
-  //!
-  //! Create a new `HLHint`.
-  ASMJIT_API HLHint* newHintNode(Var& var, uint32_t hint, uint32_t value) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Code-Stream]
-  // --------------------------------------------------------------------------
-
-  //! Add a function `node` to the stream.
-  ASMJIT_API HLNode* addFunc(HLFunc* func) noexcept;
-
-  //! Add node `node` after current and set current to `node`.
-  ASMJIT_API HLNode* addNode(HLNode* node) noexcept;
-  //! Insert `node` before `ref`.
-  ASMJIT_API HLNode* addNodeBefore(HLNode* node, HLNode* ref) noexcept;
-  //! Insert `node` after `ref`.
-  ASMJIT_API HLNode* addNodeAfter(HLNode* node, HLNode* ref) noexcept;
-  //! Remove `node`.
-  ASMJIT_API HLNode* removeNode(HLNode* node) noexcept;
-  //! Remove multiple nodes.
-  ASMJIT_API void removeNodes(HLNode* first, HLNode* last) noexcept;
-
-  //! Get the first node.
-  ASMJIT_INLINE HLNode* getFirstNode() const noexcept { return _firstNode; }
-  //! Get the last node.
-  ASMJIT_INLINE HLNode* getLastNode() const noexcept { return _lastNode; }
-
-  //! Get current node.
-  //!
-  //! \note If this method returns `nullptr` it means that nothing has been
-  //! emitted yet.
-  ASMJIT_INLINE HLNode* getCursor() const noexcept { return _cursor; }
-  //! \internal
-  //!
-  //! Set the current node without returning the previous node.
-  ASMJIT_INLINE void _setCursor(HLNode* node) noexcept { _cursor = node; }
-  //! Set the current node to `node` and return the previous one.
-  ASMJIT_API HLNode* setCursor(HLNode* node) noexcept;
+  //! Create a new `AsmHint`.
+  ASMJIT_API AsmHint* newHintNode(Reg& reg, uint32_t hint, uint32_t value) noexcept;
 
   // --------------------------------------------------------------------------
   // [Func]
   // --------------------------------------------------------------------------
 
+  //! Add a function `node` to the stream.
+  ASMJIT_API AsmFunc* addFunc(AsmFunc* func);
   //! Get current function.
-  ASMJIT_INLINE HLFunc* getFunc() const noexcept { return _func; }
-
-  // --------------------------------------------------------------------------
-  // [Align]
-  // --------------------------------------------------------------------------
-
-  //! Align target buffer to the `offset` specified.
-  //!
-  //! The sequence that is used to fill the gap between the aligned location
-  //! and the current depends on `alignMode`, see \ref AlignMode.
-  ASMJIT_API Error align(uint32_t alignMode, uint32_t offset) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Label]
-  // --------------------------------------------------------------------------
-
-  //! Get `HLLabel` by `id`.
-  //!
-  //! NOTE: The label has to be valid, see `isLabelValid()`.
-  ASMJIT_API HLLabel* getHLLabel(uint32_t id) const noexcept;
-
-  //! Get `HLLabel` by `label`.
-  //!
-  //! NOTE: The label has to be valid, see `isLabelValid()`.
-  ASMJIT_INLINE HLLabel* getHLLabel(const Label& label) noexcept {
-    return getHLLabel(label.getId());
-  }
-
-  //! Get whether the label `id` is valid.
-  ASMJIT_API bool isLabelValid(uint32_t id) const noexcept;
-  //! Get whether the `label` is valid.
-  ASMJIT_INLINE bool isLabelValid(const Label& label) const noexcept {
-    return isLabelValid(label.getId());
-  }
-
-  //! \internal
-  //!
-  //! Create a new label and return its ID.
-  ASMJIT_API uint32_t _newLabelId() noexcept;
-
-  //! Create and return a new `Label`.
-  ASMJIT_INLINE Label newLabel() noexcept { return Label(_newLabelId()); }
-
-  //! Bind label to the current offset.
-  //!
-  //! NOTE: Label can be bound only once!
-  ASMJIT_API Error bind(const Label& label) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Embed]
-  // --------------------------------------------------------------------------
-
-  //! Embed data.
-  ASMJIT_API Error embed(const void* data, uint32_t size) noexcept;
-
-  //! Embed a constant pool data, adding the following in order:
-  //!   1. Data alignment.
-  //!   2. Label.
-  //!   3. Constant pool data.
-  ASMJIT_API Error embedConstPool(const Label& label, const ConstPool& pool) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Comment]
-  // --------------------------------------------------------------------------
-
-  //! Emit a single comment line.
-  ASMJIT_API Error comment(const char* fmt, ...) noexcept;
+  ASMJIT_INLINE AsmFunc* getFunc() const noexcept { return _func; }
 
   // --------------------------------------------------------------------------
   // [Hint]
   // --------------------------------------------------------------------------
 
-  //! Emit a new hint (purery informational node).
-  ASMJIT_API Error _hint(Var& var, uint32_t hint, uint32_t value) noexcept;
+  //! Emit a new hint (purely informational node).
+  ASMJIT_API Error _hint(Reg& reg, uint32_t hint, uint32_t value);
 
   // --------------------------------------------------------------------------
   // [Vars]
   // --------------------------------------------------------------------------
 
-  //! Get whether variable `var` is created.
-  ASMJIT_INLINE bool isVarValid(const Var& var) const noexcept {
-    return static_cast<size_t>(var.getId() & Operand::kIdIndexMask) < _varList.getLength();
+  //! Create a new virtual register.
+  ASMJIT_API VirtReg* newVirtReg(const VirtType& typeInfo, const char* name) noexcept;
+
+  //! Get whether the virtual register `r` is valid.
+  ASMJIT_INLINE bool isVirtRegValid(const Reg& reg) const noexcept {
+    return isVirtRegValid(reg.getId());
+  }
+  //! \overload
+  ASMJIT_INLINE bool isVirtRegValid(uint32_t id) const noexcept {
+    size_t index = Operand::unpackId(id);
+    return index < _vRegArray.getLength();
   }
 
-  //! \internal
-  //!
-  //! Get `VarData` by `var`.
-  ASMJIT_INLINE VarData* getVd(const Var& var) const noexcept {
-    return getVdById(var.getId());
-  }
-
-  //! \internal
-  //!
-  //! Get `VarData` by `id`.
-  ASMJIT_INLINE VarData* getVdById(uint32_t id) const noexcept {
+  //! Get \ref VirtReg associated with the given `r`.
+  ASMJIT_INLINE VirtReg* getVirtReg(const Reg& reg) const noexcept { return getVirtRegById(reg.getId()); }
+  //! Get \ref VirtReg associated with the given `id`.
+  ASMJIT_INLINE VirtReg* getVirtRegById(uint32_t id) const noexcept {
     ASMJIT_ASSERT(id != kInvalidValue);
-    ASMJIT_ASSERT(static_cast<size_t>(id & Operand::kIdIndexMask) < _varList.getLength());
+    size_t index = Operand::unpackId(id);
 
-    return _varList[id & Operand::kIdIndexMask];
+    ASMJIT_ASSERT(index < _vRegArray.getLength());
+    return _vRegArray[index];
   }
 
-  //! \internal
-  //!
-  //! Get an array of 'VarData*'.
-  ASMJIT_INLINE VarData** _getVdArray() const noexcept {
-    return const_cast<VarData**>(_varList.getData());
-  }
+  //! Get an array of all virtual registers managed by the Compiler.
+  ASMJIT_INLINE const PodVector<VirtReg*>& getVirtRegArray() const noexcept { return _vRegArray; }
 
-  //! \internal
-  //!
-  //! Create a new `VarData`.
-  ASMJIT_API VarData* _newVd(const VarInfo& vi, const char* name) noexcept;
+  //! Alloc a virtual register `reg`.
+  ASMJIT_API Error alloc(Reg& reg);
+  //! Alloc a virtual register `reg` using `physId` as a register id.
+  ASMJIT_API Error alloc(Reg& reg, uint32_t physId);
+  //! Alloc a virtual register `reg` using `ref` as a register operand.
+  ASMJIT_API Error alloc(Reg& reg, const Reg& ref);
+  //! Spill a virtual register `reg`.
+  ASMJIT_API Error spill(Reg& reg);
+  //! Save a virtual register `reg` if the status is `modified` at this point.
+  ASMJIT_API Error save(Reg& reg);
+  //! Unuse a virtual register `reg`.
+  ASMJIT_API Error unuse(Reg& reg);
 
-  //! Alloc variable `var`.
-  ASMJIT_API Error alloc(Var& var) noexcept;
-  //! Alloc variable `var` using `regIndex` as a register index.
-  ASMJIT_API Error alloc(Var& var, uint32_t regIndex) noexcept;
-  //! Alloc variable `var` using `reg` as a register operand.
-  ASMJIT_API Error alloc(Var& var, const Reg& reg) noexcept;
-  //! Spill variable `var`.
-  ASMJIT_API Error spill(Var& var) noexcept;
-  //! Save variable `var` if the status is `modified` at this point.
-  ASMJIT_API Error save(Var& var) noexcept;
-  //! Unuse variable `var`.
-  ASMJIT_API Error unuse(Var& var) noexcept;
+  //! Get priority of a virtual register `reg`.
+  ASMJIT_API uint32_t getPriority(Reg& reg) const;
+  //! Set priority of variable `reg` to `priority`.
+  ASMJIT_API void setPriority(Reg& reg, uint32_t priority);
 
-  //! Get priority of variable `var`.
-  ASMJIT_API uint32_t getPriority(Var& var) const noexcept;
-  //! Set priority of variable `var` to `priority`.
-  ASMJIT_API void setPriority(Var& var, uint32_t priority) noexcept;
+  //! Get save-on-unuse `reg` property.
+  ASMJIT_API bool getSaveOnUnuse(Reg& reg) const;
+  //! Set save-on-unuse `reg` property to `value`.
+  ASMJIT_API void setSaveOnUnuse(Reg& reg, bool value);
 
-  //! Get save-on-unuse `var` property.
-  ASMJIT_API bool getSaveOnUnuse(Var& var) const noexcept;
-  //! Set save-on-unuse `var` property to `value`.
-  ASMJIT_API void setSaveOnUnuse(Var& var, bool value) noexcept;
-
-  //! Rename variable `var` to `name`.
+  //! Rename variable `reg` to `name`.
   //!
   //! NOTE: Only new name will appear in the logger.
-  ASMJIT_API void rename(Var& var, const char* fmt, ...) noexcept;
+  ASMJIT_API void rename(Reg& reg, const char* fmt, ...);
 
   // --------------------------------------------------------------------------
   // [Stack]
@@ -476,7 +915,7 @@ class ASMJIT_VIRTAPI Compiler : public ExternalTool {
   //! \internal
   //!
   //! Create a new memory chunk allocated on the current function's stack.
-  virtual Error _newStack(BaseMem* mem, uint32_t size, uint32_t alignment, const char* name) noexcept = 0;
+  virtual Error _newStack(Mem& m, uint32_t size, uint32_t alignment, const char* name) = 0;
 
   // --------------------------------------------------------------------------
   // [Const]
@@ -485,86 +924,31 @@ class ASMJIT_VIRTAPI Compiler : public ExternalTool {
   //! \internal
   //!
   //! Put data to a constant-pool and get a memory reference to it.
-  virtual Error _newConst(BaseMem* mem, uint32_t scope, const void* data, size_t size) noexcept = 0;
+  virtual Error _newConst(Mem& m, uint32_t scope, const void* data, size_t size) = 0;
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Code-Generation features, used by \ref hasFeature() and \ref setFeature().
-  uint32_t _features;
-  //! Maximum count of nodes to look ahead when allocating/spilling
-  //! registers.
-  uint32_t _maxLookAhead;
+  const uint32_t* _typeIdMap;            //!< Mapping between arch-independent type-id and backend specific one.
+  uint32_t _maxLookAhead;                //!< Maximum look-ahead of RA.
 
-  //! Options affecting the next instruction.
-  uint32_t _instOptions;
   //! Processing token generator.
   //!
-  //! Used to get a unique token that is then used to process `HLNode`s. See
+  //! Used to get a unique token that is then used to process `AsmNode`s. See
   //! `Compiler::_getUniqueToken()` for more details.
   uint32_t _tokenGenerator;
 
-  //! Flow id added to each node created (used only by `Context)`.
-  uint32_t _nodeFlowId;
-  //! Flags added to each node created (used only by `Context)`.
-  uint32_t _nodeFlags;
+  AsmFunc* _func;                        //!< Current function.
 
-  //! Variable mapping (translates incoming VarType into target).
-  const uint8_t* _targetVarMapping;
+  Zone _vRegAllocator;                   //!< Allocates \ref VirtReg objects.
+  PodVector<VirtReg*> _vRegArray;        //!< Stores array of \ref VirtReg pointers.
 
-  //! First node.
-  HLNode* _firstNode;
-  //! Last node.
-  HLNode* _lastNode;
-
-  //! Current node.
-  HLNode* _cursor;
-  //! Current function.
-  HLFunc* _func;
-
-  //! General purpose zone allocator.
-  Zone _zoneAllocator;
-  //! Variable zone.
-  Zone _varAllocator;
-  //! String/data zone.
-  Zone _stringAllocator;
-  //! Local constant pool zone.
-  Zone _constAllocator;
-
-  //! VarData list.
-  PodVector<VarData*> _varList;
-
-  //! Local constant pool, flushed at the end of each function.
-  ConstPool _localConstPool;
-  //! Global constant pool, flushed at the end of the compilation.
-  ConstPool _globalConstPool;
-
-  //! Label to start of the local constant pool.
-  Label _localConstPoolLabel;
-  //! Label to start of the global constant pool.
-  Label _globalConstPoolLabel;
+  AsmConstPool* _localConstPool;         //!< Local constant pool, flushed at the end of each function.
+  AsmConstPool* _globalConstPool;        //!< Global constant pool, flushed at the end of the compilation.
 };
 
 //! \}
-
-// ============================================================================
-// [Defined-Later]
-// ============================================================================
-
-ASMJIT_INLINE HLNode::HLNode(Compiler* compiler, uint32_t type) noexcept {
-  _prev = nullptr;
-  _next = nullptr;
-  _type = static_cast<uint8_t>(type);
-  _opCount = 0;
-  _flags = static_cast<uint16_t>(compiler->_nodeFlags);
-  _flowId = compiler->_nodeFlowId;
-  _tokenId = 0;
-  _comment = nullptr;
-  _map = nullptr;
-  _liveness = nullptr;
-  _state = nullptr;
-}
 
 } // asmjit namespace
 

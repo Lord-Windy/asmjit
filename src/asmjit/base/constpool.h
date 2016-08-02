@@ -25,7 +25,7 @@ namespace asmjit {
 
 //! Constant pool.
 class ConstPool {
- public:
+public:
   ASMJIT_NO_COPY(ConstPool)
 
   enum {
@@ -46,12 +46,9 @@ class ConstPool {
   //!
   //! Zone-allocated const-pool gap.
   struct Gap {
-    //! Link to the next gap
-    Gap* _next;
-    //! Offset of the gap.
-    size_t _offset;
-    //! Remaining bytes of the gap (basically a gap size).
-    size_t _length;
+    Gap* _next;                          //!< Pointer to the next gap
+    size_t _offset;                      //!< Offset of the gap.
+    size_t _length;                      //!< Remaining bytes of the gap (basically a gap size).
   };
 
   // --------------------------------------------------------------------------
@@ -62,26 +59,14 @@ class ConstPool {
   //!
   //! Zone-allocated const-pool node.
   struct Node {
-    // --------------------------------------------------------------------------
-    // [Accessors]
-    // --------------------------------------------------------------------------
-
     ASMJIT_INLINE void* getData() const noexcept {
       return static_cast<void*>(const_cast<ConstPool::Node*>(this) + 1);
     }
 
-    // --------------------------------------------------------------------------
-    // [Members]
-    // --------------------------------------------------------------------------
-
-    //! Left/Right nodes.
-    Node* _link[2];
-    //! Horizontal level for balance.
-    uint32_t _level : 31;
-    //! Whether this constant is shared with another.
-    uint32_t _shared : 1;
-    //! Data offset from the beginning of the pool.
-    uint32_t _offset;
+    Node* _link[2];                      //!< Left/Right nodes.
+    uint32_t _level : 31;                //!< Horizontal level for balance.
+    uint32_t _shared : 1;                //!< If this constant is shared with another.
+    uint32_t _offset;                    //!< Data offset from the beginning of the pool.
   };
 
   // --------------------------------------------------------------------------
@@ -142,8 +127,7 @@ class ConstPool {
     template<typename Visitor>
     ASMJIT_INLINE void iterate(Visitor& visitor) const noexcept {
       Node* node = const_cast<Node*>(_root);
-      if (node == nullptr)
-        return;
+      if (!node) return;
 
       Node* stack[kHeightLimit];
       size_t top = 0;
@@ -158,7 +142,7 @@ class ConstPool {
           continue;
         }
 
-L_Visit:
+Visit:
         visitor.visit(node);
         node = node->_link[1];
         if (node != nullptr)
@@ -168,7 +152,7 @@ L_Visit:
           return;
 
         node = stack[--top];
-        goto L_Visit;
+        goto Visit;
       }
     }
 
@@ -178,8 +162,7 @@ L_Visit:
 
     static ASMJIT_INLINE Node* _newNode(Zone* zone, const void* data, size_t size, size_t offset, bool shared) noexcept {
       Node* node = zone->allocT<Node>(sizeof(Node) + size);
-      if (node == nullptr)
-        return nullptr;
+      if (ASMJIT_UNLIKELY(!node)) return nullptr;
 
       node->_link[0] = nullptr;
       node->_link[1] = nullptr;
@@ -195,12 +178,9 @@ L_Visit:
     // [Members]
     // --------------------------------------------------------------------------
 
-    //! Root of the tree
-    Node* _root;
-    //! Length of the tree (count of nodes).
-    size_t _length;
-    //! Size of the data.
-    size_t _dataSize;
+    Node* _root;                         //!< Root of the tree
+    size_t _length;                      //!< Length of the tree (count of nodes).
+    size_t _dataSize;                    //!< Size of the data.
   };
 
   // --------------------------------------------------------------------------
@@ -214,7 +194,7 @@ L_Visit:
   // [Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API void reset() noexcept;
+  ASMJIT_API void reset(Zone* zone) noexcept;
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -257,19 +237,13 @@ L_Visit:
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Zone allocator.
-  Zone* _zone;
-  //! Tree per size.
-  Tree _tree[kIndexCount];
-  //! Gaps per size.
-  Gap* _gaps[kIndexCount];
-  //! Gaps pool
-  Gap* _gapPool;
+  Zone* _zone;                           //!< Zone allocator.
+  Tree _tree[kIndexCount];               //!< Tree per size.
+  Gap* _gaps[kIndexCount];               //!< Gaps per size.
+  Gap* _gapPool;                         //!< Gaps pool
 
-  //! Size of the pool (in bytes).
-  size_t _size;
-  //! Alignemnt.
-  size_t _alignment;
+  size_t _size;                          //!< Size of the pool (in bytes).
+  size_t _alignment;                     //!< Required pool alignment.
 };
 
 //! \}

@@ -14,17 +14,11 @@ include(CheckCXXCompilerFlag)
 # Used for debugging asmjit itself (default FALSE).
 # set(ASMJIT_TRACE FALSE)
 
-# Whether to build ARM32 backend (TRUE if building for ARM32).
-# set(ASMJIT_BUILD_ARM32 FALSE)
+# Whether to build ARM backend (TRUE if building for ARM32 and ARM64).
+# set(ASMJIT_BUILD_ARM FALSE)
 
-# Whether to build ARM64 backend (TRUE if building for ARM64).
-# set(ASMJIT_BUILD_ARM64 FALSE)
-
-# Whether to build X86 backend (TRUE if building for X86).
+# Whether to build X86 backend (TRUE if building for X86 and X64).
 # set(ASMJIT_BUILD_X86 FALSE)
-
-# Whether to build X64 backend (TRUE if building for X64).
-# set(ASMJIT_BUILD_X64 FALSE)
 
 # Whether to build tests and samples (default FALSE).
 # set(ASMJIT_BUILD_TEST FALSE)
@@ -71,13 +65,25 @@ message("-- [asmjit] ASMJIT_DIR=${ASMJIT_DIR}")
 function(np_detect_options out)
   set(out_array)
   foreach(flag ${ARGN})
-    check_cxx_compiler_flag("${flag}" ok)
-    if(ok)
+    string(REGEX REPLACE "[-=:;/]" "_" flag_signature "${flag}")
+    check_cxx_compiler_flag(${flag} "check_cxx_${flag_signature}")
+    if(${check_cxx_${flag_signature}})
       list(APPEND out_array "${flag}")
     endif()
-    unset(ok)
   endforeach()
   set(${out} "${out_array}" PARENT_SCOPE)
+endfunction()
+
+function(np_print_cflags cflags cflags_dbg cflags_rel)
+  foreach(flag ${cflags})
+    message("   ${flag}")
+  endforeach()
+  foreach(flag ${cflags_dbg})
+    message("   ${flag} [DEBUG]")
+  endforeach()
+  foreach(flag ${cflags_rel})
+    message("   ${flag} [RELEASE]")
+  endforeach()
 endfunction()
 
 # =============================================================================
@@ -85,6 +91,7 @@ endfunction()
 # =============================================================================
 
 set(ASMJIT_SOURCE_DIR "${ASMJIT_DIR}/src")      # Asmjit source directory.
+get_filename_component(ASMJIT_SOURCE_DIR "${ASMJIT_SOURCE_DIR}" ABSOLUTE)
 set(ASMJIT_INCLUDE_DIR "${ASMJIT_SOURCE_DIR}")  # Asmjit include directory.
 
 set(ASMJIT_CFLAGS)                              # Asmjit CFLAGS / CXXFLAGS.
@@ -125,7 +132,8 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang)$")
   np_detect_options(ASMJIT_CC_OPTIONS
     "-fno-exceptions"
     "-fno-tree-vectorize"
-    "-fvisibility=hidden")
+    "-fvisibility=hidden"
+    "-Winconsistent-missing-override")
 
   list(APPEND ASMJIT_PRIVATE_CFLAGS ${ASMJIT_CC_OPTIONS})
   list(APPEND ASMJIT_PRIVATE_CFLAGS_REL -fmerge-all-constants)
@@ -158,28 +166,24 @@ if(NOT ASMJIT_EMBED)
   list(INSERT ASMJIT_LIBS 0 asmjit)
 endif()
 
-if(ASMJIT_BUILD_ARM32)
-  List(APPEND ASMJIT_CFLAGS "${ASMJIT_D}ASMJIT_BUILD_ARM32")
-endif()
-
-if(ASMJIT_BUILD_ARM64)
-  List(APPEND ASMJIT_CFLAGS "${ASMJIT_D}ASMJIT_BUILD_ARM64")
+if(ASMJIT_BUILD_ARM)
+  List(APPEND ASMJIT_CFLAGS "${ASMJIT_D}ASMJIT_BUILD_ARM")
 endif()
 
 if(ASMJIT_BUILD_X86)
   List(APPEND ASMJIT_CFLAGS "${ASMJIT_D}ASMJIT_BUILD_X86")
 endif()
 
-if(ASMJIT_BUILD_X64)
-  List(APPEND ASMJIT_CFLAGS "${ASMJIT_D}ASMJIT_BUILD_X64")
-endif()
-
-set(ASMJIT_PRIVATE_CFLAGS_DBG ${ASMJIT_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_DBG})
-set(ASMJIT_PRIVATE_CFLAGS_REL ${ASMJIT_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_REL})
+list(APPEND ASMJIT_PRIVATE_CFLAGS ${ASMJIT_CFLAGS})
 
 message("-- [asmjit] ASMJIT_DEPS=${ASMJIT_DEPS}")
 message("-- [asmjit] ASMJIT_LIBS=${ASMJIT_LIBS}")
 message("-- [asmjit] ASMJIT_CFLAGS=${ASMJIT_CFLAGS}")
+message("-- [asmjit] ASMJIT_PRIVATE_CFLAGS=")
+np_print_cflags(
+  "${ASMJIT_PRIVATE_CFLAGS}"
+  "${ASMJIT_PRIVATE_CFLAGS_DBG}"
+  "${ASMJIT_PRIVATE_CFLAGS_REL}")
 
 # =============================================================================
 # [AsmJit - Macros]
@@ -245,34 +249,41 @@ asmjit_add_source(ASMJIT_SRC asmjit
 )
 
 asmjit_add_source(ASMJIT_SRC asmjit/base
+  archinfo.cpp
+  archinfo.h
+  asmbuilder.cpp
+  asmbuilder.h
   assembler.cpp
   assembler.h
+  bitutils.h
+  codegen.cpp
+  codegen.h
+  codeholder.cpp
+  codeholder.h
   compiler.cpp
   compiler.h
   compilercontext.cpp
   compilercontext_p.h
-  compilerfunc.h
   constpool.cpp
   constpool.h
   containers.cpp
   containers.h
   cpuinfo.cpp
   cpuinfo.h
+  func.h
   globals.cpp
   globals.h
-  hlstream.cpp
-  hlstream.h
-  logger.cpp
-  logger.h
+  logging.cpp
+  logging.h
   operand.cpp
   operand.h
-  podvector.cpp
-  podvector.h
   runtime.cpp
   runtime.h
+  simdtypes.h
+  string.cpp
+  string.h
   utils.cpp
   utils.h
-  vectypes.h
   vmem.cpp
   vmem.h
   zone.cpp
@@ -298,10 +309,13 @@ asmjit_add_source(ASMJIT_SRC asmjit/x86
   x86compiler.h
   x86compilercontext.cpp
   x86compilercontext_p.h
-  x86compilerfunc.cpp
-  x86compilerfunc.h
+  x86func.cpp
+  x86func.h
   x86inst.cpp
   x86inst.h
+  x86logging.cpp
+  x86logging.h
+  x86misc.h
   x86operand.cpp
   x86operand_regs.cpp
   x86operand.h
@@ -316,7 +330,7 @@ if(NOT ASMJIT_EMBED)
   asmjit_add_library(asmjit
     "${ASMJIT_SRC}"
     "${ASMJIT_DEPS}"
-    ""
+    "${ASMJIT_PRIVATE_CFLAGS}"
     "${ASMJIT_PRIVATE_CFLAGS_DBG}"
     "${ASMJIT_PRIVATE_CFLAGS_REL}"
   )
@@ -344,12 +358,12 @@ if(NOT ASMJIT_EMBED)
 
     if(CMAKE_BUILD_TYPE)
       if("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-        target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_DBG})
+        target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_DBG})
       else()
-        target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_REL})
+        target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS_REL})
       endif()
     else()
-      target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS}
+      target_compile_options(asmjit_test_unit PRIVATE ${ASMJIT_TEST_CFLAGS} ${ASMJIT_PRIVATE_CFLAGS}
         $<$<CONFIG:Debug>:${ASMJIT_PRIVATE_CFLAGS_DBG}>
         $<$<NOT:$<CONFIG:Debug>>:${ASMJIT_PRIVATE_CFLAGS_REL}>)
     endif()

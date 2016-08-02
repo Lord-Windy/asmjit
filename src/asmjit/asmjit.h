@@ -81,26 +81,22 @@
 //!
 //! List of the most useful code-generation and operand classes:
 //! - \ref asmjit::Assembler - Low-level code-generation.
-//! - \ref asmjit::ExternalTool - An external tool that can serialize to `Assembler`:
-//!   - \ref asmjit::Compiler - High-level code-generation.
+//! - \ref asmjit::AsmBuilder - Builder that allows to build and keep \ref AsmNode instances
+//!   - \ref asmjit::AsmNode - base class for any node:
+//!     - \ref asmjit::AsmInst - Instruction/Jump.
+//!     - \ref asmjit::AsmData - Data.
+//!     - \ref asmjit::AsmAlign - Align directive.
+//!     - \ref asmjit::AsmLabel - Label.
+//!     - \ref asmjit::AsmComment - Comment.
+//!     - \ref asmjit::AsmSentinel - Sentinel (used as a marker, has no other function).
+//!     - \ref asmjit::AsmFunc - Function entry, compatible with \ref AsmLabel (Compiler).
+//!     - \ref asmjit::AsmFuncRet - Function return (Compiler).
+//!     - \ref asmjit::AsmCall - Function call (Compiler).
+//!     - \ref asmjit::AsmPushArg - Push stack argument (Compiler).
+//!     - \ref asmjit::AsmHint - Register allocator hint (Compiler).
 //! - \ref asmjit::Runtime - Describes where the code is stored and how it's executed:
 //!   - \ref asmjit::HostRuntime - Runtime that runs on the host machine:
 //!     - \ref asmjit::JitRuntime - Runtime designed for JIT code generation and execution.
-//!     - \ref asmjit::StaticRuntime - Runtime for code that starts at a specific address.
-//! - \ref asmjit::Stream - Stream is a list of \ref HLNode objects stored as a double
-//!   linked list:
-//!   - \ref asmjit::HLNode - Base node interface:
-//!     - \ref asmjit::HLInst - Instruction node.
-//!     - \ref asmjit::HLData - Data node.
-//!     - \ref asmjit::HLAlign - Align directive node.
-//!     - \ref asmjit::HLLabel - Label node.
-//!     - \ref asmjit::HLComment - Comment node.
-//!     - \ref asmjit::HLSentinel - Sentinel node.
-//!     - \ref asmjit::HLHint - Instruction node.
-//!     - \ref asmjit::HLFunc - Function declaration node.
-//!     - \ref asmjit::HLRet - Function return node.
-//!     - \ref asmjit::HLCall - Function call node.
-//!     - \ref asmjit::HLCallArg - Function call argument node.
 //! - \ref asmjit::Operand - base class for all operands:
 //!   - \ref asmjit::Reg - Register operand (`Assembler` only).
 //!   - \ref asmjit::Var - Variable operand (`Compiler` only).
@@ -126,60 +122,6 @@
 //!   return 0;
 //! }
 //! ~~~
-//!
-//! Logging and Error Handling
-//! --------------------------
-//!
-//! AsmJit contains a robust interface that can be used to log the generated code
-//! and to handle possible errors. Base logging interface is provided by \ref
-//! Logger, which is abstract and can be used as a base for your own logger.
-//! AsmJit also implements some trivial logging concepts out of the box to
-//! simplify the development. \ref FileLogger logs into a C `FILE*` stream and
-//! \ref StringLogger concatenates all log messages into a single string.
-//!
-//! The following snippet shows how to setup a basic logger and error handler:
-//!
-//! ~~~
-//! using namespace asmjit;
-//!
-//! struct MyErrorHandler : public ErrorHandler {
-//!   virtual bool handleError(Error code, const char* message, void* origin) {
-//!     printf("Error 0x%0.8X: %s\n", code, message);
-//!
-//!     // True  - error handled and code generation can continue.
-//!     // False - error not handled, code generation should stop.
-//!     return false;
-//!   }
-//! }
-//!
-//! int main(int argc, char* argv[]) {
-//!   JitRuntime runtime;
-//!   FileLogger logger(stderr);
-//!   MyErrorHandler eh;
-//!
-//!   X86Assembler a(&runtime);
-//!   a.setLogger(&logger);
-//!   a.setErrorHandler(&eh);
-//!
-//!   ...
-//!
-//!   return 0;
-//! }
-//! ~~~
-//!
-//! AsmJit also contains an \ref ErrorHandler, which is an abstract class that
-//! can be used to implement your own error handling. It can be associated with
-//! \ref Assembler and used to report all errors. It's a very convenient way to
-//! be aware of any error that happens during the code generation without making
-//! the error handling complicated.
-//!
-//! List of the most useful logging and error handling classes:
-//! - \ref asmjit::Logger - abstract logging interface:
-//!   - \ref asmjit::FileLogger - A logger that logs to `FILE*`.
-//!   - \ref asmjit::StringLogger - A logger that concatenates to a single string.
-//! - \ref asmjit::ErrorHandler - Easy way to handle \ref Assembler and \ref
-//!   Compiler
-//!   errors.
 //!
 //! Zone Memory Allocator
 //! ---------------------
@@ -222,8 +164,8 @@
 //! --------------
 //!
 //! SIMD code generation often requires to embed constants after each function
-//! or at the end of the whole code block. AsmJit contains `Vec64`, `Vec128`
-//! and `Vec256` classes that can be used to prepare data useful when generating
+//! or at the end of the whole code block. AsmJit contains `Data64`, `Data128`
+//! and `Data256` classes that can be used to prepare data useful when generating
 //! SIMD code.
 //!
 //! X86/X64 code generators contain member functions `dmm`, `dxmm`, and `dymm`,
@@ -252,24 +194,27 @@
 //! be used directly (like `eax`, `mm`, `xmm`, ...) or created through
 //! these functions:
 //!
-//! - `asmjit::x86::gpb_lo()` - Get an 8-bit low GPB register.
-//! - `asmjit::x86::gpb_hi()` - Get an 8-bit high GPB register.
-//! - `asmjit::x86::gpw()` - Get a 16-bit GPW register.
-//! - `asmjit::x86::gpd()` - Get a 32-bit GPD register.
-//! - `asmjit::x86::gpq()` - Get a 64-bit GPQ Gp register.
-//! - `asmjit::x86::gpz()` - Get a 32-bit or 64-bit GPD/GPQ register.
-//! - `asmjit::x86::fp()`  - Get a 80-bit FPU register.
-//! - `asmjit::x86::mm()`  - Get a 64-bit MMX register.
-//! - `asmjit::x86::xmm()` - Get a 128-bit XMM register.
-//! - `asmjit::x86::ymm()` - Get a 256-bit YMM register.
-//! - `asmjit::x86::amm()` - Get a 512-bit ZMM register.
+//! - `asmjit::x86::gpb_lo()`     - Create an 8-bit low GPB register operand.
+//! - `asmjit::x86::gpb_hi()`     - Create an 8-bit high GPB register operand.
+//! - `asmjit::x86::gpw()`        - Create a 16-bit GPW register operand.
+//! - `asmjit::x86::gpd()`        - Create a 32-bit GPD register operand.
+//! - `asmjit::x86::gpq()`        - Create a 64-bit GPQ register operand.
+//! - `asmjit::x86::fp()`         - Create a 80-bit FPU register operand.
+//! - `asmjit::x86::mm()`         - Create a 64-bit MMX register operand.
+//! - `asmjit::x86::k()`          - Create a 64-bit K register operand.
+//! - `asmjit::x86::cr()`         - Create a 32/64-bit CR (control register) operand.
+//! - `asmjit::x86::dr()`         - Create a 32/64-bit DR (debug register) operand.
+//! - `asmjit::x86::bnd()`        - Create a 128-bit BND register operand.
+//! - `asmjit::x86::xmm()`        - Create a 128-bit XMM register operand.
+//! - `asmjit::x86::ymm()`        - Create a 256-bit YMM register operand.
+//! - `asmjit::x86::zmm()`        - Create a 512-bit ZMM register operand.
 //!
 //! X86/X64 Addressing
 //! ------------------
 //!
-//! X86 and x64 architectures contains several addressing modes and most ones
+//! X86 and X64 architectures contains several addressing modes and most ones
 //! are possible with AsmJit library. Memory represents are represented by
-//! `BaseMem` class. These functions are used to make operands that represents
+//! `Mem` class. These functions are used to make operands that represents
 //! memory addresses:
 //!
 //! - `asmjit::x86::ptr()`        - Address size not specified.
@@ -278,7 +223,7 @@
 //! - `asmjit::x86::dword_ptr()`  - 4 bytes (GPD size).
 //! - `asmjit::x86::qword_ptr()`  - 8 bytes (GPQ/MMX size).
 //! - `asmjit::x86::tword_ptr()`  - 10 bytes (FPU size).
-//! - `asmjit::x86::dqword_ptr()` - 16 bytes (XMM size).
+//! - `asmjit::x86::oword_ptr()`  - 16 bytes (XMM size).
 //! - `asmjit::x86::yword_ptr()`  - 32 bytes (YMM size).
 //! - `asmjit::x86::zword_ptr()`  - 64 bytes (ZMM size).
 //!
@@ -293,8 +238,8 @@
 //! X86 and X86 support simple address forms like `[base + displacement]` and
 //! also complex address forms like `[base + index * scale + displacement]`.
 //!
-//! X86/X64 Immediates
-//! ------------------
+//! X86/X64 Immediate Values
+//! ------------------------
 //!
 //! Immediate values are constants thats passed directly after instruction
 //! opcode. To create such value use `asmjit::imm()` or `asmjit::imm_u()`
@@ -343,15 +288,15 @@
 // [Dependencies]
 #include "./base.h"
 
-// [ARM/ARM64]
-#if defined(ASMJIT_BUILD_ARM32) || defined(ASMJIT_BUILD_ARM64)
-#include "./arm.h"
-#endif // ASMJIT_BUILD_ARM32 || ASMJIT_BUILD_ARM64
-
 // [X86/X64]
-#if defined(ASMJIT_BUILD_X86) || defined(ASMJIT_BUILD_X64)
+#if defined(ASMJIT_BUILD_X86)
 #include "./x86.h"
-#endif // ASMJIT_BUILD_X86 || ASMJIT_BUILD_X64
+#endif // ASMJIT_BUILD_X86
+
+// [ARM32/ARM64]
+#if defined(ASMJIT_BUILD_ARM)
+#include "./arm.h"
+#endif // ASMJIT_BUILD_ARM
 
 // [Host]
 #include "./host.h"

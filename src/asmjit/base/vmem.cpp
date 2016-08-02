@@ -8,7 +8,6 @@
 #define ASMJIT_EXPORTS
 
 // [Dependencies]
-#include "../base/globals.h"
 #include "../base/vmem.h"
 
 #if ASMJIT_OS_POSIX
@@ -68,10 +67,10 @@ namespace asmjit {
 // Windows specific implementation using `VirtualAllocEx` and `VirtualFree`.
 #if ASMJIT_OS_WINDOWS
 struct VMemLocal {
-  // AsmJit allows to pass a `nullptr` handle to `VMemUtil`. This function is
+  // AsmJit allows to pass null handle to `VMemUtil`. This function is
   // just a convenient way to convert such handle to the current process one.
   ASMJIT_INLINE HANDLE getSafeProcessHandle(HANDLE hParam) const noexcept {
-    return hParam != nullptr ? hParam : hProcess;
+    return hParam ? hParam : hProcess;
   }
 
   size_t pageSize;
@@ -129,14 +128,10 @@ void* VMemUtil::allocProcessMemory(HANDLE hProcess, size_t length, size_t* alloc
     protectFlags |= (flags & kVMemFlagWritable) ? PAGE_READWRITE : PAGE_READONLY;
 
   LPVOID mBase = ::VirtualAllocEx(hProcess, nullptr, mSize, MEM_COMMIT | MEM_RESERVE, protectFlags);
-  if (mBase == nullptr)
-    return nullptr;
+  if (!mBase) return nullptr;
 
-  ASMJIT_ASSERT(Utils::isAligned<size_t>(
-    reinterpret_cast<size_t>(mBase), vMem.pageSize));
-
-  if (allocated != nullptr)
-    *allocated = mSize;
+  ASMJIT_ASSERT(Utils::isAligned<size_t>(reinterpret_cast<size_t>(mBase), vMem.pageSize));
+  if (allocated) *allocated = mSize;
   return mBase;
 }
 
@@ -147,7 +142,7 @@ Error VMemUtil::release(void* addr, size_t length) noexcept {
 Error VMemUtil::releaseProcessMemory(HANDLE hProcess, void* addr, size_t /* length */) noexcept {
   hProcess = vMemGet().getSafeProcessHandle(hProcess);
   if (!::VirtualFreeEx(hProcess, addr, 0, MEM_RELEASE))
-    return kErrorInvalidState;
+    return DebugUtils::errored(kErrorInvalidState);
   return kErrorOk;
 }
 #endif // ASMJIT_OS_WINDOWS
@@ -204,14 +199,13 @@ void* VMemUtil::alloc(size_t length, size_t* allocated, uint32_t flags) noexcept
   if (mbase == MAP_FAILED)
     return nullptr;
 
-  if (allocated != nullptr)
-    *allocated = msize;
+  if (allocated) *allocated = msize;
   return mbase;
 }
 
 Error VMemUtil::release(void* addr, size_t length) noexcept {
   if (::munmap(addr, length) != 0)
-    return kErrorInvalidState;
+    return DebugUtils::errored(kErrorInvalidState);
 
   return kErrorOk;
 }
@@ -290,15 +284,14 @@ struct VMemMgr::RbNode {
 //!
 //! Get whether the node is red (nullptr or node with red flag).
 static ASMJIT_INLINE bool rbIsRed(RbNode* node) noexcept {
-  return node != nullptr && node->red;
+  return node && node->red;
 }
 
 //! \internal
 //!
 //! Check whether the RB tree is valid.
 static int rbAssert(RbNode* root) noexcept {
-  if (root == nullptr)
-    return 1;
+  if (!root) return 1;
 
   RbNode* ln = root->node[0];
   RbNode* rn = root->node[1];
@@ -314,7 +307,7 @@ static int rbAssert(RbNode* root) noexcept {
   ASMJIT_ASSERT(rn == nullptr || rn->mem > root->mem);
 
   // Black violation.
-  ASMJIT_ASSERT( !(lh != 0 && rh != 0 && lh != rh) );
+  ASMJIT_ASSERT(!(lh != 0 && rh != 0 && lh != rh));
 
   // Only count black links.
   if (lh != 0 && rh != 0)
@@ -459,10 +452,7 @@ static bool vMemMgrCheckTree(VMemMgr* self) noexcept {
 static MemNode* vMemMgrCreateNode(VMemMgr* self, size_t size, size_t density) noexcept {
   size_t vSize;
   uint8_t* vmem = vMemMgrAllocVMem(self, size, &vSize);
-
-  // Out of memory.
-  if (vmem == nullptr)
-    return nullptr;
+  if (!vmem) return nullptr;
 
   size_t blocks = (vSize / density);
   size_t bsize = (((blocks + 7) >> 3) + sizeof(size_t) - 1) & ~(size_t)(sizeof(size_t) - 1);
@@ -471,7 +461,7 @@ static MemNode* vMemMgrCreateNode(VMemMgr* self, size_t size, size_t density) no
   uint8_t* data = static_cast<uint8_t*>(ASMJIT_ALLOC(bsize * 2));
 
   // Out of memory.
-  if (node == nullptr || data == nullptr) {
+  if (!node || !data) {
     vMemMgrReleaseVMem(self, vmem, vSize);
     if (node) ASMJIT_FREE(node);
     if (data) ASMJIT_FREE(data);
@@ -502,7 +492,7 @@ static MemNode* vMemMgrCreateNode(VMemMgr* self, size_t size, size_t density) no
 }
 
 static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) noexcept {
-  if (self->_root == nullptr) {
+  if (!self->_root) {
     // Empty tree case.
     self->_root = node;
   }
@@ -523,7 +513,7 @@ static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) noexcept {
 
     // Search down the tree.
     for (;;) {
-      if (q == nullptr) {
+      if (!q) {
         // Insert new node at the bottom.
         q = node;
         p->node[dir] = node;
@@ -549,8 +539,7 @@ static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) noexcept {
       dir = q->mem < node->mem;
 
       // Update helpers.
-      if (g != nullptr)
-        t = g;
+      if (g) t = g;
 
       g = p;
       p = q;
@@ -567,7 +556,7 @@ static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) noexcept {
   // Link with others.
   node->prev = self->_last;
 
-  if (self->_first == nullptr) {
+  if (!self->_first) {
     self->_first = node;
     self->_last = node;
     self->_optimal = node;
@@ -602,7 +591,7 @@ static MemNode* vMemMgrRemoveNode(VMemMgr* self, MemNode* node) noexcept {
   q->node[1] = self->_root;
 
   // Search and push a red down.
-  while (q->node[dir] != nullptr) {
+  while (q->node[dir]) {
     int last = dir;
 
     // Update helpers.
@@ -623,7 +612,7 @@ static MemNode* vMemMgrRemoveNode(VMemMgr* self, MemNode* node) noexcept {
       else if (!rbIsRed(q->node[!dir])) {
         RbNode* s = p->node[!last];
 
-        if (s != nullptr) {
+        if (s) {
           if (!rbIsRed(s->node[!last]) && !rbIsRed(s->node[last])) {
             // Color flip.
             p->red = 0;
@@ -662,8 +651,7 @@ static MemNode* vMemMgrRemoveNode(VMemMgr* self, MemNode* node) noexcept {
 
   // Update root and make it black.
   self->_root = static_cast<MemNode*>(head.node[1]);
-  if (self->_root != nullptr)
-    self->_root->red = 0;
+  if (self->_root) self->_root->red = 0;
 
   // Unlink.
   MemNode* next = static_cast<MemNode*>(q)->next;
@@ -687,7 +675,7 @@ static MemNode* vMemMgrRemoveNode(VMemMgr* self, MemNode* node) noexcept {
 
 static MemNode* vMemMgrFindNodeByPtr(VMemMgr* self, uint8_t* mem) noexcept {
   MemNode* node = self->_root;
-  while (node != nullptr) {
+  while (node) {
     uint8_t* nodeMem = node->mem;
 
     // Go left.
@@ -723,22 +711,15 @@ static void* vMemMgrAllocPermanent(VMemMgr* self, size_t vSize) noexcept {
     node = node->prev;
 
   // Or allocate new node.
-  if (node == nullptr) {
+  if (!node) {
     size_t nodeSize = permanentNodeSize;
-
-    if (nodeSize < vSize)
-      nodeSize = vSize;
+    if (nodeSize < vSize) nodeSize = vSize;
 
     node = static_cast<PermanentNode*>(ASMJIT_ALLOC(sizeof(PermanentNode)));
-
-    // Out of memory.
-    if (node == nullptr)
-      return nullptr;
+    if (!node) return nullptr;
 
     node->mem = vMemMgrAllocVMem(self, nodeSize, &node->size);
-
-    // Out of memory.
-    if (node->mem == nullptr) {
+    if (!node->mem) {
       ASMJIT_FREE(node);
       return nullptr;
     }
@@ -848,12 +829,10 @@ static void* vMemMgrAllocFreeable(VMemMgr* self, size_t vSize) noexcept {
   // allocate a new one.
   {
     size_t blockSize = self->_blockSize;
-    if (blockSize < vSize)
-      blockSize = vSize;
+    if (blockSize < vSize) blockSize = vSize;
 
     node = vMemMgrCreateNode(self, blockSize, self->_blockDensity);
-    if (node == nullptr)
-      return nullptr;
+    if (!node) return nullptr;
 
     // Update binary tree.
     vMemMgrInsertNode(self, node);
@@ -894,7 +873,7 @@ L_Found:
 static void vMemMgrReset(VMemMgr* self, bool keepVirtualMemory) noexcept {
   MemNode* node = self->_first;
 
-  while (node != nullptr) {
+  while (node) {
     MemNode* next = node->next;
 
     if (!keepVirtualMemory)
@@ -974,14 +953,11 @@ void* VMemMgr::alloc(size_t size, uint32_t type) noexcept {
 }
 
 Error VMemMgr::release(void* p) noexcept {
-  if (p == nullptr)
-    return kErrorOk;
+  if (!p) return kErrorOk;
 
   AutoLock locked(_lock);
   MemNode* node = vMemMgrFindNodeByPtr(this, static_cast<uint8_t*>(p));
-
-  if (node == nullptr)
-    return kErrorInvalidArgument;
+  if (!node) return DebugUtils::errored(kErrorInvalidArgument);
 
   size_t offset = (size_t)((uint8_t*)p - (uint8_t*)node->mem);
   size_t bitpos = M_DIV(offset, node->density);
@@ -1061,17 +1037,13 @@ Error VMemMgr::release(void* p) noexcept {
 }
 
 Error VMemMgr::shrink(void* p, size_t used) noexcept {
-  if (p == nullptr)
-    return kErrorOk;
-
+  if (!p) return kErrorOk;
   if (used == 0)
     return release(p);
 
   AutoLock locked(_lock);
-
   MemNode* node = vMemMgrFindNodeByPtr(this, (uint8_t*)p);
-  if (node == nullptr)
-    return kErrorInvalidArgument;
+  if (!node) return DebugUtils::errored(kErrorInvalidArgument);
 
   size_t offset = (size_t)((uint8_t*)p - (uint8_t*)node->mem);
   size_t bitpos = M_DIV(offset, node->density);

@@ -42,8 +42,16 @@ namespace asmjit {
 // ARM information has to be retrieved by the OS (this is how ARM was designed).
 #if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
 
+#if ASMJIT_ARCH_ARM32
+static void armPopulateBaselineArm32Features(CpuInfo* cpuInfo) noexcept {
+  cpuInfo->setupArch(ArchInfo::kIdArm32);
+}
+#endif // ASMJIT_ARCH_ARM32
+
 #if ASMJIT_ARCH_ARM64
-static void armPopulateBaseline64Features(CpuInfo* cpuInfo) noexcept {
+static void armPopulateBaselineArm64Features(CpuInfo* cpuInfo) noexcept {
+  cpuInfo->setupArch(ArchInfo::kIdArm64);
+
   // Thumb (including all variations) is only supported on ARM32.
 
   // ARM64 is based on ARMv8 and newer.
@@ -68,7 +76,7 @@ static void armPopulateBaseline64Features(CpuInfo* cpuInfo) noexcept {
 //! The detection is based on `IsProcessorFeaturePresent()` API call.
 static void armDetectCpuInfoOnWindows(CpuInfo* cpuInfo) noexcept {
 #if ASMJIT_ARCH_ARM32
-  cpuInfo->setArch(kArchArm32);
+  armPopulateBaselineArm32Features(cpuInfo);
 
   // Windows for ARM requires at least ARMv7 with DSP extensions.
   cpuInfo->addFeature(CpuInfo::kArmFeatureV6);
@@ -83,8 +91,7 @@ static void armDetectCpuInfoOnWindows(CpuInfo* cpuInfo) noexcept {
   cpuInfo->addFeature(CpuInfo::kArmFeatureTHUMB);
   cpuInfo->addFeature(CpuInfo::kArmFeatureTHUMB2);
 #else
-  cpuInfo->setArch(kArchArm64);
-  armPopulateBaseline64Features(cpuInfo);
+  armPopulateBaselineArm64Features(cpuInfo);
 #endif
 
   // Windows for ARM requires NEON.
@@ -115,8 +122,8 @@ struct LinuxHWCapMapping {
 
 static void armDetectHWCaps(CpuInfo* cpuInfo,
   unsigned long type, const LinuxHWCapMapping* mapping, size_t length) noexcept {
-
   unsigned long mask = getauxval(type);
+
   for (size_t i = 0; i < length; i++)
     if ((mask & mapping[i].hwcapMask) == mapping[i].hwcapMask)
       cpuInfo->addFeature(mapping[i].featureId);
@@ -129,7 +136,7 @@ static void armDetectHWCaps(CpuInfo* cpuInfo,
 //! The detection is based on `getauxval()`.
 static void armDetectCpuInfoOnLinux(CpuInfo* cpuInfo) noexcept {
 #if ASMJIT_ARCH_ARM32
-  cpuInfo->setArch(kArchArm32);
+  armPopulateBaselineArm32Features(cpuInfo);
 
   // `AT_HWCAP` provides ARMv7 (and less) related flags.
   static const LinuxHWCapMapping hwCapMapping[] = {
@@ -173,8 +180,7 @@ static void armDetectCpuInfoOnLinux(CpuInfo* cpuInfo) noexcept {
     cpuInfo->addFeature(CpuInfo::kArmFeatureV8);
   }
 #else
-  cpuInfo->setArch(kArchArm64);
-  armPopulateBaseline64Features(cpuInfo);
+  armPopulateBaselineArm64Features(cpuInfo);
 
   // `AT_HWCAP` provides ARMv8 related flags.
   static const LinuxHWCapMapping hwCapMapping[] = {
@@ -378,8 +384,10 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
   CpuIdResult regs;
   XGetBVResult xcr0 = { 0, 0 };
 
-  // Architecture is known at compile-time.
-  cpuInfo->setArch(ASMJIT_ARCH_X86 ? kArchX86 : kArchX64);
+  cpuInfo->setupArch(ArchInfo::kIdHost);
+  cpuInfo->_archInfo.setCdeclCallConv(kCallConvHostCDecl);
+  cpuInfo->_archInfo.setStdCallConv(kCallConvHostStdCall);
+  cpuInfo->_archInfo.setFastCallConv(kCallConvHostFastCall);
 
   // --------------------------------------------------------------------------
   // [CPUID EAX=0x0]
@@ -442,10 +450,6 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
     if (regs.edx & 0x04000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureSSE)
                                         .addFeature(CpuInfo::kX86FeatureSSE2);
     if (regs.edx & 0x10000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureMT);
-
-    // AMD sets multi-threading ON if it has two or more cores.
-    if (cpuInfo->_hwThreadsCount == 1 && cpuInfo->_vendorId == CpuInfo::kVendorAMD && (regs.edx & 0x10000000U))
-      cpuInfo->_hwThreadsCount = 2;
 
     // Get the content of XCR0 if supported by CPU and enabled by OS.
     if ((regs.ecx & 0x0C000000U) == 0x0C000000U)
@@ -533,6 +537,9 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
   // [CPUID EAX=0x80000000...maxId]
   // --------------------------------------------------------------------------
 
+  // The highest EAX that we understand.
+  uint32_t kHighestProcessedEAX = 0x80000008U;
+
   // Several CPUID calls are required to get the whole branc string. It's easy
   // to copy one DWORD at a time instead of performing a byte copy.
   uint32_t* brand = reinterpret_cast<uint32_t*>(cpuInfo->_brandString);
@@ -542,7 +549,7 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
     x86CallCpuId(&regs, i);
     switch (i) {
       case 0x80000000U:
-        maxId = Utils::iMin<uint32_t>(regs.eax, 0x80000004);
+        maxId = Utils::iMin<uint32_t>(regs.eax, kHighestProcessedEAX);
         break;
 
       case 0x80000001U:
@@ -573,14 +580,16 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
         *brand++ = regs.ebx;
         *brand++ = regs.ecx;
         *brand++ = regs.edx;
+
+        // Go directly to the last one.
+        if (i == 0x80000004U) i = 0x80000008U - 1;
         break;
 
-      default:
-        // Stop the loop, additional features can be detected in the future.
-        i = maxId;
+      case 0x80000008U:
+        if (regs.ebx & 0x00000001U) cpuInfo->addFeature(CpuInfo::kX86FeatureCLZERO);
         break;
     }
-  } while (i++ < maxId);
+  } while (++i <= maxId);
 
   // Simplify CPU brand string by removing unnecessary spaces.
   x86SimplifyBrandString(cpuInfo->_brandString);
@@ -588,10 +597,45 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
 #endif // ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
 
 // ============================================================================
+// [asmjit::CpuInfo - Detect - Natural Stack Alignment]
+// ============================================================================
+
+static ASMJIT_INLINE uint32_t cpuDetectNaturalStackAlignment() noexcept {
+  // Alignment is assumed to match the pointer-size by default.
+  uint32_t alignment = sizeof(intptr_t);
+
+  // X86 & X64
+  // ---------
+  //
+  //   - 32-bit X86 requires stack to be aligned to 4 bytes. Modern Linux, Mac
+  //     and UNIX guarantees 16-byte stack alignment even in 32-bit, but I'm
+  //     not sure about all other UNIX operating systems, because 16-byte
+  //     alignment is an addition to older specification.
+  //   - 64-bit X86 requires stack to be aligned to 16 bytes.
+#if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
+  int kIsModernOS = ASMJIT_OS_LINUX  || // Linux & ANDROID.
+                    ASMJIT_OS_MAC    || // OSX and iOS.
+                    ASMJIT_OS_BSD    ;  // BSD variants.
+  alignment = ASMJIT_ARCH_X64 || kIsModernOS ? 16 : 4;
+#endif
+
+  // ARM & ARM64
+  // -----------
+  //
+  //   - 32-bit ARM requires stack to be aligned to 8 bytes.
+  //   - 64-bit ARM requires stack to be aligned to 16 bytes.
+#if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
+  alignment = ASMJIT_ARCH_ARM32 ? 8 : 16;
+#endif
+
+  return alignment;
+}
+
+// ============================================================================
 // [asmjit::CpuInfo - Detect - HWThreadsCount]
 // ============================================================================
 
-static uint32_t cpuDetectHWThreadsCount() noexcept {
+static ASMJIT_INLINE uint32_t cpuDetectHWThreadsCount() noexcept {
 #if ASMJIT_OS_WINDOWS
   SYSTEM_INFO info;
   ::GetSystemInfo(&info);
@@ -612,9 +656,6 @@ static uint32_t cpuDetectHWThreadsCount() noexcept {
 void CpuInfo::detect() noexcept {
   reset();
 
-  // Detect the number of hardware threads available.
-  _hwThreadsCount = cpuDetectHWThreadsCount();
-
 #if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
   armDetectCpuInfo(this);
 #endif // ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
@@ -622,6 +663,9 @@ void CpuInfo::detect() noexcept {
 #if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
   x86DetectCpuInfo(this);
 #endif // ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
+
+  _archInfo.setNaturalStackAlignment(cpuDetectNaturalStackAlignment());
+  _hwThreadsCount = cpuDetectHWThreadsCount();
 }
 
 // ============================================================================

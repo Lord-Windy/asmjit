@@ -35,41 +35,21 @@ namespace asmjit {
 //! allocated by `Zone`. The advantage is that `Zone` can free all of the data
 //! allocated at once by calling `reset()` or by `Zone` destructor.
 class Zone {
- public:
+public:
   //! \internal
   //!
   //! A single block of memory.
   struct Block {
-    // ------------------------------------------------------------------------
-    // [Accessors]
-    // ------------------------------------------------------------------------
-
     //! Get the size of the block.
-    ASMJIT_INLINE size_t getBlockSize() const noexcept {
-      return (size_t)(end - data);
-    }
-
+    ASMJIT_INLINE size_t getBlockSize() const noexcept { return (size_t)(end - data); }
     //! Get count of remaining bytes in the block.
-    ASMJIT_INLINE size_t getRemainingSize() const noexcept {
-      return (size_t)(end - pos);
-    }
+    ASMJIT_INLINE size_t getRemainingSize() const noexcept { return (size_t)(end - pos); }
 
-    // ------------------------------------------------------------------------
-    // [Members]
-    // ------------------------------------------------------------------------
-
-    //! Current data pointer (pointer to the first available byte).
-    uint8_t* pos;
-    //! End data pointer (pointer to the first invalid byte).
-    uint8_t* end;
-
-    //! Link to the previous block.
-    Block* prev;
-    //! Link to the next block.
-    Block* next;
-
-    //! Data.
-    uint8_t data[sizeof(void*)];
+    uint8_t* pos;                        //!< Current data pointer (pointer to the first available byte).
+    uint8_t* end;                        //!< End data pointer (pointer to the first invalid byte).
+    Block* prev;                         //!< Pointer to the previous block.
+    Block* next;                         //!< Pointer to the next block.
+    uint8_t data[sizeof(void*)];         //!< Start of the data.
   };
 
   enum {
@@ -138,11 +118,8 @@ class Zone {
   //! Zone zone(65536 - Zone::kZoneOverhead);
   //!
   //! // Create your objects using zone object allocating, for example:
-  //! Object* obj = static_cast<Object*>( zone.alloc(sizeof(Object)) );
-  //
-  //! if (obj == nullptr) {
-  //!   // Handle out of memory error.
-  //! }
+  //! Object* obj = zone.allocT<Object>();
+  //! if (!obj) { /* Handle out of memory */ }
   //!
   //! // Placement `new` and `delete` operators can be used to instantiate it.
   //! new(obj) Object();
@@ -177,15 +154,11 @@ class Zone {
 
   //! Like `alloc()`, but the return pointer is casted to `T*`.
   template<typename T>
-  ASMJIT_INLINE T* allocT(size_t size = sizeof(T)) noexcept {
-    return static_cast<T*>(alloc(size));
-  }
+  ASMJIT_INLINE T* allocT(size_t size = sizeof(T)) noexcept { return static_cast<T*>(alloc(size)); }
 
   //! Like `allocZeroed()`, but the return pointer is casted to `T*`.
   template<typename T>
-  ASMJIT_INLINE T* allocZeroedT(size_t size = sizeof(T)) noexcept {
-    return static_cast<T*>(allocZeroed(size));
-  }
+  ASMJIT_INLINE T* allocZeroedT(size_t size = sizeof(T)) noexcept { return static_cast<T*>(allocZeroed(size)); }
 
   //! \internal
   ASMJIT_API void* _alloc(size_t size) noexcept;

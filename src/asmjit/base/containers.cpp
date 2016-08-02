@@ -17,355 +17,118 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::StringBuilder - Construction / Destruction]
+// [asmjit::PodVectorBase - NullData]
 // ============================================================================
 
-// Should be placed in read-only memory.
-static const char StringBuilder_empty[4] = { 0 };
+const PodVectorBase::Data PodVectorBase::_nullData = { 0, 0 };
 
-StringBuilder::StringBuilder() noexcept
-  : _data(const_cast<char*>(StringBuilder_empty)),
-    _length(0),
-    _capacity(0),
-    _canFree(false) {}
-
-StringBuilder::~StringBuilder() noexcept {
-  if (_canFree)
-    ASMJIT_FREE(_data);
+static ASMJIT_INLINE bool isDataStatic(PodVectorBase* self, PodVectorBase::Data* d) noexcept {
+  return (void*)(self + 1) == (void*)d;
 }
 
 // ============================================================================
-// [asmjit::StringBuilder - Prepare / Reserve]
+// [asmjit::PodVectorBase - Reset]
 // ============================================================================
 
-char* StringBuilder::prepare(uint32_t op, size_t len) noexcept {
-  // --------------------------------------------------------------------------
-  // [Set]
-  // --------------------------------------------------------------------------
+//! Clear vector data and free internal buffer.
+void PodVectorBase::reset(bool releaseMemory) noexcept {
+  Data* d = _d;
+  if (d == &_nullData)
+    return;
 
-  if (op == kStringOpSet) {
-    // We don't care here, but we can't return a NULL pointer since it indicates
-    // failure in memory allocation.
-    if (len == 0) {
-      if (_data != StringBuilder_empty)
-        _data[0] = 0;
-
-      _length = 0;
-      return _data;
-    }
-
-    if (_capacity < len) {
-      if (len >= IntTraits<size_t>::maxValue() - sizeof(intptr_t) * 2)
-        return nullptr;
-
-      size_t to = Utils::alignTo<size_t>(len, sizeof(intptr_t));
-      if (to < 256 - sizeof(intptr_t))
-        to = 256 - sizeof(intptr_t);
-
-      char* newData = static_cast<char*>(ASMJIT_ALLOC(to + sizeof(intptr_t)));
-      if (newData == nullptr) {
-        clear();
-        return nullptr;
-      }
-
-      if (_canFree)
-        ASMJIT_FREE(_data);
-
-      _data = newData;
-      _capacity = to + sizeof(intptr_t) - 1;
-      _canFree = true;
-    }
-
-    _data[len] = 0;
-    _length = len;
-
-    ASMJIT_ASSERT(_length <= _capacity);
-    return _data;
+  if (releaseMemory && !isDataStatic(this, d)) {
+    ASMJIT_FREE(d);
+    _d = const_cast<Data*>(&_nullData);
+    return;
   }
 
-  // --------------------------------------------------------------------------
-  // [Append]
-  // --------------------------------------------------------------------------
-
-  else {
-    // We don't care here, but we can't return a nullptr pointer since it indicates
-    // failure in memory allocation.
-    if (len == 0)
-      return _data + _length;
-
-    // Overflow.
-    if (IntTraits<size_t>::maxValue() - sizeof(intptr_t) * 2 - _length < len)
-      return nullptr;
-
-    size_t after = _length + len;
-    if (_capacity < after) {
-      size_t to = _capacity;
-
-      if (to < 256)
-        to = 256;
-
-      while (to < 1024 * 1024 && to < after)
-        to *= 2;
-
-      if (to < after) {
-        to = after;
-        if (to < (IntTraits<size_t>::maxValue() - 1024 * 32))
-          to = Utils::alignTo<size_t>(to, 1024 * 32);
-      }
-
-      to = Utils::alignTo<size_t>(to, sizeof(intptr_t));
-      char* newData = static_cast<char*>(ASMJIT_ALLOC(to + sizeof(intptr_t)));
-
-      if (newData == nullptr)
-        return nullptr;
-
-      ::memcpy(newData, _data, _length);
-      if (_canFree)
-        ASMJIT_FREE(_data);
-
-      _data = newData;
-      _capacity = to + sizeof(intptr_t) - 1;
-      _canFree = true;
-    }
-
-    char* ret = _data + _length;
-    _data[after] = 0;
-    _length = after;
-
-    ASMJIT_ASSERT(_length <= _capacity);
-    return ret;
-  }
-}
-
-bool StringBuilder::reserve(size_t to) noexcept {
-  if (_capacity >= to)
-    return true;
-
-  if (to >= IntTraits<size_t>::maxValue() - sizeof(intptr_t) * 2)
-    return false;
-
-  to = Utils::alignTo<size_t>(to, sizeof(intptr_t));
-
-  char* newData = static_cast<char*>(ASMJIT_ALLOC(to + sizeof(intptr_t)));
-  if (newData == nullptr)
-    return false;
-
-  ::memcpy(newData, _data, _length + 1);
-  if (_canFree)
-    ASMJIT_FREE(_data);
-
-  _data = newData;
-  _capacity = to + sizeof(intptr_t) - 1;
-  _canFree = true;
-  return true;
+  d->length = 0;
 }
 
 // ============================================================================
-// [asmjit::StringBuilder - Clear]
+// [asmjit::PodVectorBase - Helpers]
 // ============================================================================
 
-void StringBuilder::clear() noexcept {
-  if (_data != StringBuilder_empty)
-    _data[0] = 0;
-  _length = 0;
-}
+Error PodVectorBase::_grow(size_t n, size_t sizeOfT) noexcept {
+  Data* d = _d;
 
-// ============================================================================
-// [asmjit::StringBuilder - Methods]
-// ============================================================================
+  size_t threshold = kMemAllocGrowMax / sizeOfT;
+  size_t capacity = d->capacity;
+  size_t after = d->length;
 
-bool StringBuilder::_opString(uint32_t op, const char* str, size_t len) noexcept {
-  if (len == kInvalidIndex)
-    len = str != nullptr ? ::strlen(str) : static_cast<size_t>(0);
+  if (IntTraits<size_t>::maxValue() - n < after)
+    return DebugUtils::errored(kErrorNoHeapMemory);
 
-  char* p = prepare(op, len);
-  if (p == nullptr)
-    return false;
+  after += n;
 
-  ::memcpy(p, str, len);
-  return true;
-}
+  if (capacity >= after)
+    return kErrorOk;
 
-bool StringBuilder::_opChar(uint32_t op, char c) noexcept {
-  char* p = prepare(op, 1);
-  if (p == nullptr)
-    return false;
+  // PodVector is used as an array to hold short-lived data structures used
+  // during code generation. The purpose of this aggressive growing strategy
+  // is to minimize memory reallocations.
+  if (capacity < 32)
+    capacity = 32;
+  else if (capacity < 128)
+    capacity = 128;
+  else if (capacity < 512)
+    capacity = 512;
 
-  *p = c;
-  return true;
-}
-
-bool StringBuilder::_opChars(uint32_t op, char c, size_t len) noexcept {
-  char* p = prepare(op, len);
-  if (p == nullptr)
-    return false;
-
-  ::memset(p, c, len);
-  return true;
-}
-
-static const char StringBuilder_numbers[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-bool StringBuilder::_opNumber(uint32_t op, uint64_t i, uint32_t base, size_t width, uint32_t flags) noexcept {
-  if (base < 2 || base > 36)
-    base = 10;
-
-  char buf[128];
-  char* p = buf + ASMJIT_ARRAY_SIZE(buf);
-
-  uint64_t orig = i;
-  char sign = '\0';
-
-  // --------------------------------------------------------------------------
-  // [Sign]
-  // --------------------------------------------------------------------------
-
-  if ((flags & kStringFormatSigned) != 0 && static_cast<int64_t>(i) < 0) {
-    i = static_cast<uint64_t>(-static_cast<int64_t>(i));
-    sign = '-';
-  }
-  else if ((flags & kStringFormatShowSign) != 0) {
-    sign = '+';
-  }
-  else if ((flags & kStringFormatShowSpace) != 0) {
-    sign = ' ';
+  while (capacity < after) {
+    if (capacity < threshold)
+      capacity *= 2;
+    else
+      capacity += threshold;
   }
 
-  // --------------------------------------------------------------------------
-  // [Number]
-  // --------------------------------------------------------------------------
-
-  do {
-    uint64_t d = i / base;
-    uint64_t r = i % base;
-
-    *--p = StringBuilder_numbers[r];
-    i = d;
-  } while (i);
-
-  size_t numberLength = (size_t)(buf + ASMJIT_ARRAY_SIZE(buf) - p);
-
-  // --------------------------------------------------------------------------
-  // [Alternate Form]
-  // --------------------------------------------------------------------------
-
-  if ((flags & kStringFormatAlternate) != 0) {
-    if (base == 8) {
-      if (orig != 0)
-        *--p = '0';
-    }
-    if (base == 16) {
-      *--p = 'x';
-      *--p = '0';
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // [Width]
-  // --------------------------------------------------------------------------
-
-  if (sign != 0)
-    *--p = sign;
-
-  if (width > 256)
-    width = 256;
-
-  if (width <= numberLength)
-    width = 0;
-  else
-    width -= numberLength;
-
-  // --------------------------------------------------------------------------
-  // Write]
-  // --------------------------------------------------------------------------
-
-  size_t prefixLength = (size_t)(buf + ASMJIT_ARRAY_SIZE(buf) - p) - numberLength;
-  char* data = prepare(op, prefixLength + width + numberLength);
-
-  if (data == nullptr)
-    return false;
-
-  ::memcpy(data, p, prefixLength);
-  data += prefixLength;
-
-  ::memset(data, '0', width);
-  data += width;
-
-  ::memcpy(data, p + prefixLength, numberLength);
-  return true;
+  return _reserve(capacity, sizeOfT);
 }
 
-bool StringBuilder::_opHex(uint32_t op, const void* data, size_t len) noexcept {
-  if (len >= IntTraits<size_t>::maxValue() / 2)
-    return false;
+Error PodVectorBase::_reserve(size_t n, size_t sizeOfT) noexcept {
+  Data* d = _d;
 
-  char* dst = prepare(op, len * 2);
-  if (dst == nullptr)
-    return false;
+  if (d->capacity >= n)
+    return kErrorOk;
 
-  const char* src = static_cast<const char*>(data);
-  for (size_t i = 0; i < len; i++, dst += 2, src += 1)
-  {
-    dst[0] = StringBuilder_numbers[(src[0] >> 4) & 0xF];
-    dst[1] = StringBuilder_numbers[(src[0]     ) & 0xF];
-  }
+  size_t nBytes = sizeof(Data) + n * sizeOfT;
+  if (nBytes < n) return DebugUtils::errored(kErrorNoHeapMemory);
 
-  return true;
-}
-
-bool StringBuilder::_opVFormat(uint32_t op, const char* fmt, va_list ap) noexcept {
-  char buf[1024];
-
-  vsnprintf(buf, ASMJIT_ARRAY_SIZE(buf), fmt, ap);
-  buf[ASMJIT_ARRAY_SIZE(buf) - 1] = '\0';
-
-  return _opString(op, buf);
-}
-
-bool StringBuilder::setFormat(const char* fmt, ...) noexcept {
-  bool result;
-
-  va_list ap;
-  va_start(ap, fmt);
-  result = _opVFormat(kStringOpSet, fmt, ap);
-  va_end(ap);
-
-  return result;
-}
-
-bool StringBuilder::appendFormat(const char* fmt, ...) noexcept {
-  bool result;
-
-  va_list ap;
-  va_start(ap, fmt);
-  result = _opVFormat(kStringOpAppend, fmt, ap);
-  va_end(ap);
-
-  return result;
-}
-
-bool StringBuilder::eq(const char* str, size_t len) const noexcept {
-  const char* aData = _data;
-  const char* bData = str;
-
-  size_t aLength = _length;
-  size_t bLength = len;
-
-  if (bLength == kInvalidIndex) {
-    size_t i;
-    for (i = 0; i < aLength; i++) {
-      if (aData[i] != bData[i] || bData[i] == 0)
-        return false;
-    }
-
-    return bData[i] == 0;
+  if (d == &_nullData) {
+    d = static_cast<Data*>(ASMJIT_ALLOC(nBytes));
+    if (!d) return DebugUtils::errored(kErrorNoHeapMemory);
+    d->length = 0;
   }
   else {
-    if (aLength != bLength)
-      return false;
+    if (isDataStatic(this, d)) {
+      Data* oldD = d;
 
-    return ::memcmp(aData, bData, aLength) == 0;
+      d = static_cast<Data*>(ASMJIT_ALLOC(nBytes));
+      if (!d) return DebugUtils::errored(kErrorNoHeapMemory);
+
+      size_t len = oldD->length;
+      d->length = len;
+      ::memcpy(d->getData(), oldD->getData(), len * sizeOfT);
+    }
+    else {
+      d = static_cast<Data*>(ASMJIT_REALLOC(d, nBytes));
+      if (!d) return DebugUtils::errored(kErrorNoHeapMemory);
+    }
   }
+
+  d->capacity = n;
+  _d = d;
+
+  return kErrorOk;
+}
+
+Error PodVectorBase::_resize(size_t n, size_t sizeOfT) noexcept {
+  ASMJIT_PROPAGATE(_reserve(n, sizeOfT));
+  size_t len = _d->length;
+
+  if (n > len) ::memset(static_cast<uint8_t*>(_d->getData()) + len * sizeOfT, 0, (n - len) * sizeOfT);
+  if (n != len) _d->length = n;
+
+  return kErrorOk;
 }
 
 } // asmjit namespace

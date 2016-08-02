@@ -11,31 +11,31 @@
 // [Dependencies]
 #include "../asmjit/asmjit.h"
 
-namespace asmgen {
+namespace asmtest {
 
 // Generate a typical alpha blend function using SSE2 instruction set. Used
 // for benchmarking and also in test86. The generated code should be stable
 // and fully functional.
-static void blend(asmjit::X86Compiler& c) {
+static void generateAlphaBlend(asmjit::X86Compiler& c) {
   using namespace asmjit;
   using namespace asmjit::x86;
 
-  X86GpVar dst = c.newIntPtr("dst");
-  X86GpVar src = c.newIntPtr("src");
+  X86Gp dst = c.newIntPtr("dst");
+  X86Gp src = c.newIntPtr("src");
 
-  X86GpVar i = c.newIntPtr("i");
-  X86GpVar j = c.newIntPtr("j");
-  X86GpVar t = c.newIntPtr("t");
+  X86Gp i = c.newIntPtr("i");
+  X86Gp j = c.newIntPtr("j");
+  X86Gp t = c.newIntPtr("t");
 
-  X86XmmVar x0 = c.newXmm("x0");
-  X86XmmVar x1 = c.newXmm("x1");
-  X86XmmVar y0 = c.newXmm("y0");
-  X86XmmVar a0 = c.newXmm("a0");
-  X86XmmVar a1 = c.newXmm("a1");
+  X86Xmm x0 = c.newXmm("x0");
+  X86Xmm x1 = c.newXmm("x1");
+  X86Xmm y0 = c.newXmm("y0");
+  X86Xmm a0 = c.newXmm("a0");
+  X86Xmm a1 = c.newXmm("a1");
 
-  X86XmmVar cZero    = c.newXmm("cZero");
-  X86XmmVar cMul255A = c.newXmm("cMul255A");
-  X86XmmVar cMul255M = c.newXmm("cMul255M");
+  X86Xmm cZero    = c.newXmm("cZero");
+  X86Xmm cMul255A = c.newXmm("cMul255A");
+  X86Xmm cMul255M = c.newXmm("cMul255M");
 
   Label L_SmallLoop = c.newLabel();
   Label L_SmallEnd = c.newLabel();
@@ -45,7 +45,7 @@ static void blend(asmjit::X86Compiler& c) {
 
   Label L_Data = c.newLabel();
 
-  c.addFunc(FuncBuilder3<Void, void*, const void*, size_t>(c.getRuntime()->getCdeclConv()));
+  c.addFunc(FuncSignature3<void, void*, const void*, size_t>(c.getArchInfo().getCdeclCallConv()));
 
   c.setArg(0, dst);
   c.setArg(1, src);
@@ -168,11 +168,11 @@ static void blend(asmjit::X86Compiler& c) {
   // Data.
   c.align(kAlignData, 16);
   c.bind(L_Data);
-  c.dxmm(Vec128::fromSW(0x0080));
-  c.dxmm(Vec128::fromSW(0x0101));
+  c.dxmm(Data128::fromI16(0x0080));
+  c.dxmm(Data128::fromI16(0x0101));
 }
 
-} // asmgen namespace
+} // asmtest namespace
 
 // [Guard]
 #endif // _TEST_GENBLEND_H

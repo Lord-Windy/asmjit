@@ -78,14 +78,14 @@ static void dumpCpu(void) {
     { asmjit::CpuInfo::kX86FeatureCMPXCHG8B     , "CMPXCHG8B"             },
     { asmjit::CpuInfo::kX86FeatureCMPXCHG16B    , "CMPXCHG16B"            },
     { asmjit::CpuInfo::kX86FeatureCLFLUSH       , "CLFLUSH"               },
-    { asmjit::CpuInfo::kX86FeatureCLFLUSH_OPT   , "CLFLUSH (Opt)"         },
+    { asmjit::CpuInfo::kX86FeatureCLFLUSH_OPT   , "CLFLUSH_OPT"           },
     { asmjit::CpuInfo::kX86FeatureCLWB          , "CLWB"                  },
     { asmjit::CpuInfo::kX86FeaturePCOMMIT       , "PCOMMIT"               },
     { asmjit::CpuInfo::kX86FeaturePREFETCH      , "PREFETCH"              },
     { asmjit::CpuInfo::kX86FeaturePREFETCHWT1   , "PREFETCHWT1"           },
     { asmjit::CpuInfo::kX86FeatureLAHF_SAHF     , "LAHF/SAHF"             },
     { asmjit::CpuInfo::kX86FeatureFXSR          , "FXSR"                  },
-    { asmjit::CpuInfo::kX86FeatureFXSR_OPT      , "FXSR (Opt)"            },
+    { asmjit::CpuInfo::kX86FeatureFXSR_OPT      , "FXSR_OPT"              },
     { asmjit::CpuInfo::kX86FeatureMMX           , "MMX"                   },
     { asmjit::CpuInfo::kX86FeatureMMX2          , "MMX2"                  },
     { asmjit::CpuInfo::kX86Feature3DNOW         , "3DNOW"                 },
@@ -125,7 +125,7 @@ static void dumpCpu(void) {
     { asmjit::CpuInfo::kX86FeatureHLE           , "HLE"                   },
     { asmjit::CpuInfo::kX86FeatureRTM           , "RTM"                   },
     { asmjit::CpuInfo::kX86FeatureERMS          , "ERMS"                  },
-    { asmjit::CpuInfo::kX86FeatureFSGSBASE      , "FS/GS Base"            },
+    { asmjit::CpuInfo::kX86FeatureFSGSBASE      , "FSGSBASE"              },
     { asmjit::CpuInfo::kX86FeatureAVX512F       , "AVX512F"               },
     { asmjit::CpuInfo::kX86FeatureAVX512CD      , "AVX512CD"              },
     { asmjit::CpuInfo::kX86FeatureAVX512PF      , "AVX512PF"              },
@@ -155,10 +155,10 @@ static void dumpCpu(void) {
 // ============================================================================
 
 #define DUMP_TYPE(_Type_) \
-  INFO("  %-27s: %u", #_Type_, static_cast<uint32_t>(sizeof(_Type_)))
+  INFO("  %-29s: %u", #_Type_, static_cast<uint32_t>(sizeof(_Type_)))
 
 static void dumpSizeOf(void) {
-  INFO("SizeOf Types:");
+  INFO("Size of built-in types:");
   DUMP_TYPE(int8_t);
   DUMP_TYPE(int16_t);
   DUMP_TYPE(int32_t);
@@ -170,24 +170,25 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(float);
   DUMP_TYPE(double);
   DUMP_TYPE(void*);
-  DUMP_TYPE(asmjit::Ptr);
-  DUMP_TYPE(asmjit::SignedPtr);
   INFO("");
 
-  INFO("SizeOf Base:");
+  INFO("Size of base types:");
+  DUMP_TYPE(asmjit::AsmBuilder);
   DUMP_TYPE(asmjit::Assembler);
+  DUMP_TYPE(asmjit::CodeGen);
+  DUMP_TYPE(asmjit::CodeHolder);
+  DUMP_TYPE(asmjit::CodeHolder::SectionEntry);
+  DUMP_TYPE(asmjit::CodeHolder::LabelEntry);
+  DUMP_TYPE(asmjit::CodeHolder::RelocEntry);
   DUMP_TYPE(asmjit::ConstPool);
-  DUMP_TYPE(asmjit::LabelData);
-  DUMP_TYPE(asmjit::RelocData);
   DUMP_TYPE(asmjit::Runtime);
   DUMP_TYPE(asmjit::Zone);
   INFO("");
 
-  INFO("SizeOf Operand:");
+  INFO("Size of Operand:");
   DUMP_TYPE(asmjit::Operand);
   DUMP_TYPE(asmjit::Reg);
-  DUMP_TYPE(asmjit::Var);
-  DUMP_TYPE(asmjit::BaseMem);
+  DUMP_TYPE(asmjit::Mem);
   DUMP_TYPE(asmjit::Imm);
   DUMP_TYPE(asmjit::Label);
   INFO("");
@@ -195,16 +196,16 @@ static void dumpSizeOf(void) {
 #if !defined(ASMJIT_DISABLE_COMPILER)
   INFO("SizeOf Compiler:");
   DUMP_TYPE(asmjit::Compiler);
-  DUMP_TYPE(asmjit::HLNode);
-  DUMP_TYPE(asmjit::HLInst);
-  DUMP_TYPE(asmjit::HLJump);
-  DUMP_TYPE(asmjit::HLData);
-  DUMP_TYPE(asmjit::HLAlign);
-  DUMP_TYPE(asmjit::HLLabel);
-  DUMP_TYPE(asmjit::HLComment);
-  DUMP_TYPE(asmjit::HLSentinel);
-  DUMP_TYPE(asmjit::HLFunc);
-  DUMP_TYPE(asmjit::HLCall);
+  DUMP_TYPE(asmjit::AsmNode);
+  DUMP_TYPE(asmjit::AsmInst);
+  DUMP_TYPE(asmjit::AsmJump);
+  DUMP_TYPE(asmjit::AsmData);
+  DUMP_TYPE(asmjit::AsmAlign);
+  DUMP_TYPE(asmjit::AsmLabel);
+  DUMP_TYPE(asmjit::AsmComment);
+  DUMP_TYPE(asmjit::AsmSentinel);
+  DUMP_TYPE(asmjit::AsmFunc);
+  DUMP_TYPE(asmjit::AsmCall);
   DUMP_TYPE(asmjit::FuncDecl);
   DUMP_TYPE(asmjit::FuncInOut);
   DUMP_TYPE(asmjit::FuncPrototype);
@@ -215,11 +216,13 @@ static void dumpSizeOf(void) {
   // [X86/X64]
   // --------------------------------------------------------------------------
 
-#if defined(ASMJIT_BUILD_X86) || defined(ASMJIT_BUILD_X64)
+#if defined(ASMJIT_BUILD_X86)
   INFO("SizeOf X86/X64:");
   DUMP_TYPE(asmjit::X86Assembler);
-  DUMP_TYPE(asmjit::X86InstInfo);
-  DUMP_TYPE(asmjit::X86InstExtendedInfo);
+  DUMP_TYPE(asmjit::X86Inst);
+  DUMP_TYPE(asmjit::X86Inst::ISignature);
+  DUMP_TYPE(asmjit::X86Inst::OSignature);
+  DUMP_TYPE(asmjit::X86Inst::ExtendedData);
 
 #if !defined(ASMJIT_DISABLE_COMPILER)
   DUMP_TYPE(asmjit::X86Compiler);

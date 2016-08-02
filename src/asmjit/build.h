@@ -56,8 +56,8 @@
 // These definitions control which backends to compile. If none of these is
 // defined AsmJit will use host architecture by default (for JIT code generation).
 //
-// #define ASMJIT_BUILD_X86          // Define to enable x86 instruction set (32-bit).
-// #define ASMJIT_BUILD_X64          // Define to enable x64 instruction set (64-bit).
+// #define ASMJIT_BUILD_X86          // Define to enable X86 and X64 code-generation.
+// #define ASMJIT_BUILD_ARM          // Define to enable ARM32 and ARM64 code-generation.
 // #define ASMJIT_BUILD_HOST         // Define to enable host instruction set.
 
 // AsmJit Build Features
@@ -69,14 +69,15 @@
 //
 // AsmJit features are enabled by default.
 // #define ASMJIT_DISABLE_COMPILER   // Disable Compiler (completely).
-// #define ASMJIT_DISABLE_LOGGER     // Disable Logger (completely).
+// #define ASMJIT_DISABLE_LOGGING    // Disable Logger and Formatter (completely).
 // #define ASMJIT_DISABLE_TEXT       // Disable everything that contains text
 //                                   // representation (instructions, errors, ...).
+// #define ASMJIT_DISABLE_VALIDATION // Disable Validation (completely).
 
 // Prevent compile-time errors caused by misconfiguration.
-#if defined(ASMJIT_DISABLE_TEXT) && !defined(ASMJIT_DISABLE_LOGGER)
-# error "[asmjit] ASMJIT_DISABLE_TEXT requires ASMJIT_DISABLE_LOGGER to be defined."
-#endif // ASMJIT_DISABLE_TEXT && !ASMJIT_DISABLE_LOGGER
+#if defined(ASMJIT_DISABLE_TEXT) && !defined(ASMJIT_DISABLE_LOGGING)
+# error "[asmjit] ASMJIT_DISABLE_TEXT requires ASMJIT_DISABLE_LOGGING to be defined."
+#endif // ASMJIT_DISABLE_TEXT && !ASMJIT_DISABLE_LOGGING
 
 // Detect ASMJIT_DEBUG and ASMJIT_RELEASE if not forced from outside.
 #if !defined(ASMJIT_DEBUG) && !defined(ASMJIT_RELEASE) && !defined(NDEBUG)
@@ -742,7 +743,7 @@
 //
 // \def ASMJIT_UNLIKELY(exp)
 // Expression exp is likely to be false.
-#if ASMJIT_HAS_BUILTIN_EXPECT
+#if ASMJIT_CC_HAS_BUILTIN_EXPECT
 # define ASMJIT_LIKELY(exp) __builtin_expect(!!(exp), 1)
 # define ASMJIT_UNLIKELY(exp) __builtin_expect(!!(exp), 0)
 #else
@@ -840,19 +841,16 @@ typedef unsigned __int64 uint64_t;
 
 // Build host architecture if no architecture is selected.
 #if !defined(ASMJIT_BUILD_HOST) && \
-    !defined(ASMJIT_BUILD_X86) && \
-    !defined(ASMJIT_BUILD_X64)
+    !defined(ASMJIT_BUILD_X86)  && \
+    !defined(ASMJIT_BUILD_ARM)
 # define ASMJIT_BUILD_HOST
 #endif
 
-// Autodetect host architecture if enabled.
+// Detect host architecture if building only for host.
 #if defined(ASMJIT_BUILD_HOST)
-# if ASMJIT_ARCH_X86 && !defined(ASMJIT_BUILD_X86)
+# if (ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64) && !defined(ASMJIT_BUILD_X86)
 #  define ASMJIT_BUILD_X86
-# endif // ASMJIT_ARCH_X86 && !ASMJIT_BUILD_X86
-# if ASMJIT_ARCH_X64 && !defined(ASMJIT_BUILD_X64)
-#  define ASMJIT_BUILD_X64
-# endif // ASMJIT_ARCH_X64 && !ASMJIT_BUILD_X64
+# endif // ASMJIT_ARCH_X86
 #endif // ASMJIT_BUILD_HOST
 
 #if defined(_MSC_VER) && _MSC_VER >= 1400
@@ -890,13 +888,14 @@ public:
 namespace asmjit {
 namespace DebugUtils {
 
-// Workaround that is used to convert an absolute path to a relative one at
-// a C macro level, used by asserts and tracing. This workaround is needed
-// as some build systems always convert the source code files to use absolute
-// paths. Please note that if absolute paths are used this doesn't remove them
-// from the compiled binary and can be still considered a security risk.
+// Workaround used to convert absolute file paths to relative ones at compile
+// time; used by asserts and tracing. This workaround is needed as some build
+// systems use absolute paths, which is reflected in __FILE__ expansion. This
+// workaround attempts to hide such absolute paths from messages produced by
+// asmjit, but won't remove them from the binary itself.
 enum {
-  kSourceRelativePathOffset = int(sizeof(__FILE__) - sizeof("asmjit/build.h"))
+  kSourceRawPathOffset = int(sizeof(__FILE__)) - int(sizeof("asmjit/build.h")),
+  kSourceRelPathOffset = kSourceRawPathOffset >= 0 ? kSourceRawPathOffset : 0
 };
 
 // ASMJIT_TRACE is only used by sources and private headers. It's safe to make

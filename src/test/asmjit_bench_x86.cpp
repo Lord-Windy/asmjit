@@ -21,61 +21,6 @@ static const uint32_t kNumRepeats = 10;
 static const uint32_t kNumIterations = 5000;
 
 // ============================================================================
-// [TestRuntime]
-// ============================================================================
-
-struct TestRuntime : public asmjit::Runtime {
-  ASMJIT_NO_COPY(TestRuntime)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  TestRuntime(uint32_t arch, uint32_t callConv) ASMJIT_NOEXCEPT {
-    _cpuInfo.setArch(arch);
-    _stackAlignment = 16;
-    _baseAddress = 0;
-    _cdeclConv = static_cast<uint8_t>(callConv);
-    _stdCallConv = static_cast<uint8_t>(callConv);
-  }
-  virtual ~TestRuntime() ASMJIT_NOEXCEPT {}
-
-  // --------------------------------------------------------------------------
-  // [Interface]
-  // --------------------------------------------------------------------------
-
-  virtual asmjit::Error add(void** dst, asmjit::Assembler* assembler) ASMJIT_NOEXCEPT {
-    size_t codeSize = assembler->getCodeSize();
-    if (codeSize == 0) {
-      *dst = NULL;
-      return asmjit::kErrorNoCodeGenerated;
-    }
-
-    void* p = ::malloc(codeSize);
-    if (p == NULL) {
-      *dst = NULL;
-      return asmjit::kErrorNoHeapMemory;
-    }
-
-    size_t relocSize = assembler->relocCode(p, _baseAddress);
-    if (relocSize == 0) {
-      ::free(p);
-      *dst = NULL;
-      return asmjit::kErrorInvalidState;
-    }
-
-    *dst = p;
-    return asmjit::kErrorOk;
-  }
-
-  virtual asmjit::Error release(void* p) ASMJIT_NOEXCEPT {
-    ::free(p);
-    return asmjit::kErrorOk;
-  }
-};
-
-
-// ============================================================================
 // [Performance]
 // ============================================================================
 
@@ -89,13 +34,8 @@ struct Performance {
     best = 0xFFFFFFFF;
   }
 
-  inline uint32_t start() {
-    return (tick = now());
-  }
-
-  inline uint32_t diff() const {
-    return now() - tick;
-  }
+  inline uint32_t start() { return (tick = now()); }
+  inline uint32_t diff() const { return now() - tick; }
 
   inline uint32_t end() {
     tick = diff();
@@ -109,6 +49,8 @@ struct Performance {
 };
 
 static double mbps(uint32_t time, size_t outputSize) {
+  if (!time) return 0.0;
+
   double bytesTotal = static_cast<double>(outputSize);
   return (bytesTotal * 1000) / (static_cast<double>(time) * 1024 * 1024);
 }
@@ -117,22 +59,21 @@ static double mbps(uint32_t time, size_t outputSize) {
 // [Main]
 // ============================================================================
 
-#if defined(ASMJIT_BUILD_X86) || defined(ASMJIT_BUILD_X64)
-static void benchX86(uint32_t arch, uint32_t callConv) {
+#if defined(ASMJIT_BUILD_X86)
+static void benchX86(uint32_t arch) {
   using namespace asmjit;
 
+  CodeHolder holder;
   Performance perf;
-  TestRuntime runtime(arch, callConv);
 
-  X86Assembler a(&runtime, arch);
+  X86Assembler a;
   X86Compiler c;
 
   uint32_t r, i;
-
-  const char* archName = arch == kArchX86 ? "X86" : "X64";
+  const char* archName = arch == ArchInfo::kIdX86 ? "X86" : "X64";
 
   // --------------------------------------------------------------------------
-  // [Bench - Opcode]
+  // [Bench - Assembler]
   // --------------------------------------------------------------------------
 
   size_t asmOutputSize = 0;
@@ -143,13 +84,13 @@ static void benchX86(uint32_t arch, uint32_t callConv) {
     asmOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      asmgen::opcode(a);
+      holder.setArchId(arch);
+      holder.attach(&a);
 
-      void *p = a.make();
-      runtime.release(p);
+      asmtest::generateOpcodes(a);
+      asmOutputSize += holder.getCodeSize();
 
-      asmOutputSize += a.getCodeSize();
-      a.reset();
+      holder.reset(false); // Detaches `a`.
     }
     perf.end();
   }
@@ -158,7 +99,7 @@ static void benchX86(uint32_t arch, uint32_t callConv) {
     "X86Assembler", archName, perf.best, mbps(perf.best, asmOutputSize));
 
   // --------------------------------------------------------------------------
-  // [Bench - Blend]
+  // [Bench - Compiler]
   // --------------------------------------------------------------------------
 
   perf.reset();
@@ -166,15 +107,14 @@ static void benchX86(uint32_t arch, uint32_t callConv) {
     cmpOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      c.attach(&a);
-      asmgen::blend(c);
+      holder.setArchId(arch);
+      holder.attach(&c);
+
+      asmtest::generateAlphaBlend(c);
       c.finalize();
+      cmpOutputSize += holder.getCodeSize();
 
-      void* p = a.make();
-      runtime.release(p);
-
-      cmpOutputSize += a.getCodeSize();
-      a.reset();
+      holder.reset(false); // Detaches `c`.
     }
     perf.end();
   }
@@ -186,11 +126,9 @@ static void benchX86(uint32_t arch, uint32_t callConv) {
 
 int main(int argc, char* argv[]) {
 #if defined(ASMJIT_BUILD_X86)
-  benchX86(asmjit::kArchX86, asmjit::kCallConvX86CDecl);
-#endif
-#if defined(ASMJIT_BUILD_X64)
-  benchX86(asmjit::kArchX64, asmjit::kCallConvX64Unix);
-#endif
+  benchX86(asmjit::ArchInfo::kIdX86);
+  benchX86(asmjit::ArchInfo::kIdX64);
+#endif // ASMJIT_BUILD_X86
 
   return 0;
 }

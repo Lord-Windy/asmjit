@@ -1,4 +1,4 @@
-// [AsmJit]
+ // [AsmJit]
 // Complete x86/x64 JIT and Remote Assembler for C++.
 //
 // [License]
@@ -9,6 +9,7 @@
 #define _ASMJIT_BASE_CPUINFO_H
 
 // [Dependencies]
+#include "../base/archinfo.h"
 #include "../base/globals.h"
 
 // [Api-Begin]
@@ -25,11 +26,7 @@ namespace asmjit {
 
 //! CPU information.
 class CpuInfo {
- public:
-  // --------------------------------------------------------------------------
-  // [Vendor]
-  // --------------------------------------------------------------------------
-
+public:
   //! CPU vendor ID.
   ASMJIT_ENUM(Vendor) {
     kVendorNone  = 0,                    //!< Generic or unknown.
@@ -37,10 +34,6 @@ class CpuInfo {
     kVendorAMD   = 2,                    //!< AMD vendor.
     kVendorVIA   = 3                     //!< VIA vendor.
   };
-
-  // --------------------------------------------------------------------------
-  // [ArmFeatures]
-  // --------------------------------------------------------------------------
 
   //! ARM/ARM64 CPU features.
   ASMJIT_ENUM(ArmFeatures) {
@@ -66,10 +59,6 @@ class CpuInfo {
     kArmFeaturesCount                    //!< Count of ARM/ARM64 CPU features.
   };
 
-  // --------------------------------------------------------------------------
-  // [X86Features]
-  // --------------------------------------------------------------------------
-
   //! X86/X64 CPU features.
   ASMJIT_ENUM(X86Features) {
     kX86FeatureNX = 0,                   //!< CPU has Not-Execute-Bit.
@@ -82,6 +71,7 @@ class CpuInfo {
     kX86FeatureCLFLUSH,                  //!< CPU has CLFUSH.
     kX86FeatureCLFLUSH_OPT,              //!< CPU has CLFUSH (optimized).
     kX86FeatureCLWB,                     //!< CPU has CLWB.
+    kX86FeatureCLZERO,                   //!< CPU has CLZERO.
     kX86FeaturePCOMMIT,                  //!< CPU has PCOMMIT.
     kX86FeaturePREFETCH,                 //!< CPU has PREFETCH.
     kX86FeaturePREFETCHWT1,              //!< CPU has PREFETCHWT1.
@@ -141,10 +131,6 @@ class CpuInfo {
     kX86FeaturesCount                    //!< Count of X86/X64 CPU features.
   };
 
-  // --------------------------------------------------------------------------
-  // [Other]
-  // --------------------------------------------------------------------------
-
   //! \internal
   enum {
     kFeaturesPerUInt32 = static_cast<int>(sizeof(uint32_t)) * 8
@@ -190,10 +176,13 @@ class CpuInfo {
   // [Accessors]
   // --------------------------------------------------------------------------
 
+  //! Get generic architecture information.
+  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
   //! Get CPU architecture, see \Arch.
-  ASMJIT_INLINE uint32_t getArch() const noexcept { return _arch; }
+  ASMJIT_INLINE uint32_t getArchId() const noexcept { return _archInfo._archId; }
+
   //! Set CPU architecture, see \Arch.
-  ASMJIT_INLINE void setArch(uint32_t arch) noexcept { _arch = static_cast<uint8_t>(arch); }
+  ASMJIT_INLINE void setupArch(uint32_t archId) noexcept { _archInfo.setup(archId); }
 
   //! Get CPU vendor string.
   ASMJIT_INLINE const char* getVendorString() const noexcept { return _vendorString; }
@@ -274,29 +263,16 @@ class CpuInfo {
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! CPU vendor string.
-  char _vendorString[16];
-  //! CPU brand string.
-  char _brandString[64];
+  ArchInfo _archInfo;                    //!< Basic architecture information.
 
-  //! CPU architecture, see \ref Arch.
-  uint8_t _arch;
-  //! \internal
-  uint8_t _reserved[3];
-  //! CPU vendor id, see \ref CpuVendor.
-  uint32_t _vendorId;
-  //! CPU family ID.
-  uint32_t _family;
-  //! CPU model ID.
-  uint32_t _model;
-  //! CPU stepping.
-  uint32_t _stepping;
-
-  //! Number of hardware threads.
-  uint32_t _hwThreadsCount;
-
-  //! CPU features (bit-array).
-  uint32_t _features[8];
+  char _vendorString[16];                //!< CPU vendor string.
+  char _brandString[64];                 //!< CPU brand string.
+  uint32_t _vendorId;                    //!< CPU vendor id, see \ref Vendor.
+  uint32_t _family;                      //!< CPU family ID.
+  uint32_t _model;                       //!< CPU model ID.
+  uint32_t _stepping;                    //!< CPU stepping.
+  uint32_t _hwThreadsCount;              //!< Number of hardware threads.
+  uint32_t _features[8];                 //!< CPU features (bit-array).
 
   // Architecture specific data.
   union {

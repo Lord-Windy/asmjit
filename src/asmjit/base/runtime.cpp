@@ -9,50 +9,13 @@
 
 // [Dependencies]
 #include "../base/assembler.h"
+#include "../base/cpuinfo.h"
 #include "../base/runtime.h"
-
-// TODO: Rename this, or make call conv independent of CompilerFunc.
-#include "../base/compilerfunc.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
 
 namespace asmjit {
-
-// ============================================================================
-// [asmjit::Runtime - Utilities]
-// ============================================================================
-
-static ASMJIT_INLINE uint32_t hostStackAlignment() noexcept {
-  // By default a pointer-size stack alignment is assumed.
-  uint32_t alignment = sizeof(intptr_t);
-
-  // ARM & ARM64
-  // -----------
-  //
-  //   - 32-bit ARM requires stack to be aligned to 8 bytes.
-  //   - 64-bit ARM requires stack to be aligned to 16 bytes.
-#if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
-  alignment = ASMJIT_ARCH_ARM32 ? 8 : 16;
-#endif
-
-  // X86 & X64
-  // ---------
-  //
-  //   - 32-bit X86 requires stack to be aligned to 4 bytes. Modern Linux, APPLE
-  //     and UNIX guarantees 16-byte stack alignment even in 32-bit, but I'm
-  //     not sure about all other UNIX operating systems, because 16-byte alignment
-  //     is addition to an older specification.
-  //   - 64-bit X86 requires stack to be aligned to 16 bytes.
-#if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
-  int modernOS = ASMJIT_OS_LINUX  || // Linux & ANDROID.
-                 ASMJIT_OS_MAC    || // OSX and iOS.
-                 ASMJIT_OS_BSD;      // BSD variants.
-  alignment = ASMJIT_ARCH_X64 || modernOS ? 16 : 4;
-#endif
-
-  return alignment;
-}
 
 static ASMJIT_INLINE void hostFlushInstructionCache(void* p, size_t size) noexcept {
   // Only useful on non-x86 architectures.
@@ -72,17 +35,11 @@ static ASMJIT_INLINE void hostFlushInstructionCache(void* p, size_t size) noexce
 // ============================================================================
 
 Runtime::Runtime() noexcept
-  : _runtimeType(kTypeNone),
+  : _archInfo(),
+    _runtimeType(kRuntimeNone),
     _allocType(kVMemAllocFreeable),
-    _cpuInfo(),
-    _stackAlignment(0),
     _cdeclConv(kCallConvNone),
-    _stdCallConv(kCallConvNone),
-    _baseAddress(kNoBaseAddress),
-    _sizeLimit(0) {
-
-  ::memset(_reserved, 0, sizeof(_reserved));
-}
+    _stdCallConv(kCallConvNone) {}
 Runtime::~Runtime() noexcept {}
 
 // ============================================================================
@@ -90,10 +47,9 @@ Runtime::~Runtime() noexcept {}
 // ============================================================================
 
 HostRuntime::HostRuntime() noexcept {
-  _runtimeType = kTypeJit;
-  _cpuInfo = CpuInfo::getHost();
+  _runtimeType = kRuntimeJit;
 
-  _stackAlignment = hostStackAlignment();
+  _archInfo = CpuInfo::getHost().getArchInfo();
   _cdeclConv = kCallConvHostCDecl;
   _stdCallConv = kCallConvHostStdCall;
 }
@@ -108,62 +64,6 @@ void HostRuntime::flush(void* p, size_t size) noexcept {
 }
 
 // ============================================================================
-// [asmjit::StaticRuntime - Construction / Destruction]
-// ============================================================================
-
-StaticRuntime::StaticRuntime(void* baseAddress, size_t sizeLimit) noexcept {
-  _sizeLimit = sizeLimit;
-  _baseAddress = static_cast<Ptr>((uintptr_t)baseAddress);
-}
-StaticRuntime::~StaticRuntime() noexcept {}
-
-// ============================================================================
-// [asmjit::StaticRuntime - Interface]
-// ============================================================================
-
-Error StaticRuntime::add(void** dst, Assembler* assembler) noexcept {
-  size_t codeSize = assembler->getCodeSize();
-  size_t sizeLimit = _sizeLimit;
-
-  if (codeSize == 0) {
-    *dst = nullptr;
-    return kErrorNoCodeGenerated;
-  }
-
-  if (sizeLimit != 0 && sizeLimit < codeSize) {
-    *dst = nullptr;
-    return kErrorCodeTooLarge;
-  }
-
-  Ptr baseAddress = _baseAddress;
-  uint8_t* p = static_cast<uint8_t*>((void*)static_cast<uintptr_t>(baseAddress));
-
-  // Since the base address is known the `relocSize` returned should be equal
-  // to `codeSize`. It's better to fail if they don't match instead of passsing
-  // silently.
-  size_t relocSize = assembler->relocCode(p, baseAddress);
-  if (relocSize == 0 || codeSize != relocSize) {
-    *dst = nullptr;
-    return kErrorInvalidState;
-  }
-
-  _baseAddress += codeSize;
-  if (sizeLimit)
-    sizeLimit -= codeSize;
-
-  flush(p, codeSize);
-  *dst = p;
-
-  return kErrorOk;
-}
-
-Error StaticRuntime::release(void* p) noexcept {
-  // There is nothing to release as `StaticRuntime` doesn't manage any memory.
-  ASMJIT_UNUSED(p);
-  return kErrorOk;
-}
-
-// ============================================================================
 // [asmjit::JitRuntime - Construction / Destruction]
 // ============================================================================
 
@@ -174,25 +74,25 @@ JitRuntime::~JitRuntime() noexcept {}
 // [asmjit::JitRuntime - Interface]
 // ============================================================================
 
-Error JitRuntime::add(void** dst, Assembler* assembler) noexcept {
-  size_t codeSize = assembler->getCodeSize();
-  if (codeSize == 0) {
+Error JitRuntime::add(void** dst, CodeHolder* holder) noexcept {
+  size_t codeSize = holder->getCodeSize();
+  if (ASMJIT_UNLIKELY(codeSize == 0)) {
     *dst = nullptr;
-    return kErrorNoCodeGenerated;
+    return DebugUtils::errored(kErrorNoCodeGenerated);
   }
 
   void* p = _memMgr.alloc(codeSize, getAllocType());
-  if (p == nullptr) {
+  if (ASMJIT_UNLIKELY(!p)) {
     *dst = nullptr;
-    return kErrorNoVirtualMemory;
+    return DebugUtils::errored(kErrorNoVirtualMemory);
   }
 
   // Relocate the code and release the unused memory back to `VMemMgr`.
-  size_t relocSize = assembler->relocCode(p);
-  if (relocSize == 0) {
+  size_t relocSize = holder->relocate(p);
+  if (ASMJIT_UNLIKELY(relocSize == 0)) {
     *dst = nullptr;
     _memMgr.release(p);
-    return kErrorInvalidState;
+    return DebugUtils::errored(kErrorInvalidState);
   }
 
   if (relocSize < codeSize)
