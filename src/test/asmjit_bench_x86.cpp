@@ -113,14 +113,20 @@ static void benchX86(uint32_t archType) {
     cmpOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      code.init(CodeInfo(archType));
+      // NOTE: Since we don't have JitRuntime we don't know anything about
+      // function calling conventions, which is required by generateAlphaBlend.
+      // So we must setup this manually.
+      CodeInfo ci(archType);
+      ci.setCdeclCallConv(archType == Arch::kTypeX86 ? kCallConvX86CDecl : kCallConvX64Unix);
+
+      code.init(ci);
       code.attach(&cc);
 
       asmtest::generateAlphaBlend(cc);
       cc.finalize();
       cmpOutputSize += code.getCodeSize();
 
-      code.reset(false); // Detaches `c`.
+      code.reset(false); // Detaches `cc`.
     }
     perf.end();
   }
