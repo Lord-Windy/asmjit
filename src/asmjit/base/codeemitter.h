@@ -205,35 +205,38 @@ public:
   virtual Error comment(const char* s, size_t len = kInvalidIndex) = 0;
 
   // --------------------------------------------------------------------------
-  // [Finalize]
+  // [Code-Generation Status]
   // --------------------------------------------------------------------------
+
+  //! Get if the CodeEmitter is initialized (i.e. attached to a \ref CodeHolder).
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _code != nullptr; }
 
   ASMJIT_API virtual Error finalize();
 
   // --------------------------------------------------------------------------
-  // [CodeEmitter Information]
+  // [Code Information]
   // --------------------------------------------------------------------------
 
-  //! Get the type of this CodeEmitter, see \ref Type.
-  ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
-
-  // --------------------------------------------------------------------------
-  // [Target Information]
-  // --------------------------------------------------------------------------
-
-  //! Get information about the target architecture, see \ref ArchInfo.
-  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
-  //! Get the target architecture.
-  ASMJIT_INLINE uint32_t getArchId() const noexcept { return _archInfo._archId; }
-  //! Get the target architecture's GP register size (4 or 8 bytes).
-  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _archInfo._gpSize; }
-  //! Get the number of target GP registers.
-  ASMJIT_INLINE uint32_t getGpTotal() const noexcept { return _archInfo._gpTotal; }
-  //! Get the number of usable (allocable) target GP registers.
-  ASMJIT_INLINE uint32_t getGpUsable() const noexcept { return _archInfo._gpUsable; }
-
+  //! Get information about the code, see \ref CodeInfo.
+  ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
   //! Get \ref CodeHolder this CodeEmitter is attached to.
   ASMJIT_INLINE CodeHolder* getCode() const noexcept { return _code; }
+
+  //! Get information about the architecture, see \ref Arch.
+  ASMJIT_INLINE const Arch& getArch() const noexcept { return _codeInfo._arch; }
+  //! Get the target architecture.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo._arch.getType(); }
+  //! Get the target architecture's GP register size (4 or 8 bytes).
+  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _codeInfo._arch.getGpSize(); }
+  //! Get the number of target GP registers.
+  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _codeInfo._arch.getGpCount(); }
+
+  // --------------------------------------------------------------------------
+  // [Global Information]
+  // --------------------------------------------------------------------------
+
+  //! Get global hints.
+  ASMJIT_INLINE uint32_t getGlobalHints() const noexcept { return _globalHints; }
 
   //! Get global options.
   //!
@@ -243,6 +246,13 @@ public:
   //! affect each instruction, for example if VEX3 is set globally, it will all
   //! instructions, even those that don't have such option set.
   ASMJIT_INLINE uint32_t getGlobalOptions() const noexcept { return _globalOptions; }
+
+  // --------------------------------------------------------------------------
+  // [Code-Emitter Information]
+  // --------------------------------------------------------------------------
+
+  //! Get the type of this CodeEmitter, see \ref Type.
+  ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
 
   // --------------------------------------------------------------------------
   // [Error Handling]
@@ -375,9 +385,9 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
+  CodeInfo _codeInfo;                    //!< Basic information about the code (matches CodeHolder::_codeInfo).
   CodeHolder* _code;                     //!< CodeHolder.
   CodeEmitter* _nextEmitter;             //!< Linked list of `CodeEmitter`s attached to a single \ref CodeHolder.
-  ArchInfo _archInfo;                    //!< Target architecture information, acquired from \ref CodeHolder.
 
   uint8_t _type;                         //!< See CodeEmitter::Type.
   uint8_t _destroyed;                    //!< Set by ~CodeEmitter() before calling `_code->detach()`.

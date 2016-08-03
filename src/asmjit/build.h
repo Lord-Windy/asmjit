@@ -861,8 +861,10 @@ typedef unsigned __int64 uint64_t;
 
 #if ASMJIT_ARCH_LE
 # define _ASMJIT_ARCH_INDEX(total, index) (index)
+# define ASMJIT_PACK32_4x8(A, B, C, D) ((A) + ((B) << 8) + ((C) << 16) + ((D) << 24))
 #else
 # define _ASMJIT_ARCH_INDEX(total, index) ((total) - 1 - (index))
+# define ASMJIT_PACK32_4x8(A, B, C, D) ((D) + ((C) << 8) + ((B) << 16) + ((A) << 24))
 #endif
 
 #if !defined(ASMJIT_ALLOC) && !defined(ASMJIT_REALLOC) && !defined(ASMJIT_FREE)

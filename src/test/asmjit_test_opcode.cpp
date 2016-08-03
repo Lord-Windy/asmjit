@@ -26,11 +26,11 @@ struct OpcodeDumpInfo {
 
 static const char* archIdToString(uint32_t archId) {
   switch (archId) {
-    case ArchInfo::kIdNone : return "None";
-    case ArchInfo::kIdX86  : return "X86";
-    case ArchInfo::kIdX64  : return "X64";
-    case ArchInfo::kIdArm32: return "ARM32";
-    case ArchInfo::kIdArm64: return "ARM64";
+    case Arch::kTypeNone : return "None";
+    case Arch::kTypeX86  : return "X86";
+    case Arch::kTypeX64  : return "X64";
+    case Arch::kTypeArm32: return "ARM32";
+    case Arch::kTypeArm64: return "ARM64";
 
     default:
       return "<unknown>";
@@ -52,11 +52,11 @@ int main(int argc, char* argv[]) {
   logger.addOptions(Logger::kOptionBinaryForm);
 
   OpcodeDumpInfo infoList[] = {
-    { ArchInfo::kIdX86, false, false },
-    { ArchInfo::kIdX64, false, false },
-    { ArchInfo::kIdX64, false, true  },
-    { ArchInfo::kIdX64, true , false },
-    { ArchInfo::kIdX64, true , true  }
+    { Arch::kTypeX86, false, false },
+    { Arch::kTypeX64, false, false },
+    { Arch::kTypeX64, false, true  },
+    { Arch::kTypeX64, true , false },
+    { Arch::kTypeX64, true , true  }
   };
 
   for (int i = 0; i < ASMJIT_ARRAY_SIZE(infoList); i++) {
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
       info.useRex1 ? "true" : "false",
       info.useRex2 ? "true" : "false");
 
-    CodeHolder code(info.arch);
+    CodeHolder code(CodeInfo(info.arch));
     code.setLogger(&logger);
     code.setErrorHandler(&eh);
 
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
 
     // If this is the host architecture the code generated can be executed
     // for debugging purposes (the first instruction is ret anyway).
-    if (code.getArchId() == ArchInfo::kIdHost) {
+    if (code.getArchType() == Arch::kTypeHost) {
       JitRuntime runtime;
       VoidFunc p;
       Error err = runtime.add((void**)&p, &code);

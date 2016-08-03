@@ -23,9 +23,9 @@ namespace asmjit {
 // ============================================================================
 
 CodeEmitter::CodeEmitter(uint32_t type) noexcept
-  : _code(nullptr),
+  : _codeInfo(),
+    _code(nullptr),
     _nextEmitter(nullptr),
-    _archInfo(),
     _type(static_cast<uint8_t>(type)),
     _destroyed(false),
     _finalized(false),
@@ -53,7 +53,7 @@ CodeEmitter::~CodeEmitter() noexcept {
 // ============================================================================
 
 Error CodeEmitter::onAttach(CodeHolder* code) noexcept {
-  _archInfo = code->getArchInfo();
+  _codeInfo = code->getCodeInfo();
   _lastError = kErrorOk;
 
   _globalHints = code->getGlobalHints();
@@ -63,7 +63,7 @@ Error CodeEmitter::onAttach(CodeHolder* code) noexcept {
 }
 
 Error CodeEmitter::onDetach(CodeHolder* code) noexcept {
-  _archInfo.reset();
+  _codeInfo.reset();
   _finalized = false;
   _lastError = kErrorNotInitialized;
 

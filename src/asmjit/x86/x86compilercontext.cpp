@@ -169,14 +169,14 @@ static void ASMJIT_CDECL X86Context_traceNode(X86Context* self, CBNode* node_, c
 // ============================================================================
 
 X86Context::X86Context(X86Compiler* compiler) : RAContext(compiler) {
-  uint32_t archId = compiler->getArchId();
+  uint32_t archType = compiler->getArchType();
 
   _varMapToVaListOffset = ASMJIT_OFFSET_OF(X86RAData, tiedArray);
 
-  _regCount._gp  = archId == ArchInfo::kIdX86 ? 8 : 16;
+  _regCount._gp  = archType == Arch::kTypeX86 ? 8 : 16;
   _regCount._mm  = 8;
   _regCount._k   = 8;
-  _regCount._xyz = archId == ArchInfo::kIdX86 ? 8 : 16;
+  _regCount._xyz = archType == Arch::kTypeX86 ? 8 : 16;
   _zsp = compiler->zsp;
   _zbp = compiler->zbp;
 
@@ -1731,7 +1731,7 @@ Error X86Context::fetch() {
   X86Compiler* compiler = getCompiler();
   X86FuncNode* func = getFunc();
 
-  uint32_t archId = compiler->getArchId();
+  uint32_t archType = compiler->getArchType();
 
   CBNode* node_ = func;
   CBNode* next = nullptr;
@@ -2022,7 +2022,7 @@ _NextGroup:
 
               if (static_cast<X86Reg*>(op)->isGpb()) {
                 tied->flags |= static_cast<X86Gp*>(op)->isGpbLo() ? TiedReg::kX86GpbLo : TiedReg::kX86GpbHi;
-                if (archId == ArchInfo::kIdX86) {
+                if (archType == Arch::kTypeX86) {
                   // If a byte register is accessed in 32-bit mode we have to limit
                   // all allocable registers for that variable to eax/ebx/ecx/edx.
                   // Other variables are not affected.

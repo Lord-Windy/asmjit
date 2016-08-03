@@ -39,7 +39,7 @@ ASMJIT_TYPE_ID(X86Zmm, VirtType::kIdX86Zmm);
 // ============================================================================
 
 //! X86 function, including calling convention, arguments and their
-//! register indices or stack positions.
+//! register indexes or stack positions.
 struct X86FuncDecl : public FuncDecl {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

@@ -9,7 +9,6 @@
 #define _ASMJIT_BASE_OPERAND_H
 
 // [Dependencies]
-#include "../base/archinfo.h"
 #include "../base/utils.h"
 
 // [Api-Begin]

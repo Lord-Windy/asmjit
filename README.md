@@ -102,7 +102,7 @@ AsmJit is designed to be easy embeddable in any project. However, it depends on 
 
 ### Architectures
 
-  * `ASMJIT_BUILD_ARM32` - Build ARM32 and ARM64 backend.
+  * `ASMJIT_BUILD_ARM` - Build ARM32 and ARM64 backend.
   * `ASMJIT_BUILD_X86` - Build X86 and X64 backend.
   * `ASMJIT_BUILD_HOST` - Build host backend, if only `ASMJIT_BUILD_HOST` is used only the host architecture detected at compile-time will be included.
 
@@ -112,36 +112,135 @@ AsmJit is designed to be easy embeddable in any project. However, it depends on 
 
   * `ASMJIT_DISABLE_TEXT` - Disable everything that uses text-representation and that causes certain strings to be stored in the resulting binary. For example when this flag is enabled all instruction and error names (and related APIs) will not be available. This flag has to be disabled together with `ASMJIT_DISABLE_LOGGING`. This option is suitable for deployment builds.
   * `ASMJIT_DISABLE_LOGGING` - Disable `Logger` and `Formatter` features completely. Use this flag if you don't need `Logger` and `Formatter` classes, suitable for deployment builds.
-  * `ASMJIT_DISABLE_COMPILER` - Disable `Compiler` completely. Use this flag if you don't use `Compiler` and don't want it compiled in.
+  * `ASMJIT_DISABLE_COMPILER` - Disable `CodeCompiler` completely. Use this flag if you don't use `CodeCompiler` and don't want it compiled in.
 
 Using AsmJit
 ------------
 
-AsmJit library uses one global namespace called `asmjit` that provides the whole API. Architecture specific code is prefixed by the architecture name and architecture specific registers and operand builders have their own namespace. For example API targeting both X86 and X64 architectures is prefixed with "X86", enums by `kX86`, and registers & operand builders are accessible through `x86` namespace. This design is very different from the initial version of AsmJit and it seems now as the most convenient one.
+AsmJit library uses one global namespace called `asmjit` that provides the whole functionality. Architecture specific code is prefixed by the architecture name and architecture specific registers and operand builders have their own namespace. For example API targeting both X86 and X64 architectures is prefixed with "X86", enums by `kX86`, and registers & operand builders are accessible through `x86` namespace. This design is very different from the initial version of AsmJit and it seems now as the most convenient one.
 
-### Runtime & Emitters
+### CodeHolder & CodeEmitter
 
-AsmJit provides `Runtime` and code emitters like `Assembler`, `AsmBuilder`, and `Compiler`. `Runtime` specifies where the code will be emitted and acts as a storage while the rest provide API to actually emit the code - assembler instructions, labels, directives, and high-level features offered by `Compiler`. Each code emitter is suitable for something else:
+AsmJit provides two classes that are used together for code generation:
 
-  * `Assembler` - Encodes instructions and data directly into the code-buffer. Assembler is a low-level concept and the most efficient way of generating machine-code. Assembler is suitable for people that already have their own register allocator and demand a full control over the generated machine-code. It uses physical registers directly and doesn't provide high-level features like code injection or handling function calling conventions offered by other emitters. Assembler supports code relocation and the generated machine-code can be relocated to any user-defined addresses.
-  * `AsmBuilder` - Very similar to `Assembler`, but instead of emitting machine-code it stores everything in a representation suitable for additional processing. It uses nodes (`AsmNode` and friends) to represent instructions and other building blocks. Since `AsmBuilder` does emit the code directly it's suitable for inspecting, injecting, and patching.
-  * `Compiler` - Based on `AsmBuilder`, but provides virtual registers that are allocated into physical registers by a register allocator. Compiler is basically a high-level assembler that is very easy to start with. It understands functions and their calling conventions. It was designed in a way that the code generated is always a function having a certain signature like in a real programming language. By having information about functions and their signatures it' able to insert prolog and epilog sequence automatically it's able to also generate a necessary code to call other function from the generated code. The `Compiler` is the simplest way to start using AsmJit.
+  * `CodeHolder` - Provides functionality to hold generated code and stores all necessary information about code sections, labels, symbols, and possible relocations.
+  * `CodeEmitter` - Provides functionality to emit code into `CodeHolder`. `CodeEmitter` is abstract and provides just basic building blocks that are then implemented by `Assembler`, `CodeBuilder`, and `CodeCompiler`.
 
-### Instruction Operands
+Code emitters:
 
-Operand is a part of an instruction, which specifies the data the instruction will operate on. All operands share the same `Operand` base class and have the same size, it's possible to define an array of operands and then just setup each operand individually setting their types and contents dynamically. There are five types of operands in AsmJit:
+  * `Assembler` - Emitter designed to emit machine code directly.
+  * `CodeBuilder` - Emitter designed to emit code into a representation that can be processed. It stores the whole code in a double linked list consisting of nodes (`CBNode` aka code-builder node). There are nodes that represent instructions (`CBInst`), labels (`CBLabel`), and other building blocks (`CBAlign`, `CBData`, ...). Some nodes are used as markers (`CBSentinel`) and comments (`CBComment`).
+  * `CodeCompiler` - High-level code emitter that uses virtual registers and contains high-level function building features. `CodeCompiler` is based on `CodeBuilder`, but extends its functionality and introduces new node types starting with CC (`CCFunc`, `CCFuncRet`, `CCFuncCall`). `CodeCompiler` is the simplest way to start with AsmJit as it abstracts many details required to generate a function in asm language.
 
-  * None - operand not initialized or not used, default when you create `Operand()`.
-  * Register - describes either physical or virtual register, all registers inherit from `Reg` operand and then specialize, for example X86/X64 defines `X86Reg` operand, which contains some archiecture-specific functionality and constants.
-  * Memory address - used to reference a memory location, provided by `Mem` class, specialized by `X86Mem` for X86/X64.
-  * Immediate value - Immediate values are usually part of instructions (encoded within the instruction itself) or data, provided by `Imm` class.
-  * Label - used to reference a location in code or data, provided by `Label` class.
+### Runtime
 
-Base class for all operands is `Operand`. It contains interface that can be used by all types of operands only and it is typically passed by value, not as a pointer. The classes `Reg`, `Mem`, `Label` and `Imm` all inherit from `Operand` and provide operand-specific functionality. Architecture specific operands are prefixed by the architecture like `X86Reg` and `X86Mem`. Most of architectures provide several types of registers, for example X86/X64 architecture has `X86Gp`, `X86Mm`, `X86Fp`, `X86Xmm`, `X86Ymm`, and others and also provides some extras including segment registers and `rip` (relative instruction pointer).
+AsmJit's `Runtime` is useful for execution and linking purposes. The `Runtime` itself is abstract and defines how to `add` and `release` function or code-section hold in `CodeHolder`. The only implementation provided directly by AsmJit is called `JitRuntime`, which is suitable for storing and executing dynamically generated code (JIT).
 
-When using a code-generator some operands have to be created explicitly by using its interface. For example labels are created by using `newLabel()` method of the code-generator and virtual registers are created by using architecture specific methods like `newGp()`, `newMm()` or `newXmm()`.
+### Instructions & Operands
 
-### Function Prototypes
+Instructions specify operations performed by the CPU, and operands specify the operation's input(s) and output(s). Each AsmJit's instruction has it's own unique id (`X86Inst::Id` for example) and platform specific code emitters always provide a type safe intrinsic (or multiple overloads) to emit such instruction. There are two ways of emitting an instruction:
+
+  * Using `emitter.emit(instId, operands...)` - Allows to emit an instruction in a dynamic way - you just need to know its id and provide its operands.
+  * Using `emitter.inst(operands...)` - A type-safe way provided by platform specific emitters, for example `X86Assembler` provides `mov(X86Gp, X86Gp)`.
+
+AsmJit's operands all use `Operand`, which can be used to store:
+
+  * No operand (uninitialized).
+  * Register (`Reg`) - Describes either physical or virtual register. Physical registers have id that matches the machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator. Each `Reg` provides:
+    * Register Type - Unique id that describes each possible register provided by the target architecture - for example X86 backend provides `X86Reg::RegType`, which defines all variations of general purpose registers (GPB-LO, GPB-HI, GPW, GPD, and GPQ) and all types of other registers like XMM, YMM, and ZMM.
+    * Register Class - Groups multiple register types under a single class - for example all general-purpose registers (of all sizes) on X86 are `X86Reg::kClassGp`, all SIMD registers (XMM, YMM, ZMM) are `X86Reg::kClassXyz`, etc.
+    * Register Size - Contains the size of the register in bytes. If the size depends on the mode (32-bit vs 64-bit) then generally the higher size is used (for example RIP register has size 8 by default).
+    * Register ID - Contains physical or virtual id of the register.
+  * Memory address (`Mem`) - Used to reference a memory location. Each `Mem` provides:
+    * Base register - A base register id (physical or virtual).
+    * Index register - An index register id (physical or virtual).
+    * Offset - Displacement or absolute address to be referenced (32-bit if base register is used and 64-bit if base register is not used).
+    * Optional flags that can describe various architecture dependent information (like scale and segment-override on X86).
+  * Immediate value (`Imm`) - Immediate values are usually part of instructions (encoded within the instruction itself) or data.
+  * Label (`Label)` - used to reference a location in code or data. Labels must be created by the `CodeEmitter` or by `CodeHolder`. Each label has its unique id per `CodeHolder` instance.
+
+AsmJit allows to construct operands dynamically, to store them, and to query a complete information about them at run-time. Operands are small (always 16 bytes per `Operand`) and should be always copied if you intend to store them (don't create operands by using `new` keyword, it's not required). Operand are safe to be `memcpy()`ed and `memset()`ed.
+
+Small example of manipulating and using operands:
+
+```c++
+using namespace asmjit;
+
+X86Gp getDstRegByValue() { return x86::ecx; }
+
+void usingOperandsExample(X86Assembler& a) {
+  // Create some operands.
+  X86Gp  dst = getDstRegByValue();  // Get `ecx` register returned by a function.
+  X86Gp  src = x86::rax;            // Get `rax` register directly from the provided `x86` namespace.
+  X86Gp  idx = x86::gpq(10);        // Construct `r10` dynamically.
+  X86Mem m = x86::ptr(src, idx);    // Construct [src + idx] memory address - referencing [rax + r10].
+
+  // Examine `m`:
+  m.getIndexType();                 // Returns `X86Reg::kRegGpq`.
+  m.getIndexId();                   // Returns 10 (`r10`).
+
+  // Reconstruct `idx` stored in mem:
+  X86Gp idx_2 = X86Gp::fromTypeAndId(m.getIndexType(), m.getIndexId());
+  idx == idx_2;                     // True, `idx` and idx_2` are identical (they refer to the same register).
+
+  Operand op = m;                   // Possible.
+  op.isMem();                       // True (can be casted to Mem and X86Mem).
+
+  m == op;                          // True, `op` is just a copy of `m`.
+  static_cast<X86Mem&>(op).addOffset(1);
+  m == op;                          // False, `op` now points to [rax + r10 + 1], which is not same as [rax + r10].
+
+  // Emitting 'mov'
+  a.mov(dst, m);                    // Type-safe way.
+  a.mov(dst, op);                   // Not possible, `mov` doesn't provide `X86Reg, Operand` overload.
+
+  a.emit(X86Inst::kIdMov, dst, m);  // Unsafe, but possible.
+  a.emit(X86Inst::kIdMov, dst, op); // Also possible, `emit()` is typeless and can be used dynamically.
+}
+```
+
+Some operands have to be created explicitly by `CodeEmitter`. For example labels must be created by `newLabel()` before they are passed to `CodeEmitter`.
+
+### Assembling First Code
+
+This example shows a all steps necessary to generate and execute machine code by using `CodeHolder`, `X86Assembler`, and `JitRuntime`:
+
+```c++
+using namespace asmjit;
+
+// Signature of the generated function.
+typedef void (*Func)(void);
+
+int main(int argc, char* argv[]) {
+  TODO: Initializing CodeHolder from Runtime is still incomplete.
+  JitRuntime runtime;
+
+  CodeHolder code;                  // Create CodeHolder.
+  X86Assembler a(&code);            // Create and attach X86Assembler to `code`.
+
+  a.mov(x86::eax, 0);               // Move zero to 'eax' register.
+  a.ret();                          // Return from function.
+
+  Func fn;
+  Error err = runtime.add((void**)&fn, &code);
+
+  if (err)
+    return 1;                       // Handle a possible error returned by AsmJit.
+
+  int result = fn();                // Execute the generated code.
+  printf("%d\n", result);           // Print the resulting "1".
+
+  // All classes use RAII, all resources will be released when `main()` returns,
+  // the generated function can be, however, freed explicitly if you intend to
+  // reuse or keep the `runtime` (which you should).
+  runtime.release(fn);
+
+  return 0;
+}
+```
+
+
+### Function Signature
 
 AsmJit needs to know the prototype of the function it will generate or call. AsmJit contains a mapping between a type and the register that will be used to represent it. To make life easier there is a function builder that does the mapping on the fly. Function builder is a template class that helps with creating a function prototype by using native C/C++ types that describe function arguments and return value. It translates C/C++ native types into AsmJit specific IDs and makes these IDs accessible to Compiler.
 

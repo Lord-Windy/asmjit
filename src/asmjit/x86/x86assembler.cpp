@@ -24,6 +24,16 @@
 namespace asmjit {
 
 // ============================================================================
+// [FastUInt8]
+// ============================================================================
+
+#if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
+typedef unsigned char FastUInt8;
+#else
+typedef unsigned int FastUInt8;
+#endif
+
+// ============================================================================
 // [Constants]
 // ============================================================================
 
@@ -385,7 +395,7 @@ X86Assembler::~X86Assembler() noexcept {}
 // ============================================================================
 
 Error X86Assembler::onAttach(CodeHolder* code) noexcept {
-  if (code->getArchId() == ArchInfo::kIdX86) {
+  if (code->getArchType() == Arch::kTypeX86) {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
     _setAddressOverrideMask(kX86MemInfo_67H_X86);
@@ -394,7 +404,7 @@ Error X86Assembler::onAttach(CodeHolder* code) noexcept {
     return kErrorOk;
   }
 
-  if (code->getArchId() == ArchInfo::kIdX64) {
+  if (code->getArchType() == Arch::kTypeX64) {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
     _setAddressOverrideMask(kX86MemInfo_67H_X64);
@@ -590,7 +600,7 @@ static Error X86Assembler_validateInstruction(
   if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
   if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
-  Error err = X86Inst::validate(self->getArchId(), instId, options, self->getOpMask(), opArray, 6);
+  Error err = X86Inst::validate(self->getArchType(), instId, options, self->getOpMask(), opArray, 6);
   if (err) return X86Assembler_failedInstruction(self, err, instId, options, o0, o1, o2, o3);
 
   return kErrorOk;
@@ -1297,7 +1307,7 @@ CaseX86M_OptB_MulDiv:
           goto EmitX86R;
         }
 
-        if (getArchId() == ArchInfo::kIdX86) {
+        if (getArchType() == Arch::kTypeX86) {
           // INC r16|r32 is only encodable in 32-bit mode (collides with REX).
           opCode = iExtData->getSecondaryOpCode() + (rbReg & 0x07);
           ADD_66H_P_BY_SIZE(o0.getSize());
@@ -1392,8 +1402,8 @@ CaseX86M_OptB_MulDiv:
         label = _code->getLabelEntry(static_cast<const Label&>(o1));
         if (!label) goto InvalidLabel;
 
-        if ((getArchId() == ArchInfo::kIdX86 && o0.getSize() == 2) ||
-            (getArchId() != ArchInfo::kIdX86 && o0.getSize() == 4)) {
+        if ((getArchType() == Arch::kTypeX86 && o0.getSize() == 2) ||
+            (getArchType() != Arch::kTypeX86 && o0.getSize() == 4)) {
           EMIT_BYTE(0x67);
         }
         EMIT_BYTE(0xE3);
@@ -1669,17 +1679,20 @@ CaseX86M_OptB_MulDiv:
 
           // Optimize the instruction size by using a 32-bit immediate if possible.
           if (imLen == 8) {
-            // Sign-extend.
-            if (Utils::isInt32(imVal)) {
-              opCode = 0xC7;
-              ADD_REX_W(1);
+            if (Utils::isUInt32(imVal)) {
+              // Zero-extend by using a 32-bit GPD destination instead of a 64-bit GPQ.
+              imLen = 4;
+            }
+            else if (Utils::isInt32(imVal)) {
+              // Sign-extend, uses 'C7 /0' opcode.
+              rbReg = opReg;
+
+              opCode = 0xC7 | X86Inst::kOpCode_W;
+              opReg = 0;
+
               imLen = 4;
               goto EmitX86R;
             }
-
-            // Zero-extend by using a 32-bit GPD destination instead of a 64-bit GPQ.
-            if (Utils::isUInt32(imVal))
-              imLen = 4;
           }
 
           opCode = 0xB8;
@@ -3591,7 +3604,7 @@ EmitModSib:
     else {
       EMIT_BYTE(x86EncodeMod(0, opReg, 5));
 
-      if (getArchId() == ArchInfo::kIdX86) {
+      if (getArchType() == Arch::kTypeX86) {
 EmitModSib_LabelRip_X86:
         dispOffset = rmMem->getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
@@ -3716,7 +3729,7 @@ EmitModVSib:
     }
     // ==========|> [LABEL|RIP + INDEX + DISP32].
     else {
-      if (getArchId() == ArchInfo::kIdX86) {
+      if (getArchType() == Arch::kTypeX86) {
         EMIT_BYTE(x86EncodeMod(0, opReg, 4));
         EMIT_BYTE(x86EncodeSib(rmMem->getShift(), rxReg, 5));
         goto EmitModSib_LabelRip_X86;
@@ -3796,12 +3809,12 @@ EmitVexEvexR:
     opReg &= 0x7;
 
     // Handle {k} and {kz} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionEvexZero)) {
+    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionKZ)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything should be zeroed. It's valid EVEX.
       if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
-      x |= options & X86Inst::kOptionEvexZero;           // [........|zLL..aaa|Vvvvv..R|RBBmmmmm].
+      x |= options & X86Inst::kOptionKZ;                 // [........|zLL..aaa|Vvvvv..R|RBBmmmmm].
     }
 
     // Check if EVEX is required by checking bits in `x` :  [........|xx...xxx|x......x|.x.x....].
@@ -3894,14 +3907,14 @@ EmitVexEvexM:
     opReg &= 0x07U;
 
     // Handle {k}, {kz}, {1tox} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionEvex1ToX | X86Inst::kOptionEvexZero)) {
+    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOption1ToX | X86Inst::kOptionKZ)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything would be zeroed. It's a valid EVEX.
       if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
 
-      x |= options & (X86Inst::kOptionEvex1ToX |         // [........|.LLbXaaa|Vvvvv..R|RXBmmmmm].
-                      X86Inst::kOptionEvexZero );        // [........|zLLbXaaa|Vvvvv..R|RXBmmmmm].
+      x |= options & (X86Inst::kOption1ToX |             // [........|.LLbXaaa|Vvvvv..R|RXBmmmmm].
+                      X86Inst::kOptionKZ   );            // [........|zLLbXaaa|Vvvvv..R|RXBmmmmm].
     }
 
     // Check if EVEX is required by checking bits in `x` :  [........|xx.xxxxx|x......x|...x....].
@@ -3963,7 +3976,7 @@ EmitVexEvexM:
   }
 
   // MOD|SIB address.
-  if (!(opCode & X86Inst::kOpCode_VSIB))
+  if (!iExtData->hasFlag(X86Inst::kInstFlagVM))
     goto EmitModSib;
 
   // MOD|VSIB address without INDEX is invalid.
@@ -3995,7 +4008,7 @@ EmitJmpOrCallAbs:
 
     uint32_t trampolineSize = 0;
 
-    if (getArchId() == ArchInfo::kIdX64) {
+    if (getArchType() == Arch::kTypeX64) {
       uint64_t baseAddress = _code->getBaseAddress();
 
       // If the base address of the output is known, it's possible to determine

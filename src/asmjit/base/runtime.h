@@ -9,7 +9,7 @@
 #define _ASMJIT_BASE_RUNTIME_H
 
 // [Dependencies]
-#include "../base/archinfo.h"
+#include "../base/codeholder.h"
 #include "../base/vmem.h"
 
 // [Api-Begin]
@@ -35,10 +35,6 @@ class ASMJIT_VIRTAPI Runtime {
 public:
   ASMJIT_NO_COPY(Runtime)
 
-  // --------------------------------------------------------------------------
-  // [RuntimeType]
-  // --------------------------------------------------------------------------
-
   ASMJIT_ENUM(RuntimeType) {
     kRuntimeNone = 0,
     kRuntimeJit = 1,
@@ -58,27 +54,19 @@ public:
   // [Accessors]
   // --------------------------------------------------------------------------
 
+  //! Get CodeInfo of this runtime.
+  //!
+  //! CodeInfo can be used to setup a CodeHolder in case you plan to generate a
+  //! code compatible and executable by this Runtime.
+  ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
+
+  //! Get the Runtime's architecture id, see \ref Arch::Type.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo.getArchType(); }
+  //! Get the Runtime's architecture mode, see \ref Arch::Mode.
+  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _codeInfo.getArchMode(); }
+
   //! Get the runtime type, see \ref Type.
   ASMJIT_INLINE uint32_t getRuntimeType() const noexcept { return _runtimeType; }
-
-  //! Get information about the target architecture, see \ref ArchInfo.
-  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
-  //! Set target architecture information.
-  ASMJIT_INLINE void setArchInfo(const ArchInfo& info) noexcept { _archInfo = info; }
-
-  //! Get target architecture id, see \ref ArchInfo.
-  ASMJIT_INLINE uint32_t getArchId() const noexcept { return _archInfo.getArchId(); }
-
-  //! Get the CDECL calling convention conforming to the runtime's ABI.
-  //!
-  //! NOTE: This is a default calling convention used by the runtime's target.
-  ASMJIT_INLINE uint32_t getCdeclConv() const noexcept { return _cdeclConv; }
-  //! Get the STDCALL calling convention conforming to the runtime's ABI.
-  //!
-  //! NOTE: STDCALL calling convention is only used by 32-bit x86 target. On
-  //! all other targets it's mapped to CDECL and calling `getStdcallConv()` will
-  //! return the same as `getCdeclConv()`.
-  ASMJIT_INLINE uint32_t getStdCallConv() const noexcept { return _stdCallConv; }
 
   // --------------------------------------------------------------------------
   // [Interface]
@@ -99,24 +87,17 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Basic information about the target architecture, see \ref ArchInfo.
-  ArchInfo _archInfo;
-
-  //! Type of the runtime.
-  uint8_t _runtimeType;
-  //! Type of the allocation.
-  uint8_t _allocType;
-  //! CDECL calling convention conforming to runtime ABI.
-  uint8_t _cdeclConv;
-  //! STDCALL calling convention conforming to runtime ABI.
-  uint8_t _stdCallConv;
+  CodeInfo _codeInfo;                    //!< Basic information about the Runtime's code.
+  uint8_t _runtimeType;                  //!< Type of the runtime.
+  uint8_t _allocType;                    //!< Type of the allocator the Runtime uses.
+  uint8_t _reserved[6];                  //!< \internal
 };
 
 // ============================================================================
 // [asmjit::HostRuntime]
 // ============================================================================
 
-//! Base runtime for JIT code generation.
+//! Runtime designed to be used in the same process the code is generated in.
 class ASMJIT_VIRTAPI HostRuntime : public Runtime {
 public:
   ASMJIT_NO_COPY(HostRuntime)
@@ -138,10 +119,10 @@ public:
   //!
   //! This member function is called after the code has been copied to the
   //! destination buffer. It is only useful for JIT code generation as it
-  //! causes a flush of the processor cache.
+  //! causes a flush of the processor's cache.
   //!
   //! Flushing is basically a NOP under X86/X64, but is needed by architectures
-  //! that do not have a transparent instruction cache.
+  //! that do not have a transparent instruction cache like ARM.
   //!
   //! This function can also be overridden to improve compatibility with tools
   //! such as Valgrind, however, it's not an official part of AsmJit.
@@ -152,7 +133,7 @@ public:
 // [asmjit::JitRuntime]
 // ============================================================================
 
-//! JIT runtime.
+//! Runtime designed to store and execute code generated at runtime (JIT).
 class ASMJIT_VIRTAPI JitRuntime : public HostRuntime {
 public:
   ASMJIT_NO_COPY(JitRuntime)

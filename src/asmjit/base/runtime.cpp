@@ -30,16 +30,46 @@ static ASMJIT_INLINE void hostFlushInstructionCache(void* p, size_t size) noexce
 #endif // !ASMJIT_ARCH_X86 && !ASMJIT_ARCH_X64
 }
 
+static ASMJIT_INLINE uint32_t hostDetectNaturalStackAlignment() noexcept {
+  // Alignment is assumed to match the pointer-size by default.
+  uint32_t alignment = sizeof(intptr_t);
+
+  // X86 & X64
+  // ---------
+  //
+  //   - 32-bit X86 requires stack to be aligned to 4 bytes. Modern Linux, Mac
+  //     and UNIX guarantees 16-byte stack alignment even in 32-bit, but I'm
+  //     not sure about all other UNIX operating systems, because 16-byte
+  //     alignment is an addition to older specification.
+  //   - 64-bit X86 requires stack to be aligned to 16 bytes.
+#if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
+  int kIsModernOS = ASMJIT_OS_LINUX  || // Linux & ANDROID.
+                    ASMJIT_OS_MAC    || // OSX and iOS.
+                    ASMJIT_OS_BSD    ;  // BSD variants.
+  alignment = ASMJIT_ARCH_X64 || kIsModernOS ? 16 : 4;
+#endif
+
+  // ARM & ARM64
+  // -----------
+  //
+  //   - 32-bit ARM requires stack to be aligned to 8 bytes.
+  //   - 64-bit ARM requires stack to be aligned to 16 bytes.
+#if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
+  alignment = ASMJIT_ARCH_ARM32 ? 8 : 16;
+#endif
+
+  return alignment;
+}
+
+
 // ============================================================================
 // [asmjit::Runtime - Construction / Destruction]
 // ============================================================================
 
 Runtime::Runtime() noexcept
-  : _archInfo(),
+  : _codeInfo(),
     _runtimeType(kRuntimeNone),
-    _allocType(kVMemAllocFreeable),
-    _cdeclConv(kCallConvNone),
-    _stdCallConv(kCallConvNone) {}
+    _allocType(kVMemAllocFreeable) {}
 Runtime::~Runtime() noexcept {}
 
 // ============================================================================
@@ -49,9 +79,12 @@ Runtime::~Runtime() noexcept {}
 HostRuntime::HostRuntime() noexcept {
   _runtimeType = kRuntimeJit;
 
-  _archInfo = CpuInfo::getHost().getArchInfo();
-  _cdeclConv = kCallConvHostCDecl;
-  _stdCallConv = kCallConvHostStdCall;
+  // Setup the CodeInfo of this Runtime.
+  _codeInfo._arch = CpuInfo::getHost().getArch();
+  _codeInfo._stackAlignment = static_cast<uint8_t>(hostDetectNaturalStackAlignment());
+  _codeInfo._cdeclCallConv  = kCallConvHostCDecl;
+  _codeInfo._stdCallConv    = kCallConvHostStdCall;
+  _codeInfo._fastCallConv   = kCallConvHostFastCall;
 }
 HostRuntime::~HostRuntime() noexcept {}
 

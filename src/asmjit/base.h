@@ -11,7 +11,6 @@
 // [Dependencies]
 #include "./build.h"
 
-#include "./base/archinfo.h"
 #include "./base/assembler.h"
 #include "./base/bitutils.h"
 #include "./base/codebuilder.h"

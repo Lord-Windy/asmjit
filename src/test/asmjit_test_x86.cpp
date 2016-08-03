@@ -88,7 +88,7 @@ public:
 
     // Alloc, use and spill preserved registers.
     if (_numVars) {
-      uint32_t gpCount = c.getGpTotal();
+      uint32_t gpCount = c.getGpCount();
       uint32_t varIndex = 0;
       uint32_t physId = 0;
       uint32_t regMask = 0x1;
@@ -1982,7 +1982,7 @@ public:
     c.shl(v1, 1);
     c.shl(v2, 1);
 
-    // Call function.
+    // Call a function.
     X86Gp fn = c.newIntPtr("fn");
     c.mov(fn, imm_ptr(calledFunc));
 
@@ -2859,7 +2859,7 @@ public:
     X86Gp pFn = c.newIntPtr("pFn");
     X86Gp vars[16];
 
-    uint32_t i, regCount = c.getGpTotal();
+    uint32_t i, regCount = c.getGpCount();
     ASMJIT_ASSERT(regCount <= ASMJIT_ARRAY_SIZE(vars));
 
     c.mov(pFn, imm_ptr(calledFunc));
@@ -3290,7 +3290,7 @@ int X86TestSuite::run() {
   for (i = 0; i < count; i++) {
     JitRuntime runtime;
 
-    CodeHolder code(runtime.getArchId());
+    CodeHolder code(runtime.getCodeInfo());
     code.setErrorHandler(&errorHandler);
 
     if (alwaysPrintLog) {
@@ -3393,9 +3393,9 @@ int main(int argc, char* argv[]) {
   X86TestSuite testSuite;
   CmdLine cmd(argc, argv);
 
-  //if (cmd.hasArg("--always-print-log")) {
+  if (cmd.hasArg("--always-print-log")) {
     testSuite.alwaysPrintLog = true;
-  //}
+  }
 
   return testSuite.run();
 }

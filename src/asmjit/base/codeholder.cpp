@@ -46,8 +46,7 @@ static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
     self->detach(self->_emitters);
 
   // Reset everything into its construction state.
-  self->_archInfo.reset();
-  self->_baseAddress = kNoBaseAddress;
+  self->_codeInfo.reset();
   self->_globalHints = 0;
   self->_globalOptions = 0;
   self->_logger = nullptr;
@@ -100,9 +99,8 @@ static void CodeHolder_initDefaultSection(CodeHolder* self) noexcept {
 // [asmjit::CodeHolder - Construction / Destruction]
 // ============================================================================
 
-CodeHolder::CodeHolder(uint32_t archId) noexcept
-  : _archInfo(),
-    _baseAddress(kNoBaseAddress),
+CodeHolder::CodeHolder() noexcept
+  : _codeInfo(),
     _isLocked(false),
     _globalHints(0),
     _globalOptions(0),
@@ -117,7 +115,28 @@ CodeHolder::CodeHolder(uint32_t archId) noexcept
     _sections(),
     _relocations() {
 
-  _archInfo.setup(archId);
+  _defaultSection.buffer.data = nullptr;
+  _defaultSection.buffer.length = 0;
+  _defaultSection.buffer.capacity = 0;
+  CodeHolder_initDefaultSection(this);
+}
+
+CodeHolder::CodeHolder(const CodeInfo& codeInfo) noexcept
+  : _codeInfo(codeInfo),
+    _isLocked(false),
+    _globalHints(0),
+    _globalOptions(0),
+    _emitters(nullptr),
+    _cgAsm(nullptr),
+    _logger(nullptr),
+    _errorHandler(nullptr),
+    _trampolinesSize(0),
+    _baseAllocator(8192  - Zone::kZoneOverhead),
+    _unusedLinks(nullptr),
+    _labels(),
+    _sections(),
+    _relocations() {
+
   _defaultSection.buffer.data = nullptr;
   _defaultSection.buffer.length = 0;
   _defaultSection.buffer.capacity = 0;
@@ -129,8 +148,18 @@ CodeHolder::~CodeHolder() noexcept {
 }
 
 // ============================================================================
-// [asmjit::CodeHolder - Reset]
+// [asmjit::CodeHolder - Init / Reset]
 // ============================================================================
+
+Error CodeHolder::init(const CodeInfo& info) noexcept {
+  // Cannot reinitialize if it's locked or there one or more CodeEmitter
+  // attached.
+  if (_isLocked || _emitters)
+    return DebugUtils::errored(kErrorInvalidState);
+
+  _codeInfo = info;
+  return kErrorOk;
+}
 
 void CodeHolder::reset(bool releaseMemory) noexcept {
   CodeHolder_resetInternal(this, releaseMemory);
@@ -222,18 +251,6 @@ Error CodeHolder::detach(CodeEmitter* emitter) noexcept {
 
 void CodeHolder::sync() noexcept {
   if (_cgAsm) _cgAsm->sync();
-}
-
-// ============================================================================
-// [asmjit::CodeHolder - Target Information]
-// ============================================================================
-
-Error CodeHolder::setArchId(uint32_t archId) noexcept {
-  if (_isLocked)
-    return DebugUtils::errored(kErrorInvalidState);
-
-  _archInfo.setup(archId);
-  return kErrorOk;
 }
 
 // ============================================================================
@@ -429,7 +446,7 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
   SectionEntry* section = _sections[0];
   ASMJIT_ASSERT(section != nullptr);
 
-  uint32_t archId = getArchId();
+  uint32_t archType = getArchType();
   uint8_t* dst = static_cast<uint8_t*>(_dst);
 
   if (baseAddress == kNoBaseAddress)
@@ -528,7 +545,7 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
     }
   }
 
-  size_t result = archId == ArchInfo::kIdX64 ? (size_t)(tramp - dst) : (size_t)(minCodeSize);
+  size_t result = archType == Arch::kTypeX64 ? (size_t)(tramp - dst) : (size_t)(minCodeSize);
   return result;
 }
 

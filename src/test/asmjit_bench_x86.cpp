@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+using namespace asmjit;
+
 // ============================================================================
 // [Configuration]
 // ============================================================================
@@ -26,7 +28,7 @@ static const uint32_t kNumIterations = 5000;
 
 struct Performance {
   static inline uint32_t now() {
-    return asmjit::Utils::getTickCount();
+    return Utils::getTickCount();
   }
 
   inline void reset() {
@@ -60,17 +62,15 @@ static double mbps(uint32_t time, size_t outputSize) {
 // ============================================================================
 
 #if defined(ASMJIT_BUILD_X86)
-static void benchX86(uint32_t arch) {
-  using namespace asmjit;
-
+static void benchX86(uint32_t archType) {
   CodeHolder code;
   Performance perf;
 
   X86Assembler a;
-  X86Compiler c;
+  X86Compiler cc;
 
   uint32_t r, i;
-  const char* archName = arch == ArchInfo::kIdX86 ? "X86" : "X64";
+  const char* archName = archType == Arch::kTypeX86 ? "X86" : "X64";
 
   // --------------------------------------------------------------------------
   // [Bench - Assembler]
@@ -84,7 +84,7 @@ static void benchX86(uint32_t arch) {
     asmOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      code.setArchId(arch);
+      code.init(CodeInfo(archType));
       code.attach(&a);
 
       asmtest::generateOpcodes(a);
@@ -113,11 +113,11 @@ static void benchX86(uint32_t arch) {
     cmpOutputSize = 0;
     perf.start();
     for (i = 0; i < kNumIterations; i++) {
-      code.setArchId(arch);
-      code.attach(&c);
+      code.init(CodeInfo(archType));
+      code.attach(&cc);
 
-      asmtest::generateAlphaBlend(c);
-      c.finalize();
+      asmtest::generateAlphaBlend(cc);
+      cc.finalize();
       cmpOutputSize += code.getCodeSize();
 
       code.reset(false); // Detaches `c`.
@@ -132,8 +132,8 @@ static void benchX86(uint32_t arch) {
 
 int main(int argc, char* argv[]) {
 #if defined(ASMJIT_BUILD_X86)
-  benchX86(asmjit::ArchInfo::kIdX86);
-  benchX86(asmjit::ArchInfo::kIdX64);
+  benchX86(Arch::kTypeX86);
+  benchX86(Arch::kTypeX64);
 #endif // ASMJIT_BUILD_X86
 
   return 0;

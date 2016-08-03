@@ -78,12 +78,6 @@ struct IntTraits {
 // [asmjit::Utils]
 // ============================================================================
 
-#if ASMJIT_ARCH_LE
-# define ASMJIT_PACK32_4x8(a, b, c, d) ((a) + ((b) << 8) + ((c) << 16) + ((d) << 24))
-#else
-# define ASMJIT_PACK32_4x8(a, b, c, d) ((d) + ((c) << 8) + ((b) << 16) + ((a) << 24))
-#endif
-
 //! AsmJit utilities - integer, string, etc...
 struct Utils {
   // --------------------------------------------------------------------------

@@ -45,7 +45,7 @@ static void generateAlphaBlend(asmjit::X86Compiler& c) {
 
   Label L_Data = c.newLabel();
 
-  c.addFunc(FuncSignature3<void, void*, const void*, size_t>(c.getArchInfo().getCdeclCallConv()));
+  c.addFunc(FuncSignature3<void, void*, const void*, size_t>(c.getCodeInfo().getCdeclCallConv()));
 
   c.setArg(0, dst);
   c.setArg(1, src);

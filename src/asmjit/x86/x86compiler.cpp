@@ -140,19 +140,19 @@ X86Compiler::~X86Compiler() noexcept {}
 // ============================================================================
 
 Error X86Compiler::onAttach(CodeHolder* code) noexcept {
-  uint32_t archId = code->getArchId();
+  uint32_t archType = code->getArchType();
 
   const uint32_t* idMap = nullptr;
   const X86Gp* gpRegs = nullptr;
 
-  switch (archId) {
-    case ArchInfo::kIdX86: idMap = _x86TypeData.idMapX86; gpRegs = x86OpData.gpd; break;
-    case ArchInfo::kIdX64: idMap = _x86TypeData.idMapX64; gpRegs = x86OpData.gpq; break;
+  switch (archType) {
+    case Arch::kTypeX86: idMap = _x86TypeData.idMapX86; gpRegs = x86OpData.gpd; break;
+    case Arch::kTypeX64: idMap = _x86TypeData.idMapX64; gpRegs = x86OpData.gpq; break;
     default:
       return DebugUtils::errored(kErrorInvalidArch);
   }
 
-  _archInfo = code->getArchInfo();
+  _codeInfo = code->getCodeInfo();
   _typeIdMap = idMap;
   _finalized = false;
 
@@ -255,7 +255,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
         Operand(_op5)
       };
 
-      Error err = X86Inst::validate(getArchId(), instId, options, _opMask, opArray, opCount);
+      Error err = X86Inst::validate(getArchType(), instId, options, _opMask, opArray, opCount);
       if (err) return setLastError(err);
 
       // Clear it as it must be enabled explicitly on assembler side.
@@ -368,7 +368,7 @@ X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
   func->_spillZoneSize = static_cast<uint16_t>(func->_x86Decl.getSpillZoneSize());
 
   // Expected/Required stack alignment.
-  func->_naturalStackAlignment = _archInfo.getNaturalStackAlignment();
+  func->_naturalStackAlignment = _codeInfo.getStackAlignment();
   func->_requiredStackAlignment = 0;
 
   // Allocate space for function arguments.

@@ -18,7 +18,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   using namespace asmjit;
   using namespace asmjit::x86;
 
-  bool isX64 = a.getArchId() != ArchInfo::kIdX86;
+  bool isX64 = a.getArchType() != Arch::kTypeX86;
 
   /*
   // TODO: Finalize implicit vs explicit.
@@ -538,27 +538,25 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   // Segment registers.
   a.nop();
 
-  if (a.getArchId() == ArchInfo::kIdX86) {
-    a.mov(es, ax);
-    a.mov(es, bx);
-    a.mov(ax, es);
-    a.mov(bx, es);
+  if (!isX64) a.mov(es, ax);
+  if (!isX64) a.mov(es, bx);
+  if (!isX64) a.mov(ax, es);
+  if (!isX64) a.mov(bx, es);
 
-    a.mov(cs, ax);
-    a.mov(cs, bx);
-    a.mov(ax, cs);
-    a.mov(bx, cs);
+  if (!isX64) a.mov(cs, ax);
+  if (!isX64) a.mov(cs, bx);
+  if (!isX64) a.mov(ax, cs);
+  if (!isX64) a.mov(bx, cs);
 
-    a.mov(ss, ax);
-    a.mov(ss, bx);
-    a.mov(ax, ss);
-    a.mov(bx, ss);
+  if (!isX64) a.mov(ss, ax);
+  if (!isX64) a.mov(ss, bx);
+  if (!isX64) a.mov(ax, ss);
+  if (!isX64) a.mov(bx, ss);
 
-    a.mov(ds, ax);
-    a.mov(ds, bx);
-    a.mov(ax, ds);
-    a.mov(bx, ds);
-  }
+  if (!isX64) a.mov(ds, ax);
+  if (!isX64) a.mov(ds, bx);
+  if (!isX64) a.mov(ax, ds);
+  if (!isX64) a.mov(bx, ds);
 
   a.mov(fs, ax);
   a.mov(fs, bx);

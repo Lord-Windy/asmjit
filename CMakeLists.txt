@@ -249,8 +249,6 @@ asmjit_add_source(ASMJIT_SRC asmjit
 )
 
 asmjit_add_source(ASMJIT_SRC asmjit/base
-  archinfo.cpp
-  archinfo.h
   assembler.cpp
   assembler.h
   bitutils.h

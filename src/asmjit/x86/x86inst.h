@@ -1574,14 +1574,15 @@ struct X86Inst {
     kOptionNotTaken       = 0x00002000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
     kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
 
-    kOptionEvexSae        = 0x00020000U, //!< EVEX suppress all exceptions (SAE).
-    kOptionEvexRnSae      = 0x00040000U, //!< EVEX 'round-to-nearest' (even) and `SAE`.
-    kOptionEvexRdSae      = 0x00080000U, //!< EVEX 'round-down' (toward -inf) and 'SAE'.
-    kOptionEvexRuSae      = 0x00100000U, //!< EVEX 'round-up' (toward +inf) and 'SAE'.
-    kOptionEvexRzSae      = 0x00200000U, //!< EVEX 'round-toward-zero' (truncate) and 'SAE'.
+    kOptionSAE            = 0x00020000U, //!< EVEX 'suppress-all-exceptions' {sae}.
+    kOptionRC             = 0x00040000U, //!< EVEX 'rounding-control' {rc} and {sae}.
 
-    kOptionEvex1ToX       = 0x00100000U, //!< EVEX broadcast the first element to all {1tox}.
-    kOptionEvexZero       = 0x00800000U, //!< EVEX use zeroing instead of merging {z}.
+    kOption1ToX           = 0x00100000U, //!< EVEX broadcast the first element to all {1tox}.
+    kOptionRN_SAE         = 0x00000000U, //!< EVEX 'round-to-nearest' (even)      {rn-sae} (bits 00).
+    kOptionRD_SAE         = 0x00200000U, //!< EVEX 'round-down' (toward -inf)     {rd-sae} (bits 01).
+    kOptionRU_SAE         = 0x00400000U, //!< EVEX 'round-up' (toward +inf)       {ru-sae} (bits 10).
+    kOptionRZ_SAE         = 0x00600000U, //!< EVEX 'round-toward-zero' (truncate) {rz-sae} (bits 11).
+    kOptionKZ             = 0x00800000U, //!< EVEX use zeroing instead of merging {z}.
 
     _kOptionInvalidRex    = 0x01000000U, //!< REX prefix can't be emitted (internal).
     kOptionOpCodeB        = 0x02000000U, //!< REX.B and/or VEX.B field (X64).
@@ -1628,9 +1629,15 @@ struct X86Inst {
     // either VEX or EVEX prefix. In that case AsmJit checks global options and
     // also instruction options to decide whether to emit EVEX prefix or not.
 
-    kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
-    kInstFlagEvex         = 0x00010000U, //!< Instruction can be encoded by EVEX (AVX-512).
+    // ------------------------------------------------------------------------
+    // [VEX/EVEX VSIB]
+    // ------------------------------------------------------------------------
 
+    kInstFlagVM           = 0x00004000U, //!< Instruction uses vector memory index (VSIB).
+    kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
+    kInstFlagVex_VM       = 0x0000C000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
+
+    kInstFlagEvex         = 0x00010000U, //!< Instruction can be encoded by EVEX (AVX-512).
     kInstFlagEvex0        = 0U,          //!< Used inside macros.
 
     kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
@@ -1971,16 +1978,6 @@ struct X86Inst {
     // AsmJit specific to emit FPU's 9B byte, collides with L.256 used only by.
     // VEX/EVEX 9B and L.256 can never appear in the same opcode value.
     kOpCode_PP_9B         = 0x07U << kOpCode_PP_Shift,
-
-    // ------------------------------------------------------------------------
-    // [VEX/EVEX VSIB]
-    // ------------------------------------------------------------------------
-
-    // TRUE if the VEX|EVEX instruction uses VSIB encoding to encode its memory
-    // operand.
-    kOpCode_VSIB_Shift    = 23,
-    kOpCode_VSIB          = 0x01U << kOpCode_VSIB_Shift,
-
 
     // ------------------------------------------------------------------------
     // [EVEX.W]

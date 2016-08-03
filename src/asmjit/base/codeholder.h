@@ -9,11 +9,9 @@
 #define _ASMJIT_BASE_CODEHOLDER_H
 
 // [Dependencies]
-#include "../base/archinfo.h"
 #include "../base/containers.h"
 #include "../base/logging.h"
 #include "../base/operand.h"
-#include "../base/runtime.h"
 #include "../base/simdtypes.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
@@ -108,6 +106,131 @@ public:
 };
 
 // ============================================================================
+// [asmjit::CodeInfo]
+// ============================================================================
+
+//! Basic information about a code (or target). It describes its architecture,
+//! code generation mode (or optimization level), and base address.
+class CodeInfo {
+public:
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE CodeInfo() noexcept
+    : _arch(),
+      _stackAlignment(0),
+      _cdeclCallConv(kCallConvNone),
+      _stdCallConv(kCallConvNone),
+      _fastCallConv(kCallConvNone),
+      _baseAddress(kNoBaseAddress) {}
+  ASMJIT_INLINE CodeInfo(const CodeInfo& other) noexcept { *this = other; }
+
+  explicit ASMJIT_INLINE CodeInfo(uint32_t archType, uint32_t archMode = 0, uint64_t baseAddress = 0) noexcept
+    : _arch(archType, archMode),
+      _packedMiscInfo(0),
+      _baseAddress(baseAddress) {}
+
+  // --------------------------------------------------------------------------
+  // [Init / Reset]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE bool isInitialized() const noexcept {
+    return _arch._type != Arch::kTypeNone;
+  }
+
+  ASMJIT_INLINE void init(const CodeInfo& other) noexcept {
+    _arch = other._arch;
+    _packedMiscInfo = other._packedMiscInfo;
+    _baseAddress = other._baseAddress;
+  }
+
+  ASMJIT_INLINE void init(uint32_t archType, uint32_t archMode = 0) noexcept {
+    _arch.init(archType, archMode);
+    _packedMiscInfo = 0;
+    _baseAddress = 0;
+  }
+
+  ASMJIT_INLINE void reset() noexcept {
+    _arch.reset();
+    _stackAlignment = 0;
+    _cdeclCallConv = kCallConvNone;
+    _stdCallConv = kCallConvNone;
+    _fastCallConv = kCallConvNone;
+    _baseAddress = kNoBaseAddress;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Architecture Information]
+  // --------------------------------------------------------------------------
+
+  //! Get architecture as \ref Arch.
+  ASMJIT_INLINE const Arch& getArch() const noexcept { return _arch; }
+
+  //! Get architecture type, see \ref Arch::Type.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _arch._type; }
+  //! Get architecture mode, see \ref Arch::Mode.
+  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _arch._mode; }
+  //! Get a size of a GP register of the architecture the code is using.
+  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _arch._gpSize; }
+  //! Get number of GP registers available of the architecture the code is using.
+  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _arch._gpCount; }
+
+  // --------------------------------------------------------------------------
+  // [High-Level Information]
+  // --------------------------------------------------------------------------
+
+  //! Get a natural stack alignment that must be honored (or 0 if not known).
+  ASMJIT_INLINE uint32_t getStackAlignment() const noexcept { return _stackAlignment; }
+  //! Set a natural stack alignment that must be honored.
+  ASMJIT_INLINE void setStackAlignment(uint8_t sa) noexcept { _stackAlignment = static_cast<uint8_t>(sa); }
+
+  ASMJIT_INLINE uint32_t getCdeclCallConv() const noexcept { return _cdeclCallConv; }
+  ASMJIT_INLINE void setCdeclCallConv(uint32_t cc) noexcept { _cdeclCallConv = static_cast<uint8_t>(cc); }
+
+  ASMJIT_INLINE uint32_t getStdCallConv() const noexcept { return _stdCallConv; }
+  ASMJIT_INLINE void setStdCallConv(uint32_t cc) noexcept { _stdCallConv = static_cast<uint8_t>(cc); }
+
+  ASMJIT_INLINE uint32_t getFastCallConv() const noexcept { return _fastCallConv; }
+  ASMJIT_INLINE void setFastCallConv(uint32_t cc) noexcept { _fastCallConv = static_cast<uint8_t>(cc); }
+
+  // --------------------------------------------------------------------------
+  // [Addressing Information]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _baseAddress != kNoBaseAddress; }
+  ASMJIT_INLINE uint64_t getBaseAddress() const noexcept { return _baseAddress; }
+  ASMJIT_INLINE void setBaseAddress(uint64_t p) noexcept { _baseAddress = p; }
+  ASMJIT_INLINE void resetBaseAddress() noexcept { _baseAddress = kNoBaseAddress; }
+
+  // --------------------------------------------------------------------------
+  // [Operator Overload]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE CodeInfo& operator=(const CodeInfo& other) noexcept { init(other); return *this; }
+  ASMJIT_INLINE bool operator==(const CodeInfo& other) const noexcept { return ::memcmp(this, &other, sizeof(*this)) == 0; }
+  ASMJIT_INLINE bool operator!=(const CodeInfo& other) const noexcept { return ::memcmp(this, &other, sizeof(*this)) != 0; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  Arch _arch;                            //!< Information about the architecture.
+
+  union {
+    struct {
+      uint8_t _stackAlignment;           //!< Natural stack alignment (ARCH+OS).
+      uint8_t _cdeclCallConv;            //!< Default CDECL calling convention.
+      uint8_t _stdCallConv;              //!< Default STDCALL calling convention.
+      uint8_t _fastCallConv;             //!< Default FASTCALL calling convention.
+    };
+    uint32_t _packedMiscInfo;            //!< \internal
+  };
+
+  uint64_t _baseAddress;                 //!< Base address.
+};
+
+// ============================================================================
 // [asmjit::CodeSection]
 // ============================================================================
 
@@ -194,13 +317,21 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API CodeHolder(uint32_t archId = ArchInfo::kIdHost) noexcept;
+  //! Create an uninitialized CodeHolder (you must init() it before it can be used).
+  ASMJIT_API CodeHolder() noexcept;
+  //! Create a CodeHolder initialized to hold code described by `codeInfo`.
+  explicit ASMJIT_API CodeHolder(const CodeInfo& codeInfo) noexcept;
+  //! Destroy the CodeHolder.
   ASMJIT_API ~CodeHolder() noexcept;
 
   // --------------------------------------------------------------------------
-  // [Reset]
+  // [Init / Reset]
   // --------------------------------------------------------------------------
 
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _codeInfo.isInitialized(); }
+
+  //! Initialize to CodeHolder to hold code described by `codeInfo`.
+  ASMJIT_API Error init(const CodeInfo& info) noexcept;
   //! Detach all code-generators attached and reset the \ref CodeHolder.
   ASMJIT_API void reset(bool releaseMemory = false) noexcept;
 
@@ -225,29 +356,27 @@ public:
   ASMJIT_API void sync() noexcept;
 
   // --------------------------------------------------------------------------
-  // [Architecture Information]
+  // [Code-Information]
   // --------------------------------------------------------------------------
 
-  //! Get information about the target architecture, see \ref ArchInfo.
-  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
-  //! Get the target architecture.
-  ASMJIT_INLINE uint32_t getArchId() const noexcept { return _archInfo._archId; }
-  //! Get the target architecture's GP register size (4 or 8 bytes).
-  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _archInfo._gpSize; }
+  //! Get information about the code, see \ref CodeInfo.
+  ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
 
-  //! Switch the `CodeHolder`' architecture to `archId`.
-  //!
-  //! NOTE: It's not allowed to change the architecture after a
-  ASMJIT_API Error setArchId(uint32_t archId) noexcept;
+  //! Get information about the architecture, see \ref Arch.
+  ASMJIT_INLINE const Arch& getArch() const noexcept { return _codeInfo._arch; }
+  //! Get the target architecture.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo._arch.getType(); }
+  //! Get the architecture's mode.
+  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _codeInfo._arch.getMode(); }
+
+  //! Get if a static base-address is set.
+  ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _codeInfo._baseAddress != kNoBaseAddress; }
+  //! Get a static base-address (uint64_t).
+  ASMJIT_INLINE uint64_t getBaseAddress() const noexcept { return _codeInfo._baseAddress; }
 
   // --------------------------------------------------------------------------
   // [Global Information]
   // --------------------------------------------------------------------------
-
-  //! Get if a static base-address is set.
-  ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _baseAddress != kNoBaseAddress; }
-  //! Get a static base-address (uint64_t).
-  ASMJIT_INLINE uint64_t getBaseAddress() const noexcept { return _baseAddress; }
 
   //! Get global hints, internally propagated to all `CodeEmitter`s attached.
   ASMJIT_INLINE uint32_t getGlobalHints() const noexcept { return _globalHints; }
@@ -375,8 +504,8 @@ public:
   //! copied. The pointer can be address returned by virtual memory allocator
   //! or any other address that has sufficient space.
   //!
-  //! \param baseAddress Base address used for relocation. The `JitRuntime`
-  //! always sets the `baseAddress` address to be the same as `dst`.
+  //! \param baseAddress Base address used for relocation. `JitRuntime` always
+  //! sets the `baseAddress` to be the same as `dst`.
   //!
   //! \return The number bytes actually used. If the code emitter reserved
   //! space for possible trampolines, but didn't use it, the number of bytes
@@ -391,8 +520,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  ArchInfo _archInfo;                    //!< Basic info about the target architecture.
-  uint64_t _baseAddress;                 //!< Static base-address of the generated code (optional).
+  CodeInfo _codeInfo;                    //!< Basic information about the code (architecture and other info).
 
   uint8_t _isLocked;                     //!< If the `CodeHolder` settings are locked.
   uint8_t _reserved[3];

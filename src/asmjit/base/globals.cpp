@@ -16,6 +16,35 @@
 namespace asmjit {
 
 // ============================================================================
+// [asmjit::Arch]
+// ============================================================================
+
+static const uint32_t archSignatureTable[] = {
+  //               +-----------------+----------------+-------+
+  //               |Type             | Mode           | GPInfo|
+  //               +-----------------+----------------+-------+
+  ASMJIT_PACK32_4x8(Arch::kTypeNone  , Arch::kModeNone, 0,  0),
+  ASMJIT_PACK32_4x8(Arch::kTypeX86   , Arch::kModeNone, 4,  8),
+  ASMJIT_PACK32_4x8(Arch::kTypeX64   , Arch::kModeNone, 8, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeX32   , Arch::kModeNone, 8, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeArm32 , Arch::kModeNone, 4, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeArm64 , Arch::kModeNone, 8, 32)
+};
+
+void Arch::init(uint32_t type, uint32_t mode) noexcept {
+  uint32_t index = type < ASMJIT_ARRAY_SIZE(archSignatureTable) ? type : uint32_t(0);
+
+  // Make sure the `archSignatureTable` array is correctly indexed.
+  _signature = archSignatureTable[index];
+  ASMJIT_ASSERT(_type == index);
+
+  // Even if the architecture is not knows we setup its type and mode, however,
+  // the information `Arch` has would be basically useless.
+  _type = type;
+  _mode = mode;
+}
+
+// ============================================================================
 // [asmjit::DebugUtils]
 // ============================================================================
 

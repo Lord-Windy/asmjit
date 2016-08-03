@@ -32,12 +32,12 @@ static ASMJIT_INLINE uint32_t x86ArgTypeToXmmType(uint32_t aType) {
 
 //! Get an architecture depending on the calling convention `callConv`.
 //!
-//! Returns ArchInfo::`kIdNone`, `kIdX86, or `kIdX64`.
+//! Returns `ArchId`.
 static ASMJIT_INLINE uint32_t x86GetArchFromCConv(uint32_t callConv) {
-  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX86Start, _kCallConvX86End)) return ArchInfo::kIdX86;
-  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX64Start, _kCallConvX64End)) return ArchInfo::kIdX64;
+  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX86Start, _kCallConvX86End)) return Arch::kTypeX86;
+  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX64Start, _kCallConvX64End)) return Arch::kTypeX64;
 
-  return ArchInfo::kIdNone;
+  return Arch::kTypeNone;
 }
 
 // ============================================================================
@@ -73,7 +73,7 @@ static uint32_t X86FuncDecl_initConv(X86FuncDecl* self, uint32_t arch, uint32_t 
   // [X86 Support]
   // --------------------------------------------------------------------------
 
-  if (arch == ArchInfo::kIdX86) {
+  if (arch == Arch::kTypeX86) {
     self->_preserved.set(X86Reg::kClassGp, Utils::mask(kBx, kSp, kBp, kSi, kDi));
 
     switch (callConv) {
@@ -137,7 +137,7 @@ static uint32_t X86FuncDecl_initConv(X86FuncDecl* self, uint32_t arch, uint32_t 
   // [X64 Support]
   // --------------------------------------------------------------------------
 
-  if (arch == ArchInfo::kIdX64) {
+  if (arch == Arch::kTypeX64) {
     switch (callConv) {
       case kCallConvX64Win:
         self->_spillZoneSize = 32;
@@ -193,7 +193,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
   ASMJIT_ASSERT(numArgs <= kFuncArgCount);
 
   uint32_t callConv = self->_callConv;
-  uint32_t regSize = (arch == ArchInfo::kIdX86) ? 4 : 8;
+  uint32_t regSize = (arch == Arch::kTypeX86) ? 4 : 8;
 
   int32_t i = 0;
   int32_t gpPos = 0;
@@ -201,8 +201,8 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
   int32_t stackOffset = 0;
   const uint32_t* idMap = nullptr;
 
-  if (arch == ArchInfo::kIdX86) idMap = _x86TypeData.idMapX86;
-  if (arch == ArchInfo::kIdX64) idMap = _x86TypeData.idMapX64;
+  if (arch == Arch::kTypeX86) idMap = _x86TypeData.idMapX86;
+  if (arch == Arch::kTypeX64) idMap = _x86TypeData.idMapX64;
 
   ASMJIT_ASSERT(idMap != nullptr);
   self->_numArgs = static_cast<uint8_t>(numArgs);
@@ -230,7 +230,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
       case VirtType::kIdI64:
       case VirtType::kIdU64:
         // 64-bit value is returned in EDX:EAX on x86.
-        if (arch == ArchInfo::kIdX86) {
+        if (arch == Arch::kTypeX86) {
           self->_retCount = 2;
           self->_rets[0]._typeId = VirtType::kIdU32;
           self->_rets[0]._regId = X86Gp::kIdAx;
@@ -252,7 +252,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
 
       case VirtType::kIdF32:
         self->_retCount = 1;
-        if (arch == ArchInfo::kIdX86) {
+        if (arch == Arch::kTypeX86) {
           self->_rets[0]._typeId = VirtType::kIdF32;
           self->_rets[0]._regId = 0;
         }
@@ -264,7 +264,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
 
       case VirtType::kIdF64:
         self->_retCount = 1;
-        if (arch == ArchInfo::kIdX86) {
+        if (arch == Arch::kTypeX86) {
           self->_rets[0]._typeId = VirtType::kIdF64;
           self->_rets[0]._regId = 0;
         }
@@ -296,7 +296,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
   if (self->_numArgs == 0)
     return kErrorOk;
 
-  if (arch == ArchInfo::kIdX86) {
+  if (arch == Arch::kTypeX86) {
     // Register arguments (Integer), always left-to-right.
     for (i = 0; i != static_cast<int32_t>(numArgs); i++) {
       FuncInOut& arg = self->getArg(i);
@@ -340,7 +340,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
     }
   }
 
-  if (arch == ArchInfo::kIdX64) {
+  if (arch == Arch::kTypeX64) {
     if (callConv == kCallConvX64Win) {
       int32_t argMax = Utils::iMin<int32_t>(numArgs, 4);
 
@@ -448,7 +448,7 @@ Error X86FuncDecl::setPrototype(const FuncPrototype& p) {
   uint32_t callConv = p.getCallConv();
   uint32_t arch = x86GetArchFromCConv(callConv);
 
-  if (arch != ArchInfo::kIdX86 && arch != ArchInfo::kIdX64)
+  if (arch != Arch::kTypeX86 && arch != Arch::kTypeX64)
     return DebugUtils::errored(kErrorInvalidArch);
 
   if (p.getNumArgs() > kFuncArgCount)

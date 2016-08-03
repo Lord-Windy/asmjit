@@ -391,6 +391,8 @@ public:
   ASMJIT_INLINE X86Gp r32() const noexcept { return X86Gp(Init, X86RegTraits<kRegGpd>::kSignature, getId()); }
   //! Cast this register to 64-bit.
   ASMJIT_INLINE X86Gp r64() const noexcept { return X86Gp(Init, X86RegTraits<kRegGpq>::kSignature, getId()); }
+
+  static ASMJIT_INLINE X86Gp fromTypeAndId(uint32_t regType, uint32_t id) noexcept;
 };
 
 //! X86/X64 SIMD register - base class of \ref X86Xmm, \ref X86Ymm, and \ref X86Zmm.
@@ -403,6 +405,8 @@ class X86Xyz : public X86Reg {
   ASMJIT_INLINE X86Ymm ymm() const noexcept;
   //! Cast this register to ZMM.
   ASMJIT_INLINE X86Zmm zmm() const noexcept;
+
+  static ASMJIT_INLINE X86Xyz fromTypeAndId(uint32_t regType, uint32_t id) noexcept;
 };
 
 //! X86/X64 segment register.
@@ -503,7 +507,6 @@ struct X86OpData {
 ASMJIT_VARAPI const X86OpData x86OpData;
 
 // ... X86Reg members that require `x86OpData`.
-
 ASMJIT_INLINE void X86Reg::setTypeAndId(uint32_t regType, uint32_t id) noexcept {
   ASMJIT_ASSERT(regType < kRegCount);
   setSignature(x86OpData.regInfo[regType].signature);
@@ -513,6 +516,16 @@ ASMJIT_INLINE void X86Reg::setTypeAndId(uint32_t regType, uint32_t id) noexcept 
 ASMJIT_INLINE X86Reg X86Reg::fromTypeAndId(uint32_t regType, uint32_t id) noexcept {
   ASMJIT_ASSERT(regType < kRegCount);
   return X86Reg(Init, x86OpData.regInfo[regType].signature, id);
+}
+
+ASMJIT_INLINE X86Gp X86Gp::fromTypeAndId(uint32_t regType, uint32_t id) noexcept {
+  ASMJIT_ASSERT(regType >= X86Reg::kRegGpbLo && regType <= X86Reg::kRegGpq);
+  return X86Gp(Init, x86OpData.regInfo[regType].signature, id);
+}
+
+ASMJIT_INLINE X86Xyz X86Xyz::fromTypeAndId(uint32_t regType, uint32_t id) noexcept {
+  ASMJIT_ASSERT(regType >= X86Reg::kRegXmm && regType <= X86Reg::kRegZmm);
+  return X86Xyz(Init, x86OpData.regInfo[regType].signature, id);
 }
 
 // ============================================================================

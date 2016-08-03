@@ -36,7 +36,7 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::CpuInfo - Detect ARM & ARM64]
+// [asmjit::CpuInfo - Detect ARM]
 // ============================================================================
 
 // ARM information has to be retrieved by the OS (this is how ARM was designed).
@@ -44,13 +44,13 @@ namespace asmjit {
 
 #if ASMJIT_ARCH_ARM32
 static void armPopulateBaselineArm32Features(CpuInfo* cpuInfo) noexcept {
-  cpuInfo->setupArch(ArchInfo::kIdArm32);
+  cpuInfo->_arch.init(Arch::kTypeArm32);
 }
 #endif // ASMJIT_ARCH_ARM32
 
 #if ASMJIT_ARCH_ARM64
 static void armPopulateBaselineArm64Features(CpuInfo* cpuInfo) noexcept {
-  cpuInfo->setupArch(ArchInfo::kIdArm64);
+  cpuInfo->_arch.init(Arch::kTypeArm64);
 
   // Thumb (including all variations) is only supported on ARM32.
 
@@ -211,7 +211,7 @@ static void armDetectCpuInfo(CpuInfo* cpuInfo) noexcept {
 #endif // ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
 
 // ============================================================================
-// [asmjit::CpuInfo - Detect X86 & X64]
+// [asmjit::CpuInfo - Detect X86]
 // ============================================================================
 
 #if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
@@ -384,10 +384,7 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
   CpuIdResult regs;
   XGetBVResult xcr0 = { 0, 0 };
 
-  cpuInfo->setupArch(ArchInfo::kIdHost);
-  cpuInfo->_archInfo.setCdeclCallConv(kCallConvHostCDecl);
-  cpuInfo->_archInfo.setStdCallConv(kCallConvHostStdCall);
-  cpuInfo->_archInfo.setFastCallConv(kCallConvHostFastCall);
+  cpuInfo->_arch.init(Arch::kTypeHost);
 
   // --------------------------------------------------------------------------
   // [CPUID EAX=0x0]
@@ -597,41 +594,6 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
 #endif // ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
 
 // ============================================================================
-// [asmjit::CpuInfo - Detect - Natural Stack Alignment]
-// ============================================================================
-
-static ASMJIT_INLINE uint32_t cpuDetectNaturalStackAlignment() noexcept {
-  // Alignment is assumed to match the pointer-size by default.
-  uint32_t alignment = sizeof(intptr_t);
-
-  // X86 & X64
-  // ---------
-  //
-  //   - 32-bit X86 requires stack to be aligned to 4 bytes. Modern Linux, Mac
-  //     and UNIX guarantees 16-byte stack alignment even in 32-bit, but I'm
-  //     not sure about all other UNIX operating systems, because 16-byte
-  //     alignment is an addition to older specification.
-  //   - 64-bit X86 requires stack to be aligned to 16 bytes.
-#if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
-  int kIsModernOS = ASMJIT_OS_LINUX  || // Linux & ANDROID.
-                    ASMJIT_OS_MAC    || // OSX and iOS.
-                    ASMJIT_OS_BSD    ;  // BSD variants.
-  alignment = ASMJIT_ARCH_X64 || kIsModernOS ? 16 : 4;
-#endif
-
-  // ARM & ARM64
-  // -----------
-  //
-  //   - 32-bit ARM requires stack to be aligned to 8 bytes.
-  //   - 64-bit ARM requires stack to be aligned to 16 bytes.
-#if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
-  alignment = ASMJIT_ARCH_ARM32 ? 8 : 16;
-#endif
-
-  return alignment;
-}
-
-// ============================================================================
 // [asmjit::CpuInfo - Detect - HWThreadsCount]
 // ============================================================================
 
@@ -664,7 +626,6 @@ void CpuInfo::detect() noexcept {
   x86DetectCpuInfo(this);
 #endif // ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
 
-  _archInfo.setNaturalStackAlignment(cpuDetectNaturalStackAlignment());
   _hwThreadsCount = cpuDetectHWThreadsCount();
 }
 

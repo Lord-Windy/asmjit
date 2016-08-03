@@ -269,16 +269,16 @@ Error X86Formatter::formatInstruction(
         formatOperand(out, logOptions, opMask);
         out.appendChar('}');
 
-        if (options & X86Inst::kOptionEvexZero)
+        if (options & X86Inst::kOptionKZ)
           out.appendString("{z}");
       }
-      else if (options & X86Inst::kOptionEvexZero) {
+      else if (options & X86Inst::kOptionKZ) {
         out.appendString(" {z}");
       }
     }
 
     // Support AVX-512 {1tox}.
-    if (op.isMem() && (options & X86Inst::kOptionEvex1ToX)) {
+    if (op.isMem() && (options & X86Inst::kOption1ToX)) {
       out.appendString(" {1tox}");
     }
   }

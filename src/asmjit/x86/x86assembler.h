@@ -347,20 +347,20 @@ struct X86EmitCommons {
   ASMJIT_INLINE This& evex() noexcept { THIS()->addOptions(X86Inst::kOptionEvex); return *THIS(); }
 
   //! Use zeroing instead of merging (AVX512+).
-  ASMJIT_INLINE This& z() noexcept { THIS()->addOptions(X86Inst::kOptionEvexZero); return *THIS(); }
+  ASMJIT_INLINE This& z() noexcept { THIS()->addOptions(X86Inst::kOptionKZ); return *THIS(); }
   //! Broadcast one element to all other elements (AVX512+).
-  ASMJIT_INLINE This& _1tox() noexcept { THIS()->addOptions(X86Inst::kOptionEvex1ToX); return *THIS(); }
+  ASMJIT_INLINE This& _1tox() noexcept { THIS()->addOptions(X86Inst::kOption1ToX); return *THIS(); }
 
   //! Suppress all exceptions (AVX512+).
-  ASMJIT_INLINE This& sae() noexcept { THIS()->addOptions(X86Inst::kOptionEvexSae); return *THIS(); }
+  ASMJIT_INLINE This& sae() noexcept { THIS()->addOptions(X86Inst::kOptionSAE); return *THIS(); }
   //! Static rounding mode `round-to-nearest` (even) and `SAE` (AVX512+).
-  ASMJIT_INLINE This& rn_sae() noexcept { THIS()->addOptions(X86Inst::kOptionEvexRnSae); return *THIS(); }
+  ASMJIT_INLINE This& rn_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRN_SAE); return *THIS(); }
   //! Static rounding mode `round-down` (toward -inf) and `SAE` (AVX512+).
-  ASMJIT_INLINE This& rd_sae() noexcept { THIS()->addOptions(X86Inst::kOptionEvexRdSae); return *THIS(); }
+  ASMJIT_INLINE This& rd_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRD_SAE); return *THIS(); }
   //! Static rounding mode `round-up` (toward +inf) and `SAE` (AVX512+).
-  ASMJIT_INLINE This& ru_sae() noexcept { THIS()->addOptions(X86Inst::kOptionEvexRuSae); return *THIS(); }
+  ASMJIT_INLINE This& ru_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRU_SAE); return *THIS(); }
   //! Static rounding mode `round-toward-zero` (truncate) and `SAE` (AVX512+).
-  ASMJIT_INLINE This& rz_sae() noexcept { THIS()->addOptions(X86Inst::kOptionEvexRzSae); return *THIS(); }
+  ASMJIT_INLINE This& rz_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRZ_SAE); return *THIS(); }
 
   // --------------------------------------------------------------------------
   // [General Purpose and Non-SIMD Instructions]

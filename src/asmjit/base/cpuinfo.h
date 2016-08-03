@@ -9,7 +9,6 @@
 #define _ASMJIT_BASE_CPUINFO_H
 
 // [Dependencies]
-#include "../base/archinfo.h"
 #include "../base/globals.h"
 
 // [Api-Begin]
@@ -161,8 +160,13 @@ public:
   ASMJIT_INLINE CpuInfo() noexcept { reset(); }
 
   // --------------------------------------------------------------------------
-  // [Reset]
+  // [Init / Reset]
   // --------------------------------------------------------------------------
+
+  //! Set CPU architecture, see \Arch.
+  ASMJIT_INLINE void initArch(uint32_t archType, uint32_t archMode = 0) noexcept {
+    _arch.init(archType, archMode);
+  }
 
   ASMJIT_INLINE void reset() noexcept { ::memset(this, 0, sizeof(CpuInfo)); }
 
@@ -177,12 +181,9 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get generic architecture information.
-  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
+  ASMJIT_INLINE const Arch& getArch() const noexcept { return _arch; }
   //! Get CPU architecture, see \Arch.
-  ASMJIT_INLINE uint32_t getArchId() const noexcept { return _archInfo._archId; }
-
-  //! Set CPU architecture, see \Arch.
-  ASMJIT_INLINE void setupArch(uint32_t archId) noexcept { _archInfo.setup(archId); }
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _arch._type; }
 
   //! Get CPU vendor string.
   ASMJIT_INLINE const char* getVendorString() const noexcept { return _vendorString; }
@@ -263,8 +264,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  ArchInfo _archInfo;                    //!< Basic architecture information.
-
+  Arch _arch;                            //!< CPU architecture.
   char _vendorString[16];                //!< CPU vendor string.
   char _brandString[64];                 //!< CPU brand string.
   uint32_t _vendorId;                    //!< CPU vendor id, see \ref Vendor.
