@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     if (code.getArchType() == Arch::kTypeHost) {
       JitRuntime runtime;
       VoidFunc p;
-      Error err = runtime.add((void**)&p, &code);
+      Error err = runtime.add(&p, &code);
       if (err == kErrorOk) p();
     }
   }

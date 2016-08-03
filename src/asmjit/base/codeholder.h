@@ -429,6 +429,9 @@ public:
   //! Get array of `SectionEntry*` records.
   ASMJIT_INLINE const PodVector<SectionEntry*>& getSections() const noexcept { return _sections; }
 
+  //! Get a specific section based on its id.
+  ASMJIT_INLINE SectionEntry* getSection(size_t index) const noexcept { return _sections[index]; }
+
   ASMJIT_API Error growBuffer(CodeBuffer* cb, size_t n) noexcept;
   ASMJIT_API Error reserveBuffer(CodeBuffer* cb, size_t n) noexcept;
 

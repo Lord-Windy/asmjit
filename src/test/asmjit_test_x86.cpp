@@ -145,31 +145,31 @@ public:
 
     switch (_numArgs) {
       case 0:
-        resultRet = asmjit_cast<Func0>(_func)();
+        resultRet = ptr_cast<Func0>(_func)();
         expectRet = 0;
         break;
       case 1:
-        resultRet = asmjit_cast<Func1>(_func)(1);
+        resultRet = ptr_cast<Func1>(_func)(1);
         expectRet = 1;
         break;
       case 2:
-        resultRet = asmjit_cast<Func2>(_func)(1, 2);
+        resultRet = ptr_cast<Func2>(_func)(1, 2);
         expectRet = 1 + 2;
         break;
       case 3:
-        resultRet = asmjit_cast<Func3>(_func)(1, 2, 3);
+        resultRet = ptr_cast<Func3>(_func)(1, 2, 3);
         expectRet = 1 + 2 + 3;
         break;
       case 4:
-        resultRet = asmjit_cast<Func4>(_func)(1, 2, 3, 4);
+        resultRet = ptr_cast<Func4>(_func)(1, 2, 3, 4);
         expectRet = 1 + 2 + 3 + 4;
         break;
       case 5:
-        resultRet = asmjit_cast<Func5>(_func)(1, 2, 3, 4, 5);
+        resultRet = ptr_cast<Func5>(_func)(1, 2, 3, 4, 5);
         expectRet = 1 + 2 + 3 + 4 + 5;
         break;
       case 6:
-        resultRet = asmjit_cast<Func6>(_func)(1, 2, 3, 4, 5, 6);
+        resultRet = ptr_cast<Func6>(_func)(1, 2, 3, 4, 5, 6);
         expectRet = 1 + 2 + 3 + 4 + 5 + 6;
         break;
     }
@@ -207,7 +207,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     func();
     return true;
@@ -249,7 +249,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     func();
     return true;
@@ -285,7 +285,7 @@ public:
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
 
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 0;
@@ -349,7 +349,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     func();
 
@@ -396,7 +396,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     func();
 
@@ -446,7 +446,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 1 + 2 + 3 + 4;
@@ -498,7 +498,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet =
@@ -555,7 +555,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(10, 20);
     int expectRet = 20;
@@ -630,7 +630,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int*, int*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultX;
     int resultY;
@@ -698,7 +698,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int i;
     int resultBuf[32];
@@ -758,7 +758,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int*, int*, int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int v0 = 4;
     int v1 = 4;
@@ -817,7 +817,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int*, const int*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int src[2] = { 4, 9 };
     int resultRet[2] = { 0, 0 };
@@ -863,7 +863,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int v0 = 2999;
     int v1 = 245;
@@ -909,7 +909,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int, int, char*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     char resultBuf[4];
     char expectBuf[4] = { 1, 0, 0, 1 };
@@ -963,7 +963,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(int*, int, int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int v0 = 0x000000FF;
 
@@ -1034,7 +1034,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(uint32_t*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     unsigned int i;
 
@@ -1099,7 +1099,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void*, void*, size_t);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     char dst[20] = { 0 };
     char src[20] = "Hello AsmJit!";
@@ -1152,7 +1152,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect)  {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int a = func(0, 1);
     int b = func(1, 0);
@@ -1213,7 +1213,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect)  {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int a = func(0, 1);
     int b = func(1, 0);
@@ -1274,7 +1274,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect)  {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int a = func(0, 1);
     int b = func(1, 0);
@@ -1340,7 +1340,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect)  {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int a = func(0, 1);
     int b = func(1, 0);
@@ -1379,7 +1379,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(char);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(-13);
     int expectRet = -13;
@@ -1429,7 +1429,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void*, void*, void*, void*, void*, void*, void*, void*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     uint8_t resultBuf[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     uint8_t expectBuf[9] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
@@ -1490,7 +1490,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(float, float, float, float, float, float, float, float*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     float resultRet;
     float expectRet = 1.0f + 2.0f + 3.0f + 4.0f + 5.0f + 6.0f + 7.0f;
@@ -1544,7 +1544,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(double, double, double, double, double, double, double, double*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double resultRet;
     double expectRet = 1.0 + 2.0 + 3.0 + 4.0 + 5.0 + 6.0 + 7.0;
@@ -1587,7 +1587,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef float (*Func)(float, float);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     float resultRet = func(1.0f, 2.0f);
     float expectRet = 1.0f + 2.0f;
@@ -1628,7 +1628,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef double (*Func)(double, double);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double resultRet = func(1.0, 2.0);
     double expectRet = 1.0 + 2.0;
@@ -1696,7 +1696,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 32640;
@@ -1778,7 +1778,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 0; // Must be zero, stack addresses must be different.
@@ -1842,7 +1842,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(uint32_t*, const uint32_t*, size_t);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     uint32_t i;
 
@@ -1911,7 +1911,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef void (*Func)(void*, const void*, size_t);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     static const uint32_t dstConstData[] = { 0x00000000, 0x10101010, 0x20100804, 0x30200003, 0x40204040, 0x5000004D, 0x60302E2C, 0x706F6E6D, 0x807F4F2F, 0x90349001, 0xA0010203, 0xB03204AB, 0xC023AFBD, 0xD0D0D0C0, 0xE0AABBCC, 0xFFFFFFFF, 0xF8F4F2F1 };
     static const uint32_t srcConstData[] = { 0xE0E0E0E0, 0xA0008080, 0x341F1E1A, 0xFEFEFEFE, 0x80302010, 0x49490A0B, 0x998F7798, 0x00000000, 0x01010101, 0xA0264733, 0xBAB0B1B9, 0xFF000000, 0xDAB0A0C1, 0xE0BACFDA, 0x99887766, 0xFFFFFF80, 0xEE0A5FEC };
@@ -1998,7 +1998,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(3, 2, 1);
     int expectRet = 36;
@@ -2048,7 +2048,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(9);
     int expectRet = (9 * 9) * (9 * 9);
@@ -2129,7 +2129,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = calledFunc(0x03, 0x12, 0xA0, 0x0B, 0x2F, 0x02, 0x0C, 0x12, 0x18, 0x1E);
@@ -2187,7 +2187,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = calledFunc(3, 3, 3, 3, 3, 3, 3, 3, 3, 3);
@@ -2240,7 +2240,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = X86Test_CallManyArgs::calledFunc(0x03, 0x12, 0xA0, 0x0B, 0x2F, 0x02, 0x0C, 0x12, 0x18, 0x1E);
@@ -2306,7 +2306,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 55;
@@ -2361,7 +2361,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef float (*Func)(float, float);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     float resultRet = func(15.5f, 2.0f);
     float expectRet = calledFunc(15.5f, 2.0f);
@@ -2414,7 +2414,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef double (*Func)(double, double);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double resultRet = func(15.5, 2.0);
     double expectRet = calledFunc(15.5, 2.0);
@@ -2486,7 +2486,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int arg1 = 4;
     int arg2 = 8;
@@ -2570,7 +2570,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int buffer[4] = { 127, 87, 23, 17 };
 
@@ -2622,7 +2622,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(5);
     int expectRet = 1 * 2 * 3 * 4 * 5;
@@ -2676,7 +2676,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(44, 199);
     int expectRet = 243;
@@ -2723,7 +2723,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef double (*Func)(const double*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double arg = 2;
 
@@ -2777,7 +2777,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef double (*Func)(const double*);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double arg = 2;
 
@@ -2826,7 +2826,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef double (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     double resultRet = func();
     double expectRet = 3.14;
@@ -2887,7 +2887,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = sizeof(void*) == 4 ? 6 : 14;
@@ -2932,7 +2932,7 @@ public:
 
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(void);
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func();
     int expectRet = 233;
@@ -3015,7 +3015,7 @@ struct X86Test_MiscMultiRet : public X86Test {
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int, int);
 
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int a = 44;
     int b = 3;
@@ -3086,7 +3086,7 @@ public:
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (*Func)(int, int);
 
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = func(56, 22);
     int expectRet = 56 + 22;
@@ -3142,7 +3142,7 @@ public:
   virtual bool run(void* _func, StringBuilder& result, StringBuilder& expect) {
     typedef int (ASMJIT_FASTCALL *Func)(int, void*);
 
-    Func func = asmjit_cast<Func>(_func);
+    Func func = ptr_cast<Func>(_func);
 
     int resultRet = 0;
     int expectRet = 1;

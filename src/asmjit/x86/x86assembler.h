@@ -5325,7 +5325,7 @@ struct X86EmitExplicit : public X86EmitCommons<This> {
 //! typedef void (*MyFunc)();
 //!
 //! // Make the function.
-//! MyFunc func = asmjit_cast<MyFunc>(a.make());
+//! MyFunc func = ptr_cast<MyFunc>(a.make());
 //!
 //! // Call the function.
 //! func();

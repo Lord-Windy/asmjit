@@ -66,6 +66,14 @@ ASMJIT_ENUM(GlobalDefs) {
 };
 
 // ============================================================================
+// [asmjit::ptr_cast]
+// ============================================================================
+
+//! Cast designed to cast between function and void* pointers.
+template<typename Dst, typename Src>
+ASMJIT_INLINE Dst ptr_cast(Src p) noexcept { return (Dst)p; }
+
+// ============================================================================
 // [asmjit::Arch]
 // ============================================================================
 
@@ -675,23 +683,6 @@ ASMJIT_API void ASMJIT_NORETURN assertionFailed(const char* file, int line, cons
 //! \}
 
 } // asmjit namespace
-
-// ============================================================================
-// [asmjit_cast<>]
-// ============================================================================
-
-//! \addtogroup asmjit_base
-//! \{
-
-//! Cast used to cast pointer to function. It's like reinterpret_cast<>,
-//! but uses internally C style cast to work with MinGW.
-//!
-//! If you are using single compiler and `reinterpret_cast<>` works for you,
-//! there is no reason to use `asmjit_cast<>`. If you are writing
-//! cross-platform software with various compiler support, consider using
-//! `asmjit_cast<>` instead of `reinterpret_cast<>`.
-template<typename T, typename Z>
-static ASMJIT_INLINE T asmjit_cast(Z* p) noexcept { return (T)p; }
 
 //! \}
 

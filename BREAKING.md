@@ -1,6 +1,8 @@
 2016-07-20
 ----------
 
+Global `asmjit_cast<>` removed and introduced a more type-safe `asmjit::ptr_cast<>`, which can cast a function to `void*` (and vice-versa), but will refuse to cast a function to `void**`, for example. Just change `asmjit_cast` to `asmjit::ptr_cast` and everything should work as usual. As a consequence, the Runtime now contains a typesafe (templated) `add()` and `remove()` methods that accept a function type directly, no need to cast manually to `void*` and `void**`. If you use your own runtime rename your virtual methods from `add` to `_add` and from `release` to `_release` and enjoy the type-safe wrappers.
+
 Merged virtual registers (known as variables or Vars) into registers themselves, making the interface simpler:
 
 ```c++

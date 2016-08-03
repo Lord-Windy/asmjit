@@ -107,7 +107,7 @@ JitRuntime::~JitRuntime() noexcept {}
 // [asmjit::JitRuntime - Interface]
 // ============================================================================
 
-Error JitRuntime::add(void** dst, CodeHolder* code) noexcept {
+Error JitRuntime::_add(void** dst, CodeHolder* code) noexcept {
   size_t codeSize = code->getCodeSize();
   if (ASMJIT_UNLIKELY(codeSize == 0)) {
     *dst = nullptr;
@@ -137,7 +137,7 @@ Error JitRuntime::add(void** dst, CodeHolder* code) noexcept {
   return kErrorOk;
 }
 
-Error JitRuntime::release(void* p) noexcept {
+Error JitRuntime::_release(void* p) noexcept {
   return _memMgr.release(p);
 }
 

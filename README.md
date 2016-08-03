@@ -13,8 +13,7 @@ Complete x86/x64 JIT and Remote Assembler for C++.
   * This readme contains outdated code.
   * Named labels and symbol support required.
   * Only the first section works atm.
-  * ArchInfo needs a better name, ArchInfo requires also target feature set for x86 (None, AVX, AVX512) and ARM (None, Thumb).
-  * DON'T USE asmjit::Compiler with this version, it requires some fixing, only use to evaluate new X86Assembler and X86Inst features.
+  * CodeInfo requires also target feature set for x86 (None, AVX, AVX512) and ARM (None, Thumb).
   * AVX512 validation not supported yet.
   * AVX512 {sae} and {er} not supported yet.
 
@@ -23,16 +22,18 @@ Introduction
 
 AsmJit is a complete JIT and remote assembler for C++ language. It can generate native code for x86 and x64 architectures and supports the whole x86/x64 instruction set - from legacy MMX to the newest AVX512. It has a type-safe API that allows C++ compiler to do semantic checks at compile-time even before the assembled code is generated and/or executed.
 
-AsmJit is not a virtual machine (VM). It doesn't have functionality to implement VM out of the box; however, it can be be used as a JIT backend of your own VM. The usage of AsmJit is not limited at all; it's suitable for multimedia, VM backends, remote code generation, and many other tasks.
+AsmJit is not a virtual machine (VM). It doesn't have functionality to implement a VM out of the box; however, it can be be used as a JIT backend of your own VM. The usage of AsmJit is not limited at all; it's suitable for multimedia, VM backends, remote code generation, and many other tasks.
+
+AsmJit, as the name implies, started as a project that provided JIT code-generation and execution. However, AsmJit evolved and it now contains features that are far beyond the scope of a simple JIT compiler. To keep the library small and lightweight the functionality not strictly related to JIT is provided by a sister project called [asmtk](https://github.com/asmjit/asmtk).
 
 Features
 --------
 
   * Complete x86/x64 instruction set - MMX, SSEx, BMIx, ADX, TBM, XOP, AVXx, FMAx, and AVX512.
-  * Assembler, AsmBuilder, and Compiler code-generation concepts - each suitable for different tasks.
+  * Assembler, AsmBuilder, and Compiler code-emitters - each suitable for different kinds of tasks.
   * Built-in CPU vendor and features detection.
   * Advanced logging/formatting and robust error handling.
-  * Virtual memory management similar to malloc/free for JIT code generation and execution.
+  * Virtual memory management similar to malloc/free for JIT code-generation and execution.
   * Lightweight and embeddable - 200-250kB compiled (with all built-in features).
   * Some built-in features can be disabled to make the library even smaller.
   * Zero dependencies - no external libraries, no STL/RTTI.
@@ -209,36 +210,331 @@ This example shows a all steps necessary to generate and execute machine code by
 using namespace asmjit;
 
 // Signature of the generated function.
-typedef void (*Func)(void);
+typedef int (*Func)(void);
 
 int main(int argc, char* argv[]) {
-  TODO: Initializing CodeHolder from Runtime is still incomplete.
-  JitRuntime runtime;
+  JitRuntime rt;                     // Create a runtime specialized for JIT.
 
-  CodeHolder code;                  // Create CodeHolder.
-  X86Assembler a(&code);            // Create and attach X86Assembler to `code`.
+  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
+  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
 
-  a.mov(x86::eax, 0);               // Move zero to 'eax' register.
-  a.ret();                          // Return from function.
+  a.mov(x86::eax, 0);                // Move zero to 'eax' register.
+  a.ret();                           // Return from function.
+  // ----> X86Assembler is no longer needed from here <----
 
   Func fn;
-  Error err = runtime.add((void**)&fn, &code);
+  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
 
-  if (err)
-    return 1;                       // Handle a possible error returned by AsmJit.
+  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  // ----> CodeHolder is no longer needed from here <----
 
-  int result = fn();                // Execute the generated code.
-  printf("%d\n", result);           // Print the resulting "1".
+  int result = fn();                 // Execute the generated code.
+  printf("%d\n", result);            // Print the resulting "1".
 
-  // All classes use RAII, all resources will be released when `main()` returns,
-  // the generated function can be, however, freed explicitly if you intend to
-  // reuse or keep the `runtime` (which you should).
-  runtime.release(fn);
+  // All classes use RAII, all resources will be released before `main()` returns,
+  // the generated function can be, however, released explicitly if you intend to
+  // reuse or keep the runtime alive, which you should in a production code.
+  rt.release(fn);
 
   return 0;
 }
 ```
 
+### Assembling More Code
+
+The previous example would work in both X86 and X64 modes as it just returns zero and does nothing else. AsmJit can be used to generate much more complex code, however, architecture and operating-system differences must be handled by the user if you prefer to stay with X86Assembler (other code emitters that provide higher level functionality will be explained later). The next example is only for 64-bit targets and shows how to use AsmJit's operands to handle WIN64 and UNIX64 calling conventions dynamically:
+
+```c++
+using namespace asmjit;
+
+// Signature of the generated function.
+typedef int (*SumFunc)(const int* arr, size_t count);
+
+int main(int argc, char* argv[]) {
+  assert(sizeof(void*) == 8 &&
+    "This example requires 64-bit environment.");
+
+  using namespace asmjit::x86;       // To make the access to X86 registers easier.
+  JitRuntime rt;                     // Create a runtime specialized for JIT.
+
+  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
+  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+
+  // Decide between Windows vs Unix calling convention:
+  //   WIN64  - passes first 4 arguments in RCX, RDX, R8, and R9.
+  //   UNIX64 - passes first 6 arguments in RDI, RSI, RCX, RDX, R8, and R9.
+  bool w64 = static_cast<bool>(ASMJIT_OS_WINDOWS);
+
+  X86Gp arr = w64 ? rcx : rdi;       // First argument (array ptr).
+  X86Gp cnt = w64 ? rdx : rsi;       // Second argument (number of elements)
+  X86Gp sum = eax;                   // Use RAX as 'sum' as it's a return register.
+
+  // To construct the loop, we need some labels.
+  Label Loop = a.newLabel();
+  Label Exit = a.newLabel();
+
+  a.xor_(sum, sum);                  // Clear 'sum' register (shorter than 'mov').
+  a.test(cnt, cnt);                  // Border case:
+  a.jz(Exit);                        //   If 'cnt' is zero jump to 'Exit'.
+
+  a.bind(Loop);                      // Start of a loop iteration.
+  a.add(sum, dword_ptr(arr));        // Add int at [arr] to 'sum'.
+  a.add(arr, 4);                     // Increment 'arr' pointer.
+  a.dec(cnt);                        // Decrease 'cnt'.
+  a.jnz(Loop);                       // If not zero jump to 'Loop'.
+
+  a.bind(Exit);                      // Exit to handle the border case.
+  a.ret();                           // Return from function ('sum' == 'eax').
+  // ----> X86Assembler is no longer needed from here <----
+
+  SumFunc fn;
+  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
+
+  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  // ----> CodeHolder is no longer needed from here <----
+
+  static const int array[6] = { 4, 8, 15, 16, 23, 42 };
+
+  int result = fn(array, 6);         // Execute the generated code.
+  printf("%d\n", result);            // Print sum of array (108).
+
+  rt.release(fn);                    // It's a good practice to release the function.
+
+  return 0;
+}
+```
+
+The example should be self-explanatory. It shows how to work with labels, how to use operands, and how to emit instructions that can use different registers based on runtime. It implements WIN64 and UNIX64 caling conventions and it would be possible to also add support for 32-bit targets with a little effort, which could be an interesting exercise to the reader.
+
+### More About CodeInfo
+
+So far we have created two functions and executed them. Thise were typical use-cases for a JIT compiler. This time, let's do something else, let's generate some 32-bit code from any machine and print it's binary representation. To do that, we create our own CodeInfo and initialize it to contain `Arch::kTypeX86` architecture. CodeInfo will populate all basic fields just based on the architecture we provide, so it's super-easy:
+
+```c++
+using namespace asmjit;
+
+int main(int argc, char* argv[]) {
+  using namespace asmjit::x86;       // To make the access to X86 registers easier.
+
+  CodeInfo ci(Arch::kTypeX86);       // CodeInfo that describes 32-bit X86 target.
+  CodeHolder code(ci);               // Create CodeHolder based on our own CodeInfo.
+  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+
+  // Generate a 32-bit function that sums 4 floats and looks like:
+  //   void func(float* dst, const float* a, const float* b)
+  a.mov(eax, dword_ptr(esp, 4));     // Load the destination pointer.
+  a.mov(ecx, dword_ptr(esp, 8));     // Load the first source pointer.
+  a.mov(edx, dword_ptr(esp, 12));    // Load the second source pointer.
+
+  a.movups(xmm0, ptr(ecx));          // Load 4 floats from [ecx] to XMM0.
+  a.movups(xmm1, ptr(edx));          // Load 4 floats from [edx] to XMM1.
+  a.addps(xmm0, xmm1);               // Add 4 floats in XMM1 to XMM0.
+  a.movups(ptr(eax), xmm0);          // Store the result to [eax].
+  a.ret();                           // Return from function.
+
+  // Now we have two options if we want to do something with the code hold
+  // by CodeHolder. In order to use it we must first sync X86Assembler with
+  // the CodeHolder as it doesn't do it for every instruction it generates for
+  // performance reasons. The options are:
+  //
+  //   1. Detach X86Assembler from CodeHolder (will automatically sync).
+  //   2. Sync explicitly, allows to use X86Assembler again if needed.
+  //
+  // NOTE: AsmJit always syncs internally when CodeHolder needs to access these
+  // buffers and knows that there is an Assembler attached, so you have to sync
+  // explicitly only if you bypass CodeHolder and intend to do something on your
+  // own.
+  code.sync();                       // So let's sync, it's easy.
+
+  // We have no Runtime this time, it's on us what we do with the code.
+  // CodeHolder stores code in CodeHolder::SectionEntry, which embeds CodeSection
+  // and CodeBuffer structures. We are interested in CodeBuffer:
+  CodeBuffer& buf = code.getSection(0)->buffer;
+
+  // Print the machine-code generated or do something more interesting with it?
+  //   8B4424048B4C24048B5424040F28010F58010F2900C3
+  for (size_t i = 0; i < buf.length; i++)
+    printf("%0.2X", buf.data[i]);
+
+  return 0;
+}
+```
+
+### Code Relocation & Base-Adresss
+
+CodeInfo contains much more information than just the target architecture. It can be configured to specify a base-address (or a virtual base-address in a linker terminology), which could be static (useful when you know the location of the target's machine code) or dynamic. AsmJit assumes dynamic base-address by default and relocates to a user-provided address on-demand. To be able to relocate to a user-provided address it needs to store some information about relocations, which is represented by `CodeHolder::RelocEntry`. Relocations are only required if you call external functions from the generated code that cannot be encoded by using a 32-bit displacement (X64 architecture doesn't provide 64-bit encodable displacement).
+
+Next example shows how to use a built-in virtual memory manager `VMemMgr` instead of using `JitRuntime` (just in case you want to use your own memory allocator) and how to relocate athe generated code into your own memory block - you can use your own virtual memory allocator if you need that, but that's OS specific and it's already provided by AsmJit, so we will use it as well.
+
+The following code is similar to the previous one, but implements a function working in both 32-bit and 64-bit environments:
+
+```c++
+using namespace asmjit;
+
+typedef void (*SumFloatsFunc)(float* dst, const float* a, const float* b);
+
+int main(int argc, char* argv[]) {
+  using namespace asmjit::x86;       // To make the access to X86 registers easier.
+
+  CodeInfo ci(Arch::kTypeHost);      // Configure CodeInfo for a host architecture
+  CodeHolder code(ci);               // Create CodeHolder based on our own CodeInfo.
+  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+
+  // Generate a function runnable in both 32-bit and 64-bit architectures:
+  bool isX86 = static_cast<bool>(ASMJIT_ARCH_X86);
+  bool isWin = static_cast<bool>(ASMJIT_OS_WINDOWS);
+
+  // Signature: 'void func(float* dst, const float* a, const float* b)'.
+  X86Gp dst;
+  X86Gp src_a;
+  X86Gp src_b;
+
+  // Handle the difference between 32-bit and 64-bit calling convention.
+  // (arguments passed through stack vs. arguments passed in registers).
+  if (ASMJIT_ARCH_X86) {
+    dst   = eax;
+    src_a = ecx;
+    src_b = edx;
+    a.mov(dst, dword_ptr(esp, 4));   // Load the destination pointer.
+    a.mov(src_a, dword_ptr(esp, 8)); // Load the first source pointer.
+    a.mov(src_b, dword_ptr(esp, 12));// Load the second source pointer.
+  }
+  else {
+    dst   = isWin ? rcx : rdi;       // First argument  (destination pointer).
+    src_a = isWin ? rdx : rsi;       // Second argument (source 'a' pointer).
+    src_b = isWin ? r8  : rdx;       // Third argument  (source 'b' pointer).
+  }
+
+  a.movups(xmm0, ptr(src_a));        // Load 4 floats from [src_a] to XMM0.
+  a.movups(xmm1, ptr(src_b));        // Load 4 floats from [src_b] to XMM1.
+  a.addps(xmm0, xmm1);               // Add 4 floats in XMM1 to XMM0.
+  a.movups(ptr(dst), xmm0);          // Store the result to [dst].
+  a.ret();                           // Return from function.
+
+  // After the code was generated it can be relocated manually to any memory
+  // location, however, we need to know it's size before we perform memory
+  // allocation. CodeHolder's `getCodeSize()` returns the worst estimated
+  // code-size (the biggest possible) in case that relocations are not
+  // possible without trampolines (in that case some extra code at the end
+  // of the current code buffer is generated during relocation).
+  size_t size = code.getCodeSize();
+
+  // Instead of rolling our own virtual memory allocator we can use the one
+  // AsmJit uses. It's decoupled so you don't need to use Runtime for that.
+  VMemMgr vm;
+
+  void* p = vm.alloc(size);          // Allocate a virtual memory (executable).
+  if (!p) return 0;                  // Handle a possible out-of-memory case.
+
+  size_t realSize = code.relocate(p);// Relocate & store the machine code in 'p'.
+  // NOTE: After this you don't need CodeHolder anymore.
+
+  // The code can be executed:
+  float arr_a[4] = { 0.0, 1.0, 2.0, 3.0 };
+  float arr_b[4] = { 5.5, 6.6, 7.7, 8.8 };
+  float result[4];
+
+  // You can use AsmJit's ptr_cast<> to cast between void* and function
+  // pointers. It's type-safe and doesn't allow to case void** to a function
+  // pointer, for example. So let's use it and let's call the generated code.
+  ptr_cast<SumFloatsFunc>(p)(result, arr_a, arr_b);
+
+  // Prints {5.500000 7.600000 9.700000 11.800000}.
+  printf("{%f %f %f %f}\n", result[0], result[1], result[2], result[3]);
+
+  // Release 'p' is it's no longer needed. It will be destroyed with 'vm'
+  // instance anyway, but it's a good practice to release it explicitly
+  // when you know that the function will not be needed anymore.
+  vm.release(p);
+
+  return 0;
+}
+```
+
+Configure the CodeInfo by calling `CodeInfo::setBaseAddress()` to initialize it to a user-provided base-address before passing it to `CodeHolder`:
+
+```c++
+// Configure the CodeInfo first.
+CodeInfo ci(...);
+ci.setBaseAddress(uint64_t(0x1234));
+
+// Then pass to CodeHolder.
+CodeHolder code(ci);
+
+// ... after you emit the machine code it will be relocated to the base address
+//     provided and stored in the pointer passed to `CodeHolder::relocate()`.
+```
+
+TODO: Maybe `CodeHolder::relocate()` is not the best name?
+
+### Working with Memory Addresses
+
+X86 provides a complex memory addressing model that allows to encode addresses having a BASE register, INDEX register with a possible scale (left shift), and displacement (called offset in AsmJit). Memory address can also specify memory segment (segment-override in X86 terminology) and some instructions (gather / scatter) require INDEX to be a SIMD register instead of a general-purpose register. AsmJit allows to encode and work with all forms of addresses mentioned and implemented by X86. It also allows to construct a 64-bit memory address, which is only allowed in one form of 'mov' instruction.
+
+```c++
+// Memory operand construction is provided by x86 namespace.
+using namespace asmjit;
+using namespace asmjit::x86;
+
+// BASE + OFFSET.
+X86Mem a = ptr(rax);                 // a = [rax]
+X86Mem b = ptr(rax, 15)              // b = [rax + 15]
+
+// BASE + INDEX + SCALE - Scale is in BITS as used by X86!
+X86Mem c = ptr(rax, rbx)             // c = [rax + rbx]
+X86Mem d = ptr(rax, rbx, 2)          // d = [rax + rbx << 2]
+X86Mem e = ptr(rax, rbx, 2, 15)      // e = [rax + rbx << 2 + 15]
+
+// BASE + VM (Vector Index) (encoded as MOD+VSIB).
+X86Mem f = ptr(rax, xmm1)            // f = [rax + xmm1]
+X86Mem g = ptr(rax, xmm1, 2)         // g = [rax + xmm1 << 2]
+X86Mem h = ptr(rax, xmm1, 2, 15)     // h = [rax + xmm1 << 2 + 15]
+
+// WITHOUT BASE:
+uint64_t ADDR = (uint64_t)0x1234;
+X86Mem i = ptr(ADDR);                // i = [0x1234]
+X86Mem j = ptr(ADDR, rbx);           // j = [0x1234 + rbx]
+X86Mem k = ptr(ADDR, rbx, 2);        // k = [0x1234 + rbx << 2]
+
+// LABEL - Will be emitted to use RIP (64-bit) or absolute address (32-bit).
+Label L = ...;
+X86Mem m = ptr(L);                   // m = [L]
+X86Mem n = ptr(L, rbx);              // n = [L + rbx]
+X86Mem o = ptr(L, rbx, 2);           // o = [L + rbx << 2]
+X86Mem p = ptr(L, rbx, 2, 15);       // p = [L + rbx << 2 + 15]
+
+// RIP - 64-bit only (RIP can't use INDEX).
+X86Mem q = ptr(rip, 24);             // q = [rip + 24]
+```
+
+Memory operands can optionally contain memory size. This is required by instructions where the memory size cannot be deduced from other operands, like `inc` and `dec`:
+
+```c++
+X86Mem a = dword_ptr(rax, rbx);      // dword ptr [rax + rbx].
+X86Mem b = qword_ptr(rdx, rsi, 0, 1);// qword ptr [rdx + rsi << 0 + 1].
+```
+
+Memory operands provide API that can be used to work with them:
+
+```c++
+X86Mem base = dword_ptr(rax, 12);    // dword ptr [rax + 12].
+
+base.hasBase();                      // true.
+base.hasIndex();                     // false.
+base.getSize();                      // 4.
+base.getOffset();                    // 12.
+
+base.setSize(0);                     // Sets the size to 0 (makes it sizeless).
+base.addOffset(-1);                  // Adds -1 to the offset and makes it 11.
+base.setOffset(0);                   // Sets the offset to 0.
+base.setBase(rcx);                   // Changes BASE to RCX.
+base.setIndex(rax);                  // Changes INDEX to RAX.
+base.hasIndex();                     // true.
+
+// ...
+```
+
+You can explore the possibilities by taking a look into [base/operand.h](./src/asmjit/base/operand.h) and [x86/x86operand.h](./src/asmjit/x86/x86operand.h). Always use `X86Mem` when targetting X86 and X64 as it extends the base `Mem` operand with additional features provided by X86.
 
 ### Function Signature
 
