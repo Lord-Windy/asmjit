@@ -749,7 +749,7 @@ public:
   //! Create a new `CBConstPool` instance.
   ASMJIT_INLINE CBConstPool(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
     : CBLabel(cb, id),
-      _constPool(&cb->_dataAllocator) {}
+      _constPool(&cb->_dataAllocator) { _type = kNodeConstPool; }
 
   //! Destroy the `CBConstPool` instance.
   ASMJIT_INLINE ~CBConstPool() noexcept {}

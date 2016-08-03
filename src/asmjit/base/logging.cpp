@@ -137,8 +137,7 @@ Error Logger::logBinary(const void* data, size_t size) noexcept {
     } while (--n);
 
     *p++ = '\n';
-    ASMJIT_PROPAGATE(
-      log(buffer, (size_t)(p - buffer)));
+    ASMJIT_PROPAGATE(log(buffer, (size_t)(p - buffer)));
   }
 
   return kErrorOk;

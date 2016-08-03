@@ -245,9 +245,15 @@ Error Assembler::embedConstPool(const Label& label, const ConstPool& pool) {
     if (ASMJIT_UNLIKELY(err)) return setLastError(err);
   }
 
-  pool.fill(_bufferPtr);
-  _bufferPtr += size;
+  uint8_t* p = _bufferPtr;
+  pool.fill(p);
 
+#if !defined(ASMJIT_DISABLE_LOGGING)
+  if (_globalOptions & kOptionLoggingEnabled)
+    _code->_logger->logBinary(p, size);
+#endif // !ASMJIT_DISABLE_LOGGING
+
+  _bufferPtr += size;
   return kErrorOk;
 }
 

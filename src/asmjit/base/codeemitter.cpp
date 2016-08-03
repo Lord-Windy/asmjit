@@ -129,7 +129,7 @@ Error CodeEmitter::setLastError(Error error, const char* message) {
 
 bool CodeEmitter::isLabelValid(uint32_t id) const noexcept {
   size_t index = Operand::unpackId(id);
-  return _code && id < _code->_labels.getLength();
+  return _code && index < _code->_labels.getLength();
 }
 
 Error CodeEmitter::commentf(const char* fmt, ...) {
