@@ -400,7 +400,9 @@ Error X86Assembler::onAttach(CodeHolder* code) noexcept {
 
     _setAddressOverrideMask(kX86MemInfo_67H_X86);
     _globalOptions |= X86Inst::_kOptionInvalidRex;
-    ::memcpy(&zax, &x86OpData.gpd, sizeof(Operand) * 8);
+
+    _nativeGpArray = x86OpData.gpd;
+    _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
   }
 
@@ -408,7 +410,9 @@ Error X86Assembler::onAttach(CodeHolder* code) noexcept {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
     _setAddressOverrideMask(kX86MemInfo_67H_X64);
-    ::memcpy(&zax, &x86OpData.gpq, sizeof(Operand) * 8);
+
+    _nativeGpArray = x86OpData.gpq;
+    _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
   }
 
@@ -416,15 +420,6 @@ Error X86Assembler::onAttach(CodeHolder* code) noexcept {
 }
 
 Error X86Assembler::onDetach(CodeHolder* code) noexcept {
-  zax.reset();
-  zbx.reset();
-  zcx.reset();
-  zdx.reset();
-  zsp.reset();
-  zbp.reset();
-  zsi.reset();
-  zdi.reset();
-
   return Base::onDetach(code);
 }
 

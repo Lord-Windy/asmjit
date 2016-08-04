@@ -177,8 +177,8 @@ X86Context::X86Context(X86Compiler* compiler) : RAContext(compiler) {
   _regCount._mm  = 8;
   _regCount._k   = 8;
   _regCount._xyz = archType == Arch::kTypeX86 ? 8 : 16;
-  _zsp = compiler->zsp;
-  _zbp = compiler->zbp;
+  _zsp = compiler->zsp();
+  _zbp = compiler->zbp();
 
 #if defined(ASMJIT_TRACE)
   _traceNode = (TraceNodeFunc)X86Context_traceNode;
@@ -4567,7 +4567,7 @@ static Error X86Context_patchFuncMem(X86Context* self, X86FuncNode* func, CBNode
           ASMJIT_ASSERT(vreg != nullptr);
 
           if (vreg->isMemArg()) {
-            m->_setBase(compiler->zax.getRegType(), self->_argBaseReg);
+            m->_setBase(compiler->_nativeGpReg.getRegType(), self->_argBaseReg);
             m->addOffsetLo32(self->_argBaseOffset + vreg->getMemOffset());
             m->clearRegHome();
           }
@@ -4575,7 +4575,7 @@ static Error X86Context_patchFuncMem(X86Context* self, X86FuncNode* func, CBNode
             RACell* cell = vreg->getMemCell();
             ASMJIT_ASSERT(cell != nullptr);
 
-            m->_setBase(compiler->zax.getRegType(), self->_varBaseReg);
+            m->_setBase(compiler->_nativeGpReg.getRegType(), self->_varBaseReg);
             m->addOffsetLo32(self->_varBaseOffset + cell->offset);
             m->clearRegHome();
           }

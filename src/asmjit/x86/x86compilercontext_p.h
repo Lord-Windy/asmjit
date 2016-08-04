@@ -650,7 +650,7 @@ struct X86Context : public RAContext {
   ASMJIT_INLINE X86Mem getVarMem(VirtReg* vreg) {
     (void)getVarCell(vreg);
     return X86Mem(Init,
-      getCompiler()->zax.getRegType(), vreg->getId(),
+      getCompiler()->_nativeGpReg.getRegType(), vreg->getId(),
       Reg::kRegNone, kInvalidValue,
       0, 0, Mem::kFlagIsRegHome);
   }

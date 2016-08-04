@@ -181,15 +181,7 @@ ASMJIT_ENUM(X86AsmLevel) {
 
 template<typename This>
 struct X86EmitCommons {
-  ASMJIT_INLINE X86EmitCommons() noexcept
-    : zax(NoInit),
-      zcx(NoInit),
-      zdx(NoInit),
-      zbx(NoInit),
-      zsp(NoInit),
-      zbp(NoInit),
-      zsi(NoInit),
-      zdi(NoInit) {}
+  ASMJIT_INLINE X86EmitCommons() noexcept {}
 
   // These typedefs are used to describe implicit operands passed explicitly.
   typedef X86Gp AL;
@@ -221,7 +213,18 @@ struct X86EmitCommons {
   // --------------------------------------------------------------------------
 
   //! Get GPD or GPQ register depending on the current architecture.
-  ASMJIT_INLINE X86Gp gpz(uint32_t index) const noexcept { return X86Gp(zax, index); }
+  ASMJIT_INLINE X86Gp gpz(uint32_t index) const noexcept {
+    return X86Gp(static_cast<const X86Gp&>(THIS_C()->_nativeGpReg), index);
+  }
+
+  ASMJIT_INLINE const X86Gp& zax() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdAx]); }
+  ASMJIT_INLINE const X86Gp& zcx() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdCx]); }
+  ASMJIT_INLINE const X86Gp& zdx() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdDx]); }
+  ASMJIT_INLINE const X86Gp& zbx() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdBx]); }
+  ASMJIT_INLINE const X86Gp& zsp() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdSp]); }
+  ASMJIT_INLINE const X86Gp& zbp() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdBp]); }
+  ASMJIT_INLINE const X86Gp& zsi() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdSi]); }
+  ASMJIT_INLINE const X86Gp& zdi() const noexcept { return static_cast<const X86Gp&>(THIS_C()->_nativeGpArray[X86Gp::kIdDi]); }
 
   //! Create an `intptr_t` memory operand depending on the current architecture.
   ASMJIT_INLINE X86Mem intptr_ptr(const X86Gp& base, int32_t disp = 0) const noexcept {
@@ -4680,13 +4683,6 @@ struct X86EmitCommons {
   INST_3x(vpshlw, Vpshlw, X86Xmm, X86Xmm, X86Xmm)                         // XOP
   INST_3x(vpshlw, Vpshlw, X86Xmm, X86Mem, X86Xmm)                         // XOP
   INST_3x(vpshlw, Vpshlw, X86Xmm, X86Xmm, X86Mem)                         // XOP
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Registers that depend on the architecture selected at runtime.
-  X86Gp zax, zcx, zdx, zbx, zsp, zbp, zsi, zdi;
 };
 
 template<typename This>

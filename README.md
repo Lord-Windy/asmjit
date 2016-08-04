@@ -578,9 +578,9 @@ int main(int argc, char* argv[]) {
   CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
   X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
 
-  // Let's get these registers from X86Assembler, they are accessible as-is.
-  X86Gp zbp = a.zbp;
-  X86Gp zsp = a.zsp;
+  // Let's get these registers from X86Assembler.
+  X86Gp zbp = a.zbp();
+  X86Gp zsp = a.zsp();
 
   int stackSize = 32;
 
@@ -638,9 +638,9 @@ int main(int argc, char* argv[]) {
   CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
   X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
 
-  // Let's get these registers from X86Assembler, they are accessible as-is.
-  X86Gp zbp = a.zbp;
-  X86Gp zsp = a.zsp;
+  // Let's get these registers from X86Assembler.
+  X86Gp zbp = a.zbp();
+  X86Gp zsp = a.zsp();
 
   // Function prolog.
   a.push(zbp);

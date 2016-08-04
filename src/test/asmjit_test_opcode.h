@@ -49,10 +49,10 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   X86Gp gdB = useRex2 ? r9d  : ebx;
   X86Gp gdC = useRex2 ? r10d : ecx;
 
-  X86Gp gzA = useRex1 ? r8   : a.zax;
-  X86Gp gzB = useRex2 ? r9   : a.zbx;
-  X86Gp gzC = useRex2 ? r10  : a.zcx;
-  X86Gp gzD = useRex2 ? r11  : a.zdx;
+  X86Gp gzA = useRex1 ? r8   : a.zax();
+  X86Gp gzB = useRex2 ? r9   : a.zbx();
+  X86Gp gzC = useRex2 ? r10  : a.zcx();
+  X86Gp gzD = useRex2 ? r11  : a.zdx();
 
   X86KReg kA = k1;
   X86KReg kB = k2;
@@ -201,11 +201,11 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.cmpxchg(gdA, gdB);                   // Implicit regA, regB, <EAX>
   a.cmpxchg(gzA, gzB);                   // Implicit regA, regB, <ZAX>
   a.cmpxchg(gdA, gdB, eax);              // Explicit regA, regB, <EAX>
-  a.cmpxchg(gzA, gzB, a.zax);            // Explicit regA, regB, <ZAX>
+  a.cmpxchg(gzA, gzB, a.zax());          // Explicit regA, regB, <ZAX>
   a.cmpxchg(anyptr_gpA, gdB);            // Implicit mem , regB, <EAX>
   a.cmpxchg(anyptr_gpA, gzB);            // Implicit mem , regB, <ZAX>
   a.cmpxchg(anyptr_gpA, gdB, eax);       // Explicit mem , regB, <EAX>
-  a.cmpxchg(anyptr_gpA, gzB, a.zax);     // Explicit mem , regB, <ZAX>
+  a.cmpxchg(anyptr_gpA, gzB, a.zax());   // Explicit mem , regB, <ZAX>
   a.cmpxchg8b(anyptr_gpA);
   a.cpuid();                             // Implicit <EAX>, <EBX>, <ECX>, <EDX>
   a.cpuid(eax, ebx, ecx, edx);           // Explicit <EAX>, <EBX>, <ECX>, <EDX>
@@ -905,11 +905,11 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.mulx(gdA, gdB, gdC);                 // Implicit gpA, gpB, gpC, <EDX>
   a.mulx(gdA, gdB, gdC, edx);            // Explicit gpA, gpB, gpC, <EDX>
   a.mulx(gzA, gzB, gzC);                 // Implicit gpA, gpB, gpC, <EDX|RDX>
-  a.mulx(gzA, gzB, gzC, a.zdx);          // Explicit gpA, gpB, gpC, <EDX|RDX>
+  a.mulx(gzA, gzB, gzC, a.zdx());        // Explicit gpA, gpB, gpC, <EDX|RDX>
   a.mulx(gdA, gdB, anyptr_gpC);          // Implicit gpA, gpB, mem, <EDX>
   a.mulx(gdA, gdB, anyptr_gpC, edx);     // Explicit gpA, gpB, mem, <EDX>
   a.mulx(gzA, gzB, anyptr_gpC);          // Implicit gpA, gpB, mem, <EDX|RDX>
-  a.mulx(gzA, gzB, anyptr_gpC, a.zdx);   // Explicit gpA, gpB, mem, <EDX|RDX>
+  a.mulx(gzA, gzB, anyptr_gpC, a.zdx()); // Explicit gpA, gpB, mem, <EDX|RDX>
   a.pdep(gdA, gdB, gdC);
   a.pdep(gzA, gzB, gzC);
   a.pdep(gdA, gdB, anyptr_gpC);
@@ -1227,7 +1227,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.divss(xmmA, anyptr_gpB);
   a.ldmxcsr(anyptr_gpA);
   a.maskmovq(mmA, mmB);                  // Implicit mmA, mmB, <EDI|RDI>
-  a.maskmovq(mmA, mmB, a.zdi);           // Explicit mmA, mmB, <EDI|RDI>
+  a.maskmovq(mmA, mmB, a.zdi());         // Explicit mmA, mmB, <EDI|RDI>
   a.maxps(xmmA, xmmB);
   a.maxps(xmmA, anyptr_gpB);
   a.maxss(xmmA, xmmB);
@@ -1389,7 +1389,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.divsd(xmmA, anyptr_gpB);
   a.lfence();
   a.maskmovdqu(xmmA, xmmB);              // Implicit xmmA, xmmB, <EDI|RDI>
-  a.maskmovdqu(xmmA, xmmB, a.zdi);       // Explicit xmmA, xmmB, <EDI|RDI>
+  a.maskmovdqu(xmmA, xmmB, a.zdi());     // Explicit xmmA, xmmB, <EDI|RDI>
   a.maxpd(xmmA, xmmB);
   a.maxpd(xmmA, anyptr_gpB);
   a.maxsd(xmmA, xmmB);
@@ -2033,7 +2033,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.vlddqu(ymmA, anyptr_gpB);
   a.vldmxcsr(anyptr_gpA);
   a.vmaskmovdqu(xmmA, xmmB);             // Implicit xmmA, xmmB, <EDI|RDI>
-  a.vmaskmovdqu(xmmA, xmmB, a.zdi);      // Explicit xmmA, xmmB, <EDI|RDI>
+  a.vmaskmovdqu(xmmA, xmmB, a.zdi());    // Explicit xmmA, xmmB, <EDI|RDI>
   a.vmaskmovps(xmmA, xmmB, anyptr_gpC);
   a.vmaskmovps(ymmA, ymmB, anyptr_gpC);
   a.vmaskmovps(anyptr_gpA, xmmB, xmmC);

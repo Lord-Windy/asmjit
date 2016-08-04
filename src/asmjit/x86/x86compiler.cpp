@@ -121,15 +121,6 @@ bool X86CallNode::_setRet(uint32_t i, const Operand_& op) noexcept {
 // ============================================================================
 
 X86Compiler::X86Compiler(CodeHolder* code) noexcept : CodeCompiler() {
-  zax.reset();
-  zcx.reset();
-  zdx.reset();
-  zbx.reset();
-  zsp.reset();
-  zbp.reset();
-  zsi.reset();
-  zdi.reset();
-
   if (code)
     code->attach(this);
 }
@@ -140,29 +131,30 @@ X86Compiler::~X86Compiler() noexcept {}
 // ============================================================================
 
 Error X86Compiler::onAttach(CodeHolder* code) noexcept {
-  uint32_t archType = code->getArchType();
+  if (code->getArchType() == Arch::kTypeX86) {
+    ASMJIT_PROPAGATE(Base::onAttach(code));
 
-  const uint32_t* idMap = nullptr;
-  const X86Gp* gpRegs = nullptr;
+    _typeIdMap = _x86TypeData.idMapX86;
 
-  switch (archType) {
-    case Arch::kTypeX86: idMap = _x86TypeData.idMapX86; gpRegs = x86OpData.gpd; break;
-    case Arch::kTypeX64: idMap = _x86TypeData.idMapX64; gpRegs = x86OpData.gpq; break;
-    default:
-      return DebugUtils::errored(kErrorInvalidArch);
+    _nativeGpArray = x86OpData.gpd;
+    _nativeGpReg = _nativeGpArray[0];
+    return kErrorOk;
   }
 
-  _codeInfo = code->getCodeInfo();
-  _typeIdMap = idMap;
-  _finalized = false;
+  if (code->getArchType() == Arch::kTypeX64) {
+    ASMJIT_PROPAGATE(Base::onAttach(code));
 
-  ::memcpy(&zax, gpRegs, sizeof(Operand) * 8);
-  return Base::onAttach(code);
+    _typeIdMap = _x86TypeData.idMapX64;
+
+    _nativeGpArray = x86OpData.gpq;
+    _nativeGpReg = _nativeGpArray[0];
+    return kErrorOk;
+  }
+
+  return DebugUtils::errored(kErrorInvalidArch);
 }
 
 Error X86Compiler::onDetach(CodeHolder* code) noexcept {
-  for (uint32_t i = 0; i < 8; i++)
-    (static_cast<Operand*>(&zax))[i].reset();
   return Base::onDetach(code);
 }
 
@@ -558,7 +550,7 @@ Error X86Compiler::_newStack(Mem& m, uint32_t size, uint32_t alignment, const ch
   vreg->_alignment = static_cast<uint8_t>(alignment);
 
   // Set the memory operand to GPD/GPQ and its ID to vreg.
-  m = X86Mem(Init, zax.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
+  m = X86Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
 
   return kErrorOk;
 }

@@ -10,6 +10,7 @@
 
 // [Dependencies]
 #include "../base/codeholder.h"
+#include "../base/operand.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -404,7 +405,10 @@ public:
   Operand_ _op4;                         //!< 5th operand data (indexed from zero)   (affects the next instruction).
   Operand_ _op5;                         //!< 6th operand data (indexed from zero)   (affects the next instruction).
   Operand_ _opMask;                      //!< op-mask (k) operand data               (affects the next instruction).
+
   Operand_ _none;                        //!< Used to pass unused operands to `_emit()` instead of passing null.
+  Reg _nativeGpReg;                      //!< Native GP register with zero id.
+  const Reg* _nativeGpArray;             //!< Array of native registers indexed from zero.
 };
 
 //! \}
