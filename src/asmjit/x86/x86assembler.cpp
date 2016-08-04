@@ -1001,11 +1001,13 @@ CaseX86M_OptB_MulDiv:
             }
             ADD_REX_W_BY_SIZE(regSize);
           }
-          imLen = Utils::isInt8(imVal) ? 1 : Utils::iMin<uint32_t>(regSize, 4);
+
+          imLen = Utils::iMin<uint32_t>(regSize, 4);
+          if (Utils::isInt8(imVal) && !(options & X86Inst::kOptionLongForm)) imLen = 1;
         }
 
         // Alternate Form - AL, AX, EAX, RAX.
-        if (rbReg == 0 && (regSize == 1 || imLen != 1)) {
+        if (rbReg == 0 && (regSize == 1 || imLen != 1) && !(options & X86Inst::kOptionLongForm)) {
           opCode &= X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_W;
           opCode |= ((opReg << 3) | (0x04 + (regSize != 1)));
           imLen = Utils::iMin<uint32_t>(regSize, 4);
@@ -1023,7 +1025,8 @@ CaseX86M_OptB_MulDiv:
           goto IllegalInstruction;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
-        imLen = Utils::isInt8(imVal) ? static_cast<uint32_t>(1) : Utils::iMin<uint32_t>(memSize, 4);
+        imLen = Utils::iMin<uint32_t>(memSize, 4);
+        if (Utils::isInt8(imVal) && !(options & X86Inst::kOptionLongForm)) imLen = 1;
 
         opCode += memSize != 1 ? (imLen != 1 ? 1 : 3) : 0;
         ADD_PREFIX_BY_SIZE(memSize);
@@ -1212,7 +1215,7 @@ CaseX86M_OptB_MulDiv:
       break;
 
     case X86Inst::kEncodingX86Imul:
-      // First process all forms distinct to `kEncodingX86M_OptB_MulDiv`.
+      // First process all forms distinct of `kEncodingX86M_OptB_MulDiv`.
       if (isign3 == ENC_OPS3(Reg, Reg, Imm)) {
         opCode = 0x6B;
         ADD_PREFIX_BY_SIZE(o0.getSize());
@@ -1220,7 +1223,7 @@ CaseX86M_OptB_MulDiv:
         imVal = static_cast<const Imm&>(o2).getInt64();
         imLen = 1;
 
-        if (!Utils::isInt8(imVal)) {
+        if (!Utils::isInt8(imVal) || (options & X86Inst::kOptionLongForm)) {
           opCode -= 2;
           imLen = o0.getSize() == 2 ? 2 : 4;
         }
@@ -1238,7 +1241,7 @@ CaseX86M_OptB_MulDiv:
         imVal = static_cast<const Imm&>(o2).getInt64();
         imLen = 1;
 
-        if (!Utils::isInt8(imVal)) {
+        if (!Utils::isInt8(imVal) || (options & X86Inst::kOptionLongForm)) {
           opCode -= 2;
           imLen = o0.getSize() == 2 ? 2 : 4;
         }
@@ -1286,7 +1289,7 @@ CaseX86M_OptB_MulDiv:
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = 1;
 
-        if (!Utils::isInt8(imVal)) {
+        if (!Utils::isInt8(imVal) || (options & X86Inst::kOptionLongForm)) {
           opCode -= 2;
           imLen = o0.getSize() == 2 ? 2 : 4;
         }
@@ -1457,7 +1460,7 @@ CaseX86M_OptB_MulDiv:
 
           intptr_t offs = label->offset - (intptr_t)(cursor - _bufferData);
 
-          if ((options & X86Inst::kOptionLongForm) == 0 && Utils::isInt8(offs - kRel8Size)) {
+          if (Utils::isInt8(offs - kRel8Size) && !(options & X86Inst::kOptionLongForm)) {
             options |= X86Inst::kOptionShortForm;
 
             EMIT_BYTE(0xEB);
@@ -1678,7 +1681,7 @@ CaseX86M_OptB_MulDiv:
           imVal = static_cast<const Imm&>(o1).getInt64();
 
           // Optimize the instruction size by using a 32-bit immediate if possible.
-          if (imLen == 8) {
+          if (imLen == 8 && !(options & X86Inst::kOptionLongForm)) {
             if (Utils::isUInt32(imVal)) {
               // Zero-extend by using a 32-bit GPD destination instead of a 64-bit GPQ.
               imLen = 4;
@@ -1765,7 +1768,8 @@ CaseX86M_OptB_MulDiv:
 
       if (isign3 == ENC_OPS1(Imm)) {
         imVal = static_cast<const Imm&>(o0).getInt64();
-        imLen = Utils::isInt8(imVal) ? 1 : 4;
+        imLen = 4;
+        if (Utils::isInt8(imVal) && !(options & X86Inst::kOptionLongForm)) imLen = 1;
 
         opCode = imLen == 1 ? 0x6A : 0x68;
         goto EmitX86Op;
@@ -2006,7 +2010,7 @@ CaseX86Pop_Gp:
         }
 
         // Alternate Form - AL, AX, EAX, RAX.
-        if (o0.getId() == 0) {
+        if (o0.getId() == 0 && !(options & X86Inst::kOptionLongForm)) {
           opCode &= X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_W;
           opCode |= 0xA8 + (o0.getSize() != 1);
           goto EmitX86Op;

@@ -425,7 +425,7 @@ public:
 //!
 //! // ... your code ...
 //!
-//! // Bind label to the current position, see `Assembler::bind()`.
+//! // Bind label to the current position, see `CodeEmitter::bind()`.
 //! a.bind(L1);
 //! ~~~
 class Label : public Operand {
@@ -1073,13 +1073,13 @@ public:
 
   //! Set immediate value as unsigned type to `val`.
   ASMJIT_INLINE Imm& setPtr(void* p) noexcept {
-    return setIntPtr((intptr_t)p);
+    return setIntPtr((uint64_t)p);
   }
 
   //! Set immediate value to `val`.
   template<typename T>
   ASMJIT_INLINE Imm& setValue(T val) noexcept {
-    return setIntPtr((intptr_t)val);
+    return setIntPtr((int64_t)val);
   }
 
   // --------------------------------------------------------------------------
