@@ -39,7 +39,7 @@ static const char* archIdToString(uint32_t archId) {
 
 struct TestErrorHandler : public ErrorHandler {
   virtual bool handleError(Error err, const char* message, CodeEmitter* origin) {
-    printf("ERROR 0x%0.8X: %s\n", err, message);
+    printf("ERROR 0x%08X: %s\n", err, message);
     return true;
   }
 };

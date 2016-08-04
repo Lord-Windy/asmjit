@@ -1944,8 +1944,8 @@ public:
         expect.appendString(", ");
       }
 
-      result.appendFormat("%0.8X", static_cast<unsigned int>(dstBuffer[i]));
-      expect.appendFormat("%0.8X", static_cast<unsigned int>(expBuffer[i]));
+      result.appendFormat("%08X", static_cast<unsigned int>(dstBuffer[i]));
+      expect.appendFormat("%08X", static_cast<unsigned int>(expBuffer[i]));
     }
 
     result.appendString("}");

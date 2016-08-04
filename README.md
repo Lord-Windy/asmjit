@@ -103,8 +103,8 @@ AsmJit is designed to be easy embeddable in any project. However, it depends on 
 
 ### Architectures
 
-  * `ASMJIT_BUILD_ARM` - Build ARM32 and ARM64 backend.
-  * `ASMJIT_BUILD_X86` - Build X86 and X64 backend.
+  * `ASMJIT_BUILD_ARM` - Build ARM32 and ARM64 backends.
+  * `ASMJIT_BUILD_X86` - Build X86 and X64 backends.
   * `ASMJIT_BUILD_HOST` - Build host backend, if only `ASMJIT_BUILD_HOST` is used only the host architecture detected at compile-time will be included.
 
   * By default only `ASMJIT_BUILD_HOST` is defined.
@@ -144,21 +144,21 @@ Instructions specify operations performed by the CPU, and operands specify the o
   * Using `emitter.emit(instId, operands...)` - Allows to emit an instruction in a dynamic way - you just need to know its id and provide its operands.
   * Using `emitter.inst(operands...)` - A type-safe way provided by platform specific emitters, for example `X86Assembler` provides `mov(X86Gp, X86Gp)`.
 
-AsmJit's operands all use `Operand`, which can be used to store:
+AsmJit's operands all inherit from a base class called `Operand` and then specialize its type to:
 
-  * No operand (uninitialized).
-  * Register (`Reg`) - Describes either physical or virtual register. Physical registers have id that matches the machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator. Each `Reg` provides:
+  * *None* (not used or uninitialized operand).
+  * *Register* (`Reg`) - Describes either physical or virtual register. Physical registers have id that matches targets machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator. Each `Reg` provides:
     * Register Type - Unique id that describes each possible register provided by the target architecture - for example X86 backend provides `X86Reg::RegType`, which defines all variations of general purpose registers (GPB-LO, GPB-HI, GPW, GPD, and GPQ) and all types of other registers like XMM, YMM, and ZMM.
     * Register Class - Groups multiple register types under a single class - for example all general-purpose registers (of all sizes) on X86 are `X86Reg::kClassGp`, all SIMD registers (XMM, YMM, ZMM) are `X86Reg::kClassXyz`, etc.
     * Register Size - Contains the size of the register in bytes. If the size depends on the mode (32-bit vs 64-bit) then generally the higher size is used (for example RIP register has size 8 by default).
     * Register ID - Contains physical or virtual id of the register.
-  * Memory address (`Mem`) - Used to reference a memory location. Each `Mem` provides:
+  * *Memory Address* (`Mem`) - Used to reference a memory location. Each `Mem` provides:
     * Base register - A base register id (physical or virtual).
     * Index register - An index register id (physical or virtual).
     * Offset - Displacement or absolute address to be referenced (32-bit if base register is used and 64-bit if base register is not used).
     * Optional flags that can describe various architecture dependent information (like scale and segment-override on X86).
-  * Immediate value (`Imm`) - Immediate values are usually part of instructions (encoded within the instruction itself) or data.
-  * Label (`Label)` - used to reference a location in code or data. Labels must be created by the `CodeEmitter` or by `CodeHolder`. Each label has its unique id per `CodeHolder` instance.
+  * *Immediate Value* (`Imm`) - Immediate values are usually part of instructions (encoded within the instruction itself) or data.
+  * *Label* (`Label)` - used to reference a location in code or data. Labels must be created by the `CodeEmitter` or by `CodeHolder`. Each label has its unique id per `CodeHolder` instance.
 
 AsmJit allows to construct operands dynamically, to store them, and to query a complete information about them at run-time. Operands are small (always 16 bytes per `Operand`) and should be always copied if you intend to store them (don't create operands by using `new` keyword, it's not required). Operand are safe to be `memcpy()`ed and `memset()`ed.
 
@@ -182,14 +182,14 @@ void usingOperandsExample(X86Assembler& a) {
 
   // Reconstruct `idx` stored in mem:
   X86Gp idx_2 = X86Gp::fromTypeAndId(m.getIndexType(), m.getIndexId());
-  idx == idx_2;                     // True, `idx` and idx_2` are identical (they refer to the same register).
+  idx == idx_2;                     // True, `idx` and idx_2` are identical.
 
   Operand op = m;                   // Possible.
   op.isMem();                       // True (can be casted to Mem and X86Mem).
 
   m == op;                          // True, `op` is just a copy of `m`.
   static_cast<X86Mem&>(op).addOffset(1);
-  m == op;                          // False, `op` now points to [rax + r10 + 1], which is not same as [rax + r10].
+  m == op;                          // False, `op` now points to [rax + r10 + 1], which is not [rax + r10].
 
   // Emitting 'mov'
   a.mov(dst, m);                    // Type-safe way.
@@ -202,9 +202,9 @@ void usingOperandsExample(X86Assembler& a) {
 
 Some operands have to be created explicitly by `CodeEmitter`. For example labels must be created by `newLabel()` before they are passed to `CodeEmitter`.
 
-### Assembling First Code
+### X86Assembler - Introduction
 
-This example shows a all steps necessary to generate and execute machine code by using `CodeHolder`, `X86Assembler`, and `JitRuntime`:
+X86Assembler is a code-emitter that emits X86 machine code into a CodeBuffer. Next example shows all steps necessary to generate and execute machine code by using `CodeHolder`, `X86Assembler`, and `JitRuntime`:
 
 ```c++
 using namespace asmjit;
@@ -240,7 +240,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-### Assembling More Code
+### X86Assembler - Using Operands
 
 The previous example would work in both X86 and X64 modes as it just returns zero and does nothing else. AsmJit can be used to generate much more complex code, however, architecture and operating-system differences must be handled by the user if you prefer to stay with X86Assembler (other code emitters that provide higher level functionality will be explained later). The next example is only for 64-bit targets and shows how to use AsmJit's operands to handle WIN64 and UNIX64 calling conventions dynamically:
 
@@ -360,7 +360,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-### Code Relocation & Base-Adresss
+### Explicit Code Relocation
 
 CodeInfo contains much more information than just the target architecture. It can be configured to specify a base-address (or a virtual base-address in a linker terminology), which could be static (useful when you know the location of the target's machine code) or dynamic. AsmJit assumes dynamic base-address by default and relocates to a user-provided address on-demand. To be able to relocate to a user-provided address it needs to store some information about relocations, which is represented by `CodeHolder::RelocEntry`. Relocations are only required if you call external functions from the generated code that cannot be encoded by using a 32-bit displacement (X64 architecture doesn't provide 64-bit encodable displacement).
 
@@ -535,6 +535,18 @@ base.hasIndex();                     // true.
 ```
 
 You can explore the possibilities by taking a look into [base/operand.h](./src/asmjit/base/operand.h) and [x86/x86operand.h](./src/asmjit/x86/x86operand.h). Always use `X86Mem` when targetting X86 and X64 as it extends the base `Mem` operand with additional features provided by X86.
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Function Signature
 
