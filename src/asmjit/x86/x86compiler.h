@@ -539,7 +539,7 @@ public:
   //! \overload
   ASMJIT_INLINE CCFuncRet* ret(const X86Gp& o0) { return addRet(o0, Operand()); }
   //! \overload
-  ASMJIT_INLINE CCFuncRet* ret(const X86Gp& o0, const X86Gp& o1) { addRet(o0, o1); }
+  ASMJIT_INLINE CCFuncRet* ret(const X86Gp& o0, const X86Gp& o1) { return addRet(o0, o1); }
   //! \overload
   ASMJIT_INLINE CCFuncRet* ret(const X86Xmm& o0) { return addRet(o0, Operand()); }
   //! \overload

@@ -266,7 +266,6 @@ public:
     }
 
     ::memcpy(static_cast<T*>(d->getData()) + d->length, &item, sizeof(T));
-
     d->length++;
     return kErrorOk;
   }
@@ -276,7 +275,7 @@ public:
   //! Can only be used together with `willGrow()`. If `willGrow(N)` returns
   //! `kErrorOk` then N elements can be added to the vector without checking
   //! if there is a place for them. Used mostly internally.
-  void appendUnsafe(const T& item) noexcept {
+  ASMJIT_INLINE void appendUnsafe(const T& item) noexcept {
     Data* d = _d;
     ASMJIT_ASSERT(d->length < d->capacity);
 
@@ -285,7 +284,7 @@ public:
   }
 
   //! Get index of `val` or `kInvalidIndex` if not found.
-  size_t indexOf(const T& val) const noexcept {
+  ASMJIT_INLINE size_t indexOf(const T& val) const noexcept {
     Data* d = _d;
 
     const T* data = static_cast<const T*>(d->getData());
@@ -299,7 +298,7 @@ public:
   }
 
   //! Remove item at index `i`.
-  void removeAt(size_t i) noexcept {
+  ASMJIT_INLINE void removeAt(size_t i) noexcept {
     Data* d = _d;
     ASMJIT_ASSERT(i < d->length);
 
@@ -309,7 +308,7 @@ public:
   }
 
   //! Swap this pod-vector with `other`.
-  void swap(PodVector<T>& other) noexcept {
+  ASMJIT_INLINE void swap(PodVector<T>& other) noexcept {
     T* otherData = other._d;
     other._d = _d;
     _d = otherData;

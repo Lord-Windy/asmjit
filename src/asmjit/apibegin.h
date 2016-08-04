@@ -37,14 +37,14 @@
 // [CLang]
 #if ASMJIT_CC_CLANG
 # pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wundefined-inline"
+# pragma clang diagnostic ignored "-Wc++11-extensions"
+# pragma clang diagnostic ignored "-Wconstant-logical-operand"
 # pragma clang diagnostic ignored "-Wunnamed-type-template-args"
 #endif // ASMJIT_CC_CLANG
 
 // [GCC]
 #if ASMJIT_CC_GCC
 # pragma GCC diagnostic push
-# pragma GCC diagnostic warning "-Winline"
 #endif // ASMJIT_CC_GCC
 
 // [MSC]
