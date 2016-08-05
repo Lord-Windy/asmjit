@@ -38,10 +38,10 @@ static ASMJIT_INLINE uint32_t hostDetectNaturalStackAlignment() noexcept {
   // ---------
   //
   //   - 32-bit X86 requires stack to be aligned to 4 bytes. Modern Linux, Mac
-  //     and UNIX guarantees 16-byte stack alignment even in 32-bit, but I'm
-  //     not sure about all other UNIX operating systems, because 16-byte
-  //     alignment is an addition to older specification.
-  //   - 64-bit X86 requires stack to be aligned to 16 bytes.
+  //     and UNIX guarantees 16-byte stack alignment even on 32-bit. I'm not
+  //     sure about all other UNIX operating systems, because 16-byte alignment
+  //!    is addition to an older specification.
+  //   - 64-bit X86 requires stack to be aligned to at least 16 bytes.
 #if ASMJIT_ARCH_X86 || ASMJIT_ARCH_X64
   int kIsModernOS = ASMJIT_OS_LINUX  || // Linux & ANDROID.
                     ASMJIT_OS_MAC    || // OSX and iOS.
@@ -49,8 +49,8 @@ static ASMJIT_INLINE uint32_t hostDetectNaturalStackAlignment() noexcept {
   alignment = ASMJIT_ARCH_X64 || kIsModernOS ? 16 : 4;
 #endif
 
-  // ARM & ARM64
-  // -----------
+  // ARM32 & ARM64
+  // -------------
   //
   //   - 32-bit ARM requires stack to be aligned to 8 bytes.
   //   - 64-bit ARM requires stack to be aligned to 16 bytes.

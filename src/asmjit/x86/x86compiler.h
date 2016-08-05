@@ -71,7 +71,7 @@ public:
       _stackFrameCopyGpIndex[i] = static_cast<uint8_t>(kInvalidReg);
   }
 
-  //! Destroy the `X86Func` instance.
+  //! Destroy the `X86Func` instance (NEVER CALLED).
   ASMJIT_INLINE ~X86Func() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -184,7 +184,7 @@ public:
     _usedArgs.reset();
   }
 
-  //! Destroy the `X86CCCall` instance.
+  //! Destroy the `X86CCCall` instance (NEVER CALLED).
   ASMJIT_INLINE ~X86CCCall() noexcept {}
 
   // --------------------------------------------------------------------------

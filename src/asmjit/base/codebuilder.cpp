@@ -514,11 +514,11 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
 }
 
 // ============================================================================
-// [asmjit::CBPipeline]
+// [asmjit::CBPass]
 // ============================================================================
 
-CBPipeline::CBPipeline() noexcept {}
-CBPipeline::~CBPipeline() noexcept {}
+CBPass::CBPass() noexcept {}
+CBPass::~CBPass() noexcept {}
 
 } // asmjit namespace
 

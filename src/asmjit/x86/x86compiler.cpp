@@ -135,7 +135,6 @@ Error X86Compiler::onAttach(CodeHolder* code) noexcept {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
     _typeIdMap = _x86TypeData.idMapX86;
-
     _nativeGpArray = x86OpData.gpd;
     _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
@@ -145,7 +144,6 @@ Error X86Compiler::onAttach(CodeHolder* code) noexcept {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
     _typeIdMap = _x86TypeData.idMapX64;
-
     _nativeGpArray = x86OpData.gpq;
     _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
@@ -171,8 +169,10 @@ Error X86Compiler::finalize() {
     _globalConstPool = nullptr;
   }
 
-  X86RAPipeline ra;
+  X86RAPass ra;
   Error err = ra.process(this, &_pipeAllocator);
+
+  _pipeAllocator.reset();
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);
 
   // TODO: There must be possibility to attach more assemblers, this is not so nice.

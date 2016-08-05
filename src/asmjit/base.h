@@ -12,7 +12,6 @@
 #include "./build.h"
 
 #include "./base/assembler.h"
-#include "./base/bitutils.h"
 #include "./base/codebuilder.h"
 #include "./base/codecompiler.h"
 #include "./base/codeemitter.h"

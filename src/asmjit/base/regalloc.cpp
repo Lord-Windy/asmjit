@@ -21,19 +21,19 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::RAPipeline - Construction / Destruction]
+// [asmjit::RAPass - Construction / Destruction]
 // ============================================================================
 
-RAPipeline::RAPipeline() noexcept :
-  CBPipeline(),
+RAPass::RAPass() noexcept :
+  CBPass(),
   _varMapToVaListOffset(0) {}
-RAPipeline::~RAPipeline() noexcept {}
+RAPass::~RAPass() noexcept {}
 
 // ============================================================================
-// [asmjit::RAPipeline - Interface]
+// [asmjit::RAPass - Interface]
 // ============================================================================
 
-Error RAPipeline::process(CodeBuilder* cb, Zone* zone) noexcept {
+Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
   _cc = static_cast<CodeCompiler*>(cb);
   _zone = zone;
   _emitComments = (cb->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
@@ -66,7 +66,7 @@ Error RAPipeline::process(CodeBuilder* cb, Zone* zone) noexcept {
   return err;
 }
 
-Error RAPipeline::compile(CCFunc* func) noexcept {
+Error RAPass::compile(CCFunc* func) noexcept {
   ASMJIT_PROPAGATE(prepare(func));
 
   Error err;
@@ -99,7 +99,7 @@ Error RAPipeline::compile(CCFunc* func) noexcept {
   return err;
 }
 
-Error RAPipeline::prepare(CCFunc* func) noexcept {
+Error RAPass::prepare(CCFunc* func) noexcept {
   CBNode* end = func->getEnd();
 
   _func = func;
@@ -134,13 +134,13 @@ Error RAPipeline::prepare(CCFunc* func) noexcept {
   return kErrorOk;
 }
 
-void RAPipeline::cleanup() noexcept {
+void RAPass::cleanup() noexcept {
   VirtReg** virtArray = _contextVd.getData();
   size_t virtCount = _contextVd.getLength();
 
   for (size_t i = 0; i < virtCount; i++) {
     VirtReg* vreg = virtArray[i];
-    vreg->resetLocalId();
+    vreg->_raId = kInvalidValue;
     vreg->resetPhysId();
   }
 
@@ -149,7 +149,7 @@ void RAPipeline::cleanup() noexcept {
 }
 
 // ============================================================================
-// [asmjit::RAPipeline - Mem]
+// [asmjit::RAPass - Mem]
 // ============================================================================
 
 static ASMJIT_INLINE uint32_t RAGetDefaultAlignment(uint32_t size) {
@@ -169,7 +169,7 @@ static ASMJIT_INLINE uint32_t RAGetDefaultAlignment(uint32_t size) {
     return 1;
 }
 
-RACell* RAPipeline::_newVarCell(VirtReg* vreg) {
+RACell* RAPass::_newVarCell(VirtReg* vreg) {
   ASMJIT_ASSERT(vreg->_memCell == nullptr);
 
   RACell* cell;
@@ -214,7 +214,7 @@ _NoMemory:
   return nullptr;
 }
 
-RACell* RAPipeline::_newStackCell(uint32_t size, uint32_t alignment) {
+RACell* RAPass::_newStackCell(uint32_t size, uint32_t alignment) {
   RACell* cell = static_cast<RACell*>(_zone->alloc(sizeof(RACell)));
   if (ASMJIT_UNLIKELY(!cell)) return nullptr;
 
@@ -252,7 +252,7 @@ RACell* RAPipeline::_newStackCell(uint32_t size, uint32_t alignment) {
   return cell;
 }
 
-Error RAPipeline::resolveCellOffsets() {
+Error RAPass::resolveCellOffsets() {
   RACell* varCell = _memVarCells;
   RACell* stackCell = _memStackCells;
 
@@ -334,10 +334,10 @@ Error RAPipeline::resolveCellOffsets() {
 }
 
 // ============================================================================
-// [asmjit::RAPipeline - RemoveUnreachableCode]
+// [asmjit::RAPass - RemoveUnreachableCode]
 // ============================================================================
 
-Error RAPipeline::removeUnreachableCode() {
+Error RAPass::removeUnreachableCode() {
   PodList<CBNode*>::Link* link = _unreachableList.getFirst();
   CBNode* stop = getStop();
 
@@ -347,8 +347,7 @@ Error RAPipeline::removeUnreachableCode() {
       // Locate all unreachable nodes.
       CBNode* first = node;
       do {
-        if (node->hasWorkData())
-          break;
+        if (node->hasPassData()) break;
         node = node->getNext();
       } while (node != stop);
 
@@ -390,7 +389,7 @@ Error RAPipeline::removeUnreachableCode() {
 }
 
 // ============================================================================
-// [asmjit::RAPipeline - Liveness Analysis]
+// [asmjit::RAPass - Liveness Analysis]
 // ============================================================================
 
 //! \internal
@@ -400,9 +399,9 @@ struct LivenessTarget {
   CBJump* from;         //!< Jumped from.
 };
 
-Error RAPipeline::livenessAnalysis() {
+Error RAPass::livenessAnalysis() {
   uint32_t bLen = static_cast<uint32_t>(
-    ((_contextVd.getLength() + BitArray::kEntityBits - 1) / BitArray::kEntityBits));
+    ((_contextVd.getLength() + RABits::kEntityBits - 1) / RABits::kEntityBits));
 
   // No variables.
   if (bLen == 0)
@@ -421,13 +420,13 @@ Error RAPipeline::livenessAnalysis() {
   RAData* wd;
 
   size_t varMapToVaListOffset = _varMapToVaListOffset;
-  BitArray* bCur = newBits(bLen);
-  if (!bCur) goto NoMem;
+  RABits* bCur = newBits(bLen);
+  if (ASMJIT_UNLIKELY(!bCur)) goto NoMem;
 
   // Allocate bits for code visited first time.
 Visit:
   for (;;) {
-    wd = node->getWorkData<RAData>();
+    wd = node->getPassData<RAData>();
     if (wd->liveness) {
       if (bCur->_addBitsDelSource(wd->liveness, bCur, bLen))
         goto Patch;
@@ -435,10 +434,10 @@ Visit:
         goto Done;
     }
 
-    BitArray* bTmp = copyBits(bCur, bLen);
+    RABits* bTmp = copyBits(bCur, bLen);
     if (!bTmp) goto NoMem;
 
-    wd = node->getWorkData<RAData>();
+    wd = node->getPassData<RAData>();
     wd->liveness = bTmp;
 
     uint32_t tiedTotal = wd->tiedTotal;
@@ -449,17 +448,16 @@ Visit:
       VirtReg* vreg = tied->vreg;
 
       uint32_t flags = tied->flags;
-      uint32_t localId = vreg->getLocalId();
+      uint32_t raId = vreg->_raId;
 
       if ((flags & TiedReg::kWAll) && !(flags & TiedReg::kRAll)) {
         // Write-Only.
-        bTmp->setBit(localId);
-        bCur->delBit(localId);
+        bTmp->setBit(raId);
+        bCur->delBit(raId);
       }
       else {
         // Read-Only or Read/Write.
-        bTmp->setBit(localId);
-        bCur->setBit(localId);
+        bTmp->setBit(raId);
       }
     }
 
@@ -476,10 +474,10 @@ Visit:
   // Patch already generated liveness bits.
 Patch:
   for (;;) {
-    ASMJIT_ASSERT(node->hasWorkData());
-    ASMJIT_ASSERT(node->getWorkData<RAData>()->liveness != nullptr);
+    ASMJIT_ASSERT(node->hasPassData());
+    ASMJIT_ASSERT(node->getPassData<RAData>()->liveness != nullptr);
 
-    BitArray* bNode = node->getWorkData<RAData>()->liveness;
+    RABits* bNode = node->getPassData<RAData>()->liveness;
     if (!bNode->_addBitsDelSource(bCur, bLen)) goto Done;
     if (node->getType() == CBNode::kNodeLabel) goto Target;
 
@@ -499,7 +497,7 @@ Target:
       }
       else {
         ltTmp = _zone->allocT<LivenessTarget>(
-          sizeof(LivenessTarget) - sizeof(BitArray) + bLen * sizeof(uintptr_t));
+          sizeof(LivenessTarget) - sizeof(RABits) + bLen * sizeof(uintptr_t));
         if (!ltTmp) goto NoMem;
       }
 
@@ -519,9 +517,9 @@ Target:
     // Visit/Patch.
     do {
       ltCur->from = from;
-      bCur->copyBits(node->getWorkData<RAData>()->liveness, bLen);
+      bCur->copyBits(node->getPassData<RAData>()->liveness, bLen);
 
-      if (!from->getWorkData<RAData>()->liveness) {
+      if (!from->getPassData<RAData>()->liveness) {
         node = from;
         goto Visit;
       }
@@ -529,7 +527,7 @@ Target:
       // Issue #25: Moved 'JumpNext' here since it's important to patch
       // code again if there are more live variables than before.
 JumpNext:
-      if (bCur->delBits(from->getWorkData<RAData>()->liveness, bLen)) {
+      if (bCur->delBits(from->getPassData<RAData>()->liveness, bLen)) {
         node = from;
         goto Patch;
       }
@@ -546,11 +544,11 @@ JumpNext:
     }
   }
 
-  bCur->copyBits(node->getWorkData<RAData>()->liveness, bLen);
+  bCur->copyBits(node->getPassData<RAData>()->liveness, bLen);
   node = node->getPrev();
-  if (node->isJmp() || !node->hasWorkData()) goto Done;
+  if (node->isJmp() || !node->hasPassData()) goto Done;
 
-  wd = node->getWorkData<RAData>();
+  wd = node->getPassData<RAData>();
   if (!wd->liveness) goto Visit;
   if (bCur->delBits(wd->liveness, bLen)) goto Patch;
 
@@ -575,12 +573,12 @@ NoMem:
 }
 
 // ============================================================================
-// [asmjit::RAPipeline - Annotate]
+// [asmjit::RAPass - Annotate]
 // ============================================================================
 
-Error RAPipeline::formatInlineComment(StringBuilder& dst, CBNode* node) {
+Error RAPass::formatInlineComment(StringBuilder& dst, CBNode* node) {
 #if !defined(ASMJIT_DISABLE_LOGGING)
-  RAData* wd = node->getWorkData<RAData>();
+  RAData* wd = node->getPassData<RAData>();
 
   if (node->hasInlineComment())
     dst.appendString(node->getInlineComment());
@@ -595,7 +593,7 @@ Error RAPipeline::formatInlineComment(StringBuilder& dst, CBNode* node) {
     dst.appendChar('[');
     dst.appendChars(' ', vdCount);
     dst.appendChar(']');
-    BitArray* liveness = wd->liveness;
+    RABits* liveness = wd->liveness;
 
     uint32_t i;
     for (i = 0; i < vdCount; i++) {
@@ -618,8 +616,8 @@ Error RAPipeline::formatInlineComment(StringBuilder& dst, CBNode* node) {
       // Uppercase if unused.
       if ( (flags & TiedReg::kUnuse)) c -= 'a' - 'A';
 
-      ASMJIT_ASSERT(offset + vreg->getLocalId() < dst.getLength());
-      dst._data[offset + vreg->getLocalId()] = c;
+      ASMJIT_ASSERT(offset + vreg->_raId < dst.getLength());
+      dst._data[offset + vreg->_raId] = c;
     }
   }
 #endif // !ASMJIT_DISABLE_LOGGING

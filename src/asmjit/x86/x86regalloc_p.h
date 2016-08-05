@@ -256,12 +256,12 @@ struct X86RAState : RAState {
   //! Modified registers (mask).
   X86RegMask _modified;
 
-  //! Variables data, the length is stored in `X86RAPipeline`.
+  //! Variables data, the length is stored in `X86RAPass`.
   X86StateCell _cells[1];
 };
 
 // ============================================================================
-// [asmjit::X86RAPipeline]
+// [asmjit::X86RAPass]
 // ============================================================================
 
 #if defined(ASMJIT_DEBUG)
@@ -276,17 +276,17 @@ struct X86RAState : RAState {
 //!
 //! Takes care of generating function prologs and epilogs, and also performs
 //! register allocation.
-class X86RAPipeline : public RAPipeline {
+class X86RAPass : public RAPass {
 public:
-  ASMJIT_NO_COPY(X86RAPipeline)
-  typedef RAPipeline Base;
+  ASMJIT_NO_COPY(X86RAPass)
+  typedef RAPass Base;
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  X86RAPipeline() noexcept;
-  virtual ~X86RAPipeline() noexcept;
+  X86RAPass() noexcept;
+  virtual ~X86RAPass() noexcept;
 
   // --------------------------------------------------------------------------
   // [Interface]

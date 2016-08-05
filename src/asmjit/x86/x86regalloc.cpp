@@ -27,10 +27,10 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-static Error X86RAPipeline_translateOperands(X86RAPipeline* self, Operand_* opArray, uint32_t opCount);
+static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uint32_t opCount);
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Utils]
+// [asmjit::X86RAPass - Utils]
 // ============================================================================
 
 // Getting `VarClass` is the only safe operation when dealing with denormalized
@@ -41,12 +41,12 @@ static ASMJIT_INLINE uint32_t x86TypeIdToClass(uint32_t typeId) noexcept {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Annotate]
+// [asmjit::X86RAPass - Annotate]
 // ============================================================================
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
 static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOptions, const Reg& r, void* handlerData) noexcept {
-  X86RAPipeline* self = static_cast<X86RAPipeline*>(handlerData);
+  X86RAPass* self = static_cast<X86RAPass*>(handlerData);
   X86Compiler* cc = self->cc();
 
   uint32_t id = r.getId();
@@ -70,7 +70,7 @@ static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOpti
 #endif // !ASMJIT_DISABLE_LOGGING
 
 #if defined(ASMJIT_TRACE)
-static void ASMJIT_CDECL X86RAPipeline_traceNode(X86RAPipeline* self, CBNode* node_, const char* prefix) {
+static void ASMJIT_CDECL X86RAPass_traceNode(X86RAPass* self, CBNode* node_, const char* prefix) {
   StringBuilderTmp<256> sb;
 
   switch (node_->getType()) {
@@ -165,12 +165,12 @@ static void ASMJIT_CDECL X86RAPipeline_traceNode(X86RAPipeline* self, CBNode* no
 #endif // ASMJIT_TRACE
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Construction / Destruction]
+// [asmjit::X86RAPass - Construction / Destruction]
 // ============================================================================
 
-X86RAPipeline::X86RAPipeline() noexcept : RAPipeline() {
+X86RAPass::X86RAPass() noexcept : RAPass() {
 #if defined(ASMJIT_TRACE)
-  _traceNode = (TraceNodeFunc)X86RAPipeline_traceNode;
+  _traceNode = (TraceNodeFunc)X86RAPass_traceNode;
 #endif // ASMJIT_TRACE
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
@@ -180,17 +180,17 @@ X86RAPipeline::X86RAPipeline() noexcept : RAPipeline() {
   _state = &_x86State;
   _varMapToVaListOffset = ASMJIT_OFFSET_OF(X86RAData, tiedArray);
 }
-X86RAPipeline::~X86RAPipeline() noexcept {}
+X86RAPass::~X86RAPass() noexcept {}
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Interface]
+// [asmjit::X86RAPass - Interface]
 // ============================================================================
 
-Error X86RAPipeline::process(CodeBuilder* cb, Zone* zone) noexcept {
+Error X86RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
   return Base::process(cb, zone);
 }
 
-Error X86RAPipeline::prepare(CCFunc* func) noexcept {
+Error X86RAPass::prepare(CCFunc* func) noexcept {
   ASMJIT_PROPAGATE(Base::prepare(func));
 
   uint32_t archType = _cc->getArchType();
@@ -397,10 +397,10 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitLoad]
+// [asmjit::X86RAPass - EmitLoad]
 // ============================================================================
 
-void X86RAPipeline::emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) {
+void X86RAPass::emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) {
   ASMJIT_ASSERT(physId != kInvalidReg);
   X86Mem m = getVarMem(vreg);
 
@@ -431,10 +431,10 @@ void X86RAPipeline::emitLoad(VirtReg* vreg, uint32_t physId, const char* reason)
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitSave]
+// [asmjit::X86RAPass - EmitSave]
 // ============================================================================
 
-void X86RAPipeline::emitSave(VirtReg* vreg, uint32_t physId, const char* reason) {
+void X86RAPass::emitSave(VirtReg* vreg, uint32_t physId, const char* reason) {
   ASMJIT_ASSERT(physId != kInvalidReg);
   X86Mem m = getVarMem(vreg);
 
@@ -465,10 +465,10 @@ void X86RAPipeline::emitSave(VirtReg* vreg, uint32_t physId, const char* reason)
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitMove]
+// [asmjit::X86RAPass - EmitMove]
 // ============================================================================
 
-void X86RAPipeline::emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) {
+void X86RAPass::emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) {
   ASMJIT_ASSERT(toPhysId != kInvalidReg);
   ASMJIT_ASSERT(fromPhysId != kInvalidReg);
 
@@ -499,10 +499,10 @@ void X86RAPipeline::emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhys
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitSwap]
+// [asmjit::X86RAPass - EmitSwap]
 // ============================================================================
 
-void X86RAPipeline::emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aIndex, uint32_t bIndex, const char* reason) {
+void X86RAPass::emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aIndex, uint32_t bIndex, const char* reason) {
   ASMJIT_ASSERT(aIndex != kInvalidReg);
   ASMJIT_ASSERT(bIndex != kInvalidReg);
 
@@ -517,10 +517,10 @@ void X86RAPipeline::emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aIndex, 
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitPushSequence / EmitPopSequence]
+// [asmjit::X86RAPass - EmitPushSequence / EmitPopSequence]
 // ============================================================================
 
-void X86RAPipeline::emitPushSequence(uint32_t regMask) {
+void X86RAPass::emitPushSequence(uint32_t regMask) {
   uint32_t i = 0;
 
   X86Gp gpr(_zsp);
@@ -535,7 +535,7 @@ void X86RAPipeline::emitPushSequence(uint32_t regMask) {
   }
 }
 
-void X86RAPipeline::emitPopSequence(uint32_t regMask) {
+void X86RAPass::emitPopSequence(uint32_t regMask) {
   if (regMask == 0) return;
 
   uint32_t i = static_cast<int32_t>(_regCount.getGp());
@@ -553,10 +553,10 @@ void X86RAPipeline::emitPopSequence(uint32_t regMask) {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitConvertVarToVar]
+// [asmjit::X86RAPass - EmitConvertVarToVar]
 // ============================================================================
 
-void X86RAPipeline::emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uint32_t srcType, uint32_t srcIndex) {
+void X86RAPass::emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uint32_t srcType, uint32_t srcIndex) {
   switch (dstType) {
     case VirtType::kIdI8:
     case VirtType::kIdU8:
@@ -609,10 +609,10 @@ void X86RAPipeline::emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uin
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitMoveVarOnStack / EmitMoveImmOnStack]
+// [asmjit::X86RAPass - EmitMoveVarOnStack / EmitMoveImmOnStack]
 // ============================================================================
 
-void X86RAPipeline::emitMoveVarOnStack(
+void X86RAPass::emitMoveVarOnStack(
   uint32_t dstType, const X86Mem* dst,
   uint32_t srcType, uint32_t srcIndex) {
 
@@ -876,7 +876,7 @@ _MovXmmQ:
   cc()->emit(X86Inst::kIdMovlps, m0, r0);
 }
 
-void X86RAPipeline::emitMoveImmOnStack(uint32_t dstType, const X86Mem* dst, const Imm* src) {
+void X86RAPass::emitMoveImmOnStack(uint32_t dstType, const X86Mem* dst, const Imm* src) {
   X86Mem mem(*dst);
   Imm imm(*src);
 
@@ -971,10 +971,10 @@ _Move64:
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - EmitMoveImmToReg]
+// [asmjit::X86RAPass - EmitMoveImmToReg]
 // ============================================================================
 
-void X86RAPipeline::emitMoveImmToReg(uint32_t dstType, uint32_t dstIndex, const Imm* src) {
+void X86RAPass::emitMoveImmToReg(uint32_t dstType, uint32_t dstIndex, const Imm* src) {
   ASMJIT_ASSERT(dstIndex != kInvalidReg);
 
   X86Reg r0;
@@ -1036,12 +1036,12 @@ _Move32:
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Register Management]
+// [asmjit::X86RAPass - Register Management]
 // ============================================================================
 
 #if defined(ASMJIT_DEBUG)
 template<int C>
-static ASMJIT_INLINE void X86RAPipeline_checkStateVars(X86RAPipeline* self) {
+static ASMJIT_INLINE void X86RAPass_checkStateVars(X86RAPass* self) {
   X86RAState* state = self->getState();
   VirtReg** sVars = state->getListByRC(C);
 
@@ -1070,21 +1070,21 @@ static ASMJIT_INLINE void X86RAPipeline_checkStateVars(X86RAPipeline* self) {
   }
 }
 
-void X86RAPipeline::_checkState() {
-  X86RAPipeline_checkStateVars<X86Reg::kClassGp >(this);
-  X86RAPipeline_checkStateVars<X86Reg::kClassMm >(this);
-  X86RAPipeline_checkStateVars<X86Reg::kClassXyz>(this);
+void X86RAPass::_checkState() {
+  X86RAPass_checkStateVars<X86Reg::kClassGp >(this);
+  X86RAPass_checkStateVars<X86Reg::kClassMm >(this);
+  X86RAPass_checkStateVars<X86Reg::kClassXyz>(this);
 }
 #else
-void X86RAPipeline::_checkState() {}
+void X86RAPass::_checkState() {}
 #endif // ASMJIT_DEBUG
 
 // ============================================================================
-// [asmjit::X86RAPipeline - State - Load]
+// [asmjit::X86RAPass - State - Load]
 // ============================================================================
 
 template<int C>
-static ASMJIT_INLINE void X86RAPipeline_loadStateVars(X86RAPipeline* self, X86RAState* src) {
+static ASMJIT_INLINE void X86RAPass_loadStateVars(X86RAPass* self, X86RAState* src) {
   X86RAState* cur = self->getState();
 
   VirtReg** cVars = cur->getListByRC(C);
@@ -1105,7 +1105,7 @@ static ASMJIT_INLINE void X86RAPipeline_loadStateVars(X86RAPipeline* self, X86RA
   }
 }
 
-void X86RAPipeline::loadState(RAState* src_) {
+void X86RAPass::loadState(RAState* src_) {
   X86RAState* cur = getState();
   X86RAState* src = static_cast<X86RAState*>(src_);
 
@@ -1113,9 +1113,9 @@ void X86RAPipeline::loadState(RAState* src_) {
   uint32_t count = static_cast<uint32_t>(_contextVd.getLength());
 
   // Load allocated variables.
-  X86RAPipeline_loadStateVars<X86Reg::kClassGp >(this, src);
-  X86RAPipeline_loadStateVars<X86Reg::kClassMm >(this, src);
-  X86RAPipeline_loadStateVars<X86Reg::kClassXyz>(this, src);
+  X86RAPass_loadStateVars<X86Reg::kClassGp >(this, src);
+  X86RAPass_loadStateVars<X86Reg::kClassMm >(this, src);
+  X86RAPass_loadStateVars<X86Reg::kClassXyz>(this, src);
 
   // Load masks.
   cur->_occupied = src->_occupied;
@@ -1137,10 +1137,10 @@ void X86RAPipeline::loadState(RAState* src_) {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - State - Save]
+// [asmjit::X86RAPass - State - Save]
 // ============================================================================
 
-RAState* X86RAPipeline::saveState() {
+RAState* X86RAPass::saveState() {
   VirtReg** vregs = _contextVd.getData();
   uint32_t count = static_cast<uint32_t>(_contextVd.getLength());
 
@@ -1171,11 +1171,11 @@ RAState* X86RAPipeline::saveState() {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - State - Switch]
+// [asmjit::X86RAPass - State - Switch]
 // ============================================================================
 
 template<int C>
-static ASMJIT_INLINE void X86RAPipeline_switchStateVars(X86RAPipeline* self, X86RAState* src) {
+static ASMJIT_INLINE void X86RAPass_switchStateVars(X86RAPass* self, X86RAState* src) {
   X86RAState* dst = self->getState();
 
   VirtReg** dVars = dst->getListByRC(C);
@@ -1194,7 +1194,7 @@ static ASMJIT_INLINE void X86RAPipeline_switchStateVars(X86RAPipeline* self, X86
       if (dVReg == sVd) continue;
 
       if (dVReg) {
-        const X86StateCell& cell = cells[dVReg->getLocalId()];
+        const X86StateCell& cell = cells[dVReg->_raId];
 
         if (cell.getState() != VirtReg::kStateReg) {
           if (cell.getState() == VirtReg::kStateMem)
@@ -1220,7 +1220,7 @@ _MoveOrLoad:
       }
 
       if (dVReg) {
-        const X86StateCell& cell = cells[dVReg->getLocalId()];
+        const X86StateCell& cell = cells[dVReg->_raId];
         if (!sVd) {
           if (cell.getState() == VirtReg::kStateReg)
             continue;
@@ -1284,7 +1284,7 @@ _MoveOrLoad:
   }
 }
 
-void X86RAPipeline::switchState(RAState* src_) {
+void X86RAPass::switchState(RAState* src_) {
   ASMJIT_ASSERT(src_ != nullptr);
 
   X86RAState* cur = getState();
@@ -1295,9 +1295,9 @@ void X86RAPipeline::switchState(RAState* src_) {
     return;
 
   // Switch variables.
-  X86RAPipeline_switchStateVars<X86Reg::kClassGp >(this, src);
-  X86RAPipeline_switchStateVars<X86Reg::kClassMm >(this, src);
-  X86RAPipeline_switchStateVars<X86Reg::kClassXyz>(this, src);
+  X86RAPass_switchStateVars<X86Reg::kClassGp >(this, src);
+  X86RAPass_switchStateVars<X86Reg::kClassMm >(this, src);
+  X86RAPass_switchStateVars<X86Reg::kClassXyz>(this, src);
 
   // Calculate changed state.
   VirtReg** vregs = _contextVd.getData();
@@ -1319,7 +1319,7 @@ void X86RAPipeline::switchState(RAState* src_) {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - State - Intersect]
+// [asmjit::X86RAPass - State - Intersect]
 // ============================================================================
 
 // The algorithm is actually not so smart, but tries to find an intersection od
@@ -1328,7 +1328,7 @@ void X86RAPipeline::switchState(RAState* src_) {
 // and `b` and performs that action here. It may improve the switch state code
 // in certain cases, but doesn't necessarily do the best job possible.
 template<int C>
-static ASMJIT_INLINE void X86RAPipeline_intersectStateVars(X86RAPipeline* self, X86RAState* a, X86RAState* b) {
+static ASMJIT_INLINE void X86RAPass_intersectStateVars(X86RAPass* self, X86RAState* a, X86RAState* b) {
   X86RAState* dst = self->getState();
 
   VirtReg** dVars = dst->getListByRC(C);
@@ -1354,8 +1354,8 @@ static ASMJIT_INLINE void X86RAPipeline_intersectStateVars(X86RAPipeline* self, 
       if (dVReg == aVReg) continue;
 
       if (dVReg) {
-        const X86StateCell& aCell = aCells[dVReg->getLocalId()];
-        const X86StateCell& bCell = bCells[dVReg->getLocalId()];
+        const X86StateCell& aCell = aCells[dVReg->_raId];
+        const X86StateCell& bCell = bCells[dVReg->_raId];
 
         if (aCell.getState() != VirtReg::kStateReg && bCell.getState() != VirtReg::kStateReg) {
           if (aCell.getState() == VirtReg::kStateMem || bCell.getState() == VirtReg::kStateMem)
@@ -1380,8 +1380,8 @@ static ASMJIT_INLINE void X86RAPipeline_intersectStateVars(X86RAPipeline* self, 
       }
 
       if (dVReg) {
-        const X86StateCell& aCell = aCells[dVReg->getLocalId()];
-        const X86StateCell& bCell = bCells[dVReg->getLocalId()];
+        const X86StateCell& aCell = aCells[dVReg->_raId];
+        const X86StateCell& bCell = bCells[dVReg->_raId];
 
         if (!aVReg) {
           if (aCell.getState() == VirtReg::kStateReg || bCell.getState() == VirtReg::kStateReg)
@@ -1417,33 +1417,33 @@ static ASMJIT_INLINE void X86RAPipeline_intersectStateVars(X86RAPipeline* self, 
       VirtReg* vreg = dVars[physId];
       if (!vreg) continue;
 
-      const X86StateCell& aCell = aCells[vreg->getLocalId()];
+      const X86StateCell& aCell = aCells[vreg->_raId];
       if ((dModified & regMask) && !(aModified & regMask) && aCell.getState() == VirtReg::kStateReg)
         self->save<C>(vreg);
     }
   }
 }
 
-void X86RAPipeline::intersectStates(RAState* a_, RAState* b_) {
+void X86RAPass::intersectStates(RAState* a_, RAState* b_) {
   X86RAState* a = static_cast<X86RAState*>(a_);
   X86RAState* b = static_cast<X86RAState*>(b_);
 
   ASMJIT_ASSERT(a != nullptr);
   ASMJIT_ASSERT(b != nullptr);
 
-  X86RAPipeline_intersectStateVars<X86Reg::kClassGp >(this, a, b);
-  X86RAPipeline_intersectStateVars<X86Reg::kClassMm >(this, a, b);
-  X86RAPipeline_intersectStateVars<X86Reg::kClassXyz>(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kClassGp >(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kClassMm >(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kClassXyz>(this, a, b);
 
   ASMJIT_X86_CHECK_STATE
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - GetJccFlow / GetOppositeJccFlow]
+// [asmjit::X86RAPass - GetJccFlow / GetOppositeJccFlow]
 // ============================================================================
 
 //! \internal
-static ASMJIT_INLINE CBNode* X86RAPipeline_getJccFlow(CBJump* jNode) {
+static ASMJIT_INLINE CBNode* X86RAPass_getJccFlow(CBJump* jNode) {
   if (jNode->isTaken())
     return jNode->getTarget();
   else
@@ -1451,7 +1451,7 @@ static ASMJIT_INLINE CBNode* X86RAPipeline_getJccFlow(CBJump* jNode) {
 }
 
 //! \internal
-static ASMJIT_INLINE CBNode* X86RAPipeline_getOppositeJccFlow(CBJump* jNode) {
+static ASMJIT_INLINE CBNode* X86RAPass_getOppositeJccFlow(CBJump* jNode) {
   if (jNode->isTaken())
     return jNode->getNext();
   else
@@ -1459,11 +1459,11 @@ static ASMJIT_INLINE CBNode* X86RAPipeline_getOppositeJccFlow(CBJump* jNode) {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - SingleVarInst]
+// [asmjit::X86RAPass - SingleVarInst]
 // ============================================================================
 
 //! \internal
-static void X86RAPipeline_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
+static void X86RAPass_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
   switch (instId) {
     // - andn     reg, reg ; Set all bits in reg to 0.
     // - xor/pxor reg, reg ; Set all bits in reg to 0.
@@ -1492,13 +1492,13 @@ static void X86RAPipeline_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Helpers]
+// [asmjit::X86RAPass - Helpers]
 // ============================================================================
 
 //! \internal
 //!
 //! Get mask of all registers actually used to pass function arguments.
-static ASMJIT_INLINE X86RegMask X86RAPipeline_getUsedArgs(X86RAPipeline* self, X86CCCall* node, X86FuncDecl* decl) {
+static ASMJIT_INLINE X86RegMask X86RAPass_getUsedArgs(X86RAPass* self, X86CCCall* node, X86FuncDecl* decl) {
   X86RegMask regs;
   regs.reset();
 
@@ -1515,7 +1515,7 @@ static ASMJIT_INLINE X86RegMask X86RAPipeline_getUsedArgs(X86RAPipeline* self, X
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - SArg Insertion]
+// [asmjit::X86RAPass - SArg Insertion]
 // ============================================================================
 
 struct SArgData {
@@ -1531,7 +1531,7 @@ struct SArgData {
   (s16 << 16) | (s17 << 17) | (s18 << 18) | (s19 << 19) | (s20 << 20) | (s21 << 21) | (s22 << 22) | (s23 << 23) | \
   (s24 << 24)
 #define A 0 // Auto-convert (doesn't need conversion step).
-static const uint32_t X86RAPipeline_sArgConvTable[VirtType::kIdCount] = {
+static const uint32_t X86RAPass_sArgConvTable[VirtType::kIdCount] = {
   // dst <- | i8| u8|i16|u16|i32|u32|i64|u64| iP| uP|f32|f64|mmx| k |xmm|xSs|xPs|xSd|xPd|ymm|yPs|yPd|zmm|zPs|zPd|
   //--------+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
   SARG(i8   , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
@@ -1563,12 +1563,12 @@ static const uint32_t X86RAPipeline_sArgConvTable[VirtType::kIdCount] = {
 #undef A
 #undef SARG
 
-static ASMJIT_INLINE bool X86RAPipeline_mustConvertSArg(X86RAPipeline* self, uint32_t aType, uint32_t sType) {
-  return (X86RAPipeline_sArgConvTable[aType] & (1 << sType)) != 0;
+static ASMJIT_INLINE bool X86RAPass_mustConvertSArg(X86RAPass* self, uint32_t aType, uint32_t sType) {
+  return (X86RAPass_sArgConvTable[aType] & (1 << sType)) != 0;
 }
 
-static ASMJIT_INLINE uint32_t X86RAPipeline_typeOfConvertedSArg(X86RAPipeline* self, uint32_t aType, uint32_t sType) {
-  ASMJIT_ASSERT(X86RAPipeline_mustConvertSArg(self, aType, sType));
+static ASMJIT_INLINE uint32_t X86RAPass_typeOfConvertedSArg(X86RAPass* self, uint32_t aType, uint32_t sType) {
+  ASMJIT_ASSERT(X86RAPass_mustConvertSArg(self, aType, sType));
   if (VirtType::isIntTypeId(aType)) return aType;
 
   if (aType == VirtType::kIdF32) return VirtType::kIdX86XmmSs;
@@ -1577,8 +1577,8 @@ static ASMJIT_INLINE uint32_t X86RAPipeline_typeOfConvertedSArg(X86RAPipeline* s
   return aType;
 }
 
-static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
-  X86RAPipeline* self, X86CCCall* call,
+static ASMJIT_INLINE Error X86RAPass_insertPushArg(
+  X86RAPass* self, X86CCCall* call,
   VirtReg* sReg, const uint32_t* gaRegs,
   const FuncInOut& arg, uint32_t argIndex,
   SArgData* sArgList, uint32_t& sArgCount) {
@@ -1605,8 +1605,8 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
   const VirtType& sInfo = _x86TypeData.typeInfo[sType];
   uint32_t sClass = sInfo.getRegClass();
 
-  if (X86RAPipeline_mustConvertSArg(self, aType, sType)) {
-    uint32_t cType = X86RAPipeline_typeOfConvertedSArg(self, aType, sType);
+  if (X86RAPass_mustConvertSArg(self, aType, sType)) {
+    uint32_t cType = X86RAPass_typeOfConvertedSArg(self, aType, sType);
 
     const VirtType& cInfo = _x86TypeData.typeInfo[cType];
     uint32_t cClass = cInfo.getRegClass();
@@ -1632,8 +1632,8 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
     X86RAData* raData = self->newRAData(2);
     if (!raData) return DebugUtils::errored(kErrorNoHeapMemory);
 
-    ASMJIT_PROPAGATE(self->makeLocal(cReg));
-    ASMJIT_PROPAGATE(self->makeLocal(sReg));
+    ASMJIT_PROPAGATE(self->assignRAId(cReg));
+    ASMJIT_PROPAGATE(self->assignRAId(sReg));
 
     raData->tiedTotal = 2;
     raData->tiedCount.reset();
@@ -1656,7 +1656,7 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
       raData->tiedIndex.set(sClass, 1);
     }
 
-    sArg->setWorkData(raData);
+    sArg->setPassData(raData);
     sArg->_args |= Utils::mask(argIndex);
 
     cc->addBefore(sArg, call);
@@ -1672,7 +1672,7 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
   }
   else {
     CCPushArg* sArg = sArgData->sArg;
-    ASMJIT_PROPAGATE(self->makeLocal(sReg));
+    ASMJIT_PROPAGATE(self->assignRAId(sReg));
 
     if (!sArg) {
       sArg = cc->newNodeT<CCPushArg>(call, sReg, (VirtReg*)nullptr);
@@ -1690,7 +1690,7 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
       raData->clobberedRegs.reset();
       raData->tiedArray[0].setup(sReg, TiedReg::kRReg, 0, gaRegs[sClass]);
 
-      sArg->setWorkData(raData);
+      sArg->setPassData(raData);
       sArgData->sArg = sArg;
 
       cc->addBefore(sArg, call);
@@ -1702,7 +1702,7 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Fetch]
+// [asmjit::X86RAPass - Fetch]
 // ============================================================================
 
 //! \internal
@@ -1712,7 +1712,7 @@ static ASMJIT_INLINE Error X86RAPipeline_insertPushArg(
 //! For each node:
 //! - Create and assign groupId and flowId.
 //! - Collect all variables and merge them to vaList.
-Error X86RAPipeline::fetch() {
+Error X86RAPass::fetch() {
   ASMJIT_TLOG("[F] ======= Fetch (Begin)\n");
 
   uint32_t archType = cc()->getArchType();
@@ -1757,7 +1757,7 @@ Error X86RAPipeline::fetch() {
   do { \
     X86RAData* raData = newRAData(0); \
     if (!raData) goto NoMem; \
-    NODE->setWorkData(raData); \
+    NODE->setPassData(raData); \
   } while (0)
 
 #define RA_DECLARE() \
@@ -1809,7 +1809,7 @@ Error X86RAPipeline::fetch() {
         tied++; \
         tiedTotal--; \
       } \
-      NODE->setWorkData(raData); \
+      NODE->setPassData(raData); \
      } \
   } while (0)
 
@@ -1821,7 +1821,7 @@ Error X86RAPipeline::fetch() {
     LNK->refCount++; \
     REG->_tied = LNK; \
     \
-    if (makeLocal(REG) != kErrorOk) \
+    if (ASMJIT_UNLIKELY(assignRAId(REG) != kErrorOk)) \
       goto NoMem; \
     tiedCount.add(REG->getRegClass()); \
   } while (0)
@@ -1835,7 +1835,7 @@ Error X86RAPipeline::fetch() {
       LNK->setup(REG, 0, 0, NEW_ALLOCABLE); \
       REG->_tied = LNK; \
       \
-      if (makeLocal(REG) != kErrorOk) \
+      if (ASMJIT_UNLIKELY(assignRAId(REG) != kErrorOk)) \
         goto NoMem; \
       tiedCount.add(REG->getRegClass()); \
     } \
@@ -1850,7 +1850,7 @@ Error X86RAPipeline::fetch() {
 
   do {
 _Do:
-    while (node_->hasWorkData()) {
+    while (node_->hasPassData()) {
 _NextGroup:
       if (!jLink)
         jLink = _jccList.getFirst();
@@ -1858,7 +1858,7 @@ _NextGroup:
         jLink = jLink->getNext();
 
       if (!jLink) goto _Done;
-      node_ = X86RAPipeline_getOppositeJccFlow(static_cast<CBJump*>(jLink->getValue()));
+      node_ = X86RAPass_getOppositeJccFlow(static_cast<CBJump*>(jLink->getValue()));
     }
 
     flowId++;
@@ -2194,7 +2194,7 @@ _NextGroup:
             // Handle instructions which result in zeros/ones or nop if used with the
             // same destination and source operand.
             if (tiedTotal == 1 && opCount >= 2 && opArray[0].isVirtReg() && opArray[1].isVirtReg() && !node->hasMemOp())
-              X86RAPipeline_prepareSingleVarInst(instId, &agTmp[0]);
+              X86RAPass_prepareSingleVarInst(instId, &agTmp[0]);
           }
         }
         RA_FINALIZE(node_);
@@ -2211,7 +2211,7 @@ _NextGroup:
           // We also advance our node pointer to the target node to simulate
           // natural flow of the function.
           if (jNode->isJmp()) {
-            if (!next->hasWorkData())
+            if (!next->hasPassData())
               ASMJIT_PROPAGATE(addUnreachableNode(next));
 
             // Jump not followed.
@@ -2227,7 +2227,7 @@ _NextGroup:
             // Jump not followed.
             if (!jTarget) break;
 
-            if (jTarget->hasWorkData()) {
+            if (jTarget->hasPassData()) {
               uint32_t jTargetFlowId = jTarget->getFlowId();
 
               // Update CBNode::kFlagIsTaken to true if this is a conditional
@@ -2237,13 +2237,13 @@ _NextGroup:
                 jNode->_flags |= CBNode::kFlagIsTaken;
               }
             }
-            else if (next->hasWorkData()) {
+            else if (next->hasPassData()) {
               node_ = jTarget;
               goto _Do;
             }
             else {
               ASMJIT_PROPAGATE(addJccNode(jNode));
-              node_ = X86RAPipeline_getJccFlow(jNode);
+              node_ = X86RAPass_getJccFlow(jNode);
               goto _Do;
             }
           }
@@ -2352,7 +2352,7 @@ _NextGroup:
         }
         RA_FINALIZE(node_);
 
-        if (!next->hasWorkData())
+        if (!next->hasPassData())
           ASMJIT_PROPAGATE(addUnreachableNode(next));
         goto _NextGroup;
       }
@@ -2371,7 +2371,7 @@ _NextGroup:
 
         func->addFuncFlags(kFuncFlagIsCaller);
         func->mergeCallStackSize(node->_x86Decl.getArgStackSize());
-        node->_usedArgs = X86RAPipeline_getUsedArgs(this, node, decl);
+        node->_usedArgs = X86RAPass_getUsedArgs(this, node, decl);
 
         uint32_t i;
         uint32_t argCount = decl->getNumArgs();
@@ -2450,7 +2450,7 @@ _NextGroup:
           // easier to handle argument conversions, because there will be at
           // most only one node per conversion.
           else {
-            if (X86RAPipeline_insertPushArg(this, node, vreg, gaRegs, arg, i, sArgList, sArgCount) != kErrorOk)
+            if (X86RAPass_insertPushArg(this, node, vreg, gaRegs, arg, i, sArgList, sArgCount) != kErrorOk)
               goto NoMem;
           }
         }
@@ -2496,7 +2496,7 @@ _Done:
   // Mark exit label and end node as fetched, otherwise they can be removed by
   // `removeUnreachableCode()`, which would lead to a crash in some later step.
   node_ = func->getEnd();
-  if (!node_->hasWorkData()) {
+  if (!node_->hasPassData()) {
     CBLabel* fExit = func->getExitNode();
     RA_POPULATE(fExit);
     fExit->setFlowId(++flowId);
@@ -2518,10 +2518,10 @@ NoMem:
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Annotate]
+// [asmjit::X86RAPass - Annotate]
 // ============================================================================
 
-Error X86RAPipeline::annotate() {
+Error X86RAPass::annotate() {
 #if !defined(ASMJIT_DISABLE_LOGGING)
   CCFunc* func = getFunc();
 
@@ -2567,7 +2567,7 @@ struct X86BaseAlloc {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE X86BaseAlloc(X86RAPipeline* context) {
+  ASMJIT_INLINE X86BaseAlloc(X86RAPass* context) {
     _context = context;
     _cc = context->cc();
   }
@@ -2578,8 +2578,8 @@ struct X86BaseAlloc {
   // --------------------------------------------------------------------------
 
   //! Get the context.
-  ASMJIT_INLINE X86RAPipeline* getContext() const { return _context; }
-  //! Get the current state (always the same instance as X86RAPipeline::_x86State).
+  ASMJIT_INLINE X86RAPass* getContext() const { return _context; }
+  //! Get the current state (always the same instance as X86RAPass::_x86State).
   ASMJIT_INLINE X86RAState* getState() const { return _context->getState(); }
 
   //! Get the node.
@@ -2613,7 +2613,7 @@ struct X86BaseAlloc {
   // --------------------------------------------------------------------------
 
 protected:
-  // Just to prevent calling these methods by X86RAPipeline::translate().
+  // Just to prevent calling these methods by X86RAPass::translate().
 
   ASMJIT_INLINE void init(CBNode* node, X86RAData* map);
   ASMJIT_INLINE void cleanup();
@@ -2633,7 +2633,7 @@ protected:
   // --------------------------------------------------------------------------
 
   //! RA context.
-  X86RAPipeline* _context;
+  X86RAPass* _context;
   //! Compiler.
   X86Compiler* _cc;
 
@@ -2745,7 +2745,7 @@ struct X86VarAlloc : public X86BaseAlloc {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE X86VarAlloc(X86RAPipeline* context) : X86BaseAlloc(context) {}
+  ASMJIT_INLINE X86VarAlloc(X86RAPass* context) : X86BaseAlloc(context) {}
   ASMJIT_INLINE ~X86VarAlloc() {}
 
   // --------------------------------------------------------------------------
@@ -2759,7 +2759,7 @@ struct X86VarAlloc : public X86BaseAlloc {
   // --------------------------------------------------------------------------
 
 protected:
-  // Just to prevent calling these methods by X86RAPipeline::translate().
+  // Just to prevent calling these methods by X86RAPass::translate().
 
   ASMJIT_INLINE void init(CBNode* node, X86RAData* map);
   ASMJIT_INLINE void cleanup();
@@ -2818,7 +2818,7 @@ protected:
 
 ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
   // Initialize.
-  X86RAData* raData = node_->getWorkData<X86RAData>();
+  X86RAData* raData = node_->getPassData<X86RAData>();
   // Initialize the allocator; connect Vd->Va.
   init(node_, raData);
 
@@ -2847,7 +2847,7 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
     // Translate node operands.
     if (node_->getType() == CBNode::kNodeInst) {
       CBInst* node = static_cast<CBInst*>(node_);
-      ASMJIT_PROPAGATE(X86RAPipeline_translateOperands(_context, node->getOpArray(), node->getOpCount()));
+      ASMJIT_PROPAGATE(X86RAPass_translateOperands(_context, node->getOpArray(), node->getOpCount()));
     }
     else if (node_->getType() == CBNode::kNodePushArg) {
       CCPushArg* node = static_cast<CCPushArg*>(node_);
@@ -3324,7 +3324,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   uint32_t counter = 0;
   uint32_t maxInst = _cc->getMaxLookAhead();
 
-  uint32_t localId = vreg->getLocalId();
+  uint32_t raId = vreg->_raId;
   uint32_t localToken = _cc->_generateUniqueToken();
 
   uint32_t gfIndex = 0;
@@ -3354,7 +3354,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
       counter++;
 
       // Terminate if the variable is dead here.
-      if (node->hasLiveness() && !node->getLiveness()->getBit(localId)) {
+      if (node->hasLiveness() && !node->getLiveness()->getBit(raId)) {
         ASMJIT_TLOG("[RA-GUESS] %s (Terminating, Not alive here)\n", vreg->getName());
         break;
       }
@@ -3514,7 +3514,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   // Stop now if there is only one bit (register) set in `allocableRegs` mask.
   if (Utils::isPowerOf2(allocableRegs)) return allocableRegs;
 
-  uint32_t localId = vreg->getLocalId();
+  uint32_t raId = vreg->_raId;
   uint32_t safeRegs = allocableRegs;
 
   uint32_t i;
@@ -3523,11 +3523,11 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   // Look ahead and calculate mask of special registers on both - input/output.
   CBNode* node = _node;
   for (i = 0; i < maxLookAhead; i++) {
-    X86RAData* raData = node->getWorkData<X86RAData>();
-    BitArray* liveness = raData ? raData->liveness : static_cast<BitArray*>(nullptr);
+    X86RAData* raData = node->getPassData<X86RAData>();
+    RABits* liveness = raData ? raData->liveness : static_cast<RABits*>(nullptr);
 
     // If the variable becomes dead it doesn't make sense to continue.
-    if (liveness && !liveness->getBit(localId)) break;
+    if (liveness && !liveness->getBit(raId)) break;
 
     // Stop on `CBSentinel` and `CCFuncRet`.
     if (node->hasFlag(CBNode::kFlagIsRet)) break;
@@ -3545,7 +3545,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
     node = node->getNext();
     ASMJIT_ASSERT(node != nullptr);
 
-    raData = node->getWorkData<X86RAData>();
+    raData = node->getPassData<X86RAData>();
     if (raData) {
       TiedReg* tied = raData->findTiedByRC(C, vreg);
       uint32_t mask;
@@ -3628,7 +3628,7 @@ struct X86CallAlloc : public X86BaseAlloc {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE X86CallAlloc(X86RAPipeline* context) : X86BaseAlloc(context) {}
+  ASMJIT_INLINE X86CallAlloc(X86RAPass* context) : X86BaseAlloc(context) {}
   ASMJIT_INLINE ~X86CallAlloc() {}
 
   // --------------------------------------------------------------------------
@@ -3649,7 +3649,7 @@ struct X86CallAlloc : public X86BaseAlloc {
   // --------------------------------------------------------------------------
 
 protected:
-  // Just to prevent calling these methods from X86RAPipeline::translate().
+  // Just to prevent calling these methods from X86RAPass::translate().
   ASMJIT_INLINE void init(X86CCCall* node, X86RAData* raData);
   ASMJIT_INLINE void cleanup();
 
@@ -3725,7 +3725,7 @@ protected:
 
 ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
   // Initialize the allocator; prepare basics and connect Vd->Va.
-  X86RAData* raData = node->getWorkData<X86RAData>();
+  X86RAData* raData = node->getPassData<X86RAData>();
   init(node, raData);
 
   // Plan register allocation. Planner is only able to assign one register per
@@ -3759,7 +3759,7 @@ ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
   duplicate<X86Reg::kClassXyz>();
 
   // Translate call operand.
-  ASMJIT_PROPAGATE(X86RAPipeline_translateOperands(_context, node->getOpArray(), node->getOpCount()));
+  ASMJIT_PROPAGATE(X86RAPass_translateOperands(_context, node->getOpArray(), node->getOpCount()));
 
   // To emit instructions after call.
   _cc->_setCursor(node);
@@ -4136,7 +4136,7 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessAlloc(VirtReg* vreg, uint32_t allocabl
     node = node->getNext();
     ASMJIT_ASSERT(node != nullptr);
 
-    X86RAData* raData = node->getWorkData<X86RAData>();
+    X86RAData* raData = node->getPassData<X86RAData>();
     if (raData) {
       TiedReg* tied = raData->findTiedByRC(C, vreg);
       if (tied) {
@@ -4279,11 +4279,11 @@ ASMJIT_INLINE void X86CallAlloc::ret() {
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - TranslateOperands]
+// [asmjit::X86RAPass - TranslateOperands]
 // ============================================================================
 
 //! \internal
-static Error X86RAPipeline_translateOperands(X86RAPipeline* self, Operand_* opArray, uint32_t opCount) {
+static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uint32_t opCount) {
   X86Compiler* cc = self->cc();
 
   // Translate variables into isters.
@@ -4305,7 +4305,7 @@ static Error X86RAPipeline_translateOperands(X86RAPipeline* self, Operand_* opAr
           if (!vreg->isMemArg())
             self->getVarCell(vreg);
 
-          // Offset will be patched later by X86RAPipeline_patchFuncMem().
+          // Offset will be patched later by X86RAPass_patchFuncMem().
           m->addOffsetLo32(vreg->isMemArg() ? self->_argActualDisp : self->_varActualDisp);
         }
         else {
@@ -4327,11 +4327,11 @@ static Error X86RAPipeline_translateOperands(X86RAPipeline* self, Operand_* opAr
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - TranslatePrologEpilog]
+// [asmjit::X86RAPass - TranslatePrologEpilog]
 // ============================================================================
 
 //! \internal
-static Error X86RAPipeline_initFunc(X86RAPipeline* self, X86Func* func) {
+static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
   X86Compiler* cc = self->cc();
   X86FuncDecl* decl = func->getDecl();
 
@@ -4536,7 +4536,7 @@ static Error X86RAPipeline_initFunc(X86RAPipeline* self, X86Func* func) {
 }
 
 //! \internal
-static Error X86RAPipeline_patchFuncMem(X86RAPipeline* self, X86Func* func, CBNode* stop) {
+static Error X86RAPass_patchFuncMem(X86RAPass* self, X86Func* func, CBNode* stop) {
   X86Compiler* cc = self->cc();
   CBNode* node = func;
 
@@ -4575,7 +4575,7 @@ static Error X86RAPipeline_patchFuncMem(X86RAPipeline* self, X86Func* func, CBNo
 }
 
 //! \internal
-static Error X86RAPipeline_translatePrologEpilog(X86RAPipeline* self, X86Func* func) {
+static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
   X86Compiler* cc = self->cc();
   X86FuncDecl* decl = func->getDecl();
 
@@ -4809,16 +4809,16 @@ static Error X86RAPipeline_translatePrologEpilog(X86RAPipeline* self, X86Func* f
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Translate - Jump]
+// [asmjit::X86RAPass - Translate - Jump]
 // ============================================================================
 
 //! \internal
-static void X86RAPipeline_translateJump(X86RAPipeline* self, CBJump* jNode, CBLabel* jTarget) {
+static void X86RAPass_translateJump(X86RAPass* self, CBJump* jNode, CBLabel* jTarget) {
   X86Compiler* cc = self->cc();
   CBNode* extNode = self->getExtraBlock();
 
   cc->_setCursor(extNode);
-  self->switchState(jTarget->getWorkData<RAData>()->state);
+  self->switchState(jTarget->getPassData<RAData>()->state);
 
   // If one or more instruction has been added during switchState() it will be
   // moved at the end of the function body.
@@ -4841,20 +4841,20 @@ static void X86RAPipeline_translateJump(X86RAPipeline* self, CBJump* jNode, CBLa
 
   // Store the `extNode` and load the state back.
   self->setExtraBlock(extNode);
-  self->loadState(jNode->getWorkData<RAData>()->state);
+  self->loadState(jNode->getPassData<RAData>()->state);
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Translate - Ret]
+// [asmjit::X86RAPass - Translate - Ret]
 // ============================================================================
 
-static Error X86RAPipeline_translateRet(X86RAPipeline* self, CCFuncRet* rNode, CBLabel* exitTarget) {
+static Error X86RAPass_translateRet(X86RAPass* self, CCFuncRet* rNode, CBLabel* exitTarget) {
   X86Compiler* cc = self->cc();
   CBNode* node = rNode->getNext();
 
   // 32-bit mode requires to push floating point return value(s), handle it
   // here as it's a special case.
-  X86RAData* raData = rNode->getWorkData<X86RAData>();
+  X86RAData* raData = rNode->getPassData<X86RAData>();
   if (raData) {
     TiedReg* tiedArray = raData->tiedArray;
     uint32_t tiedTotal = raData->tiedTotal;
@@ -4918,10 +4918,10 @@ _EmitRet:
 }
 
 // ============================================================================
-// [asmjit::X86RAPipeline - Translate - Func]
+// [asmjit::X86RAPass - Translate - Func]
 // ============================================================================
 
-Error X86RAPipeline::translate() {
+Error X86RAPass::translate() {
   ASMJIT_TLOG("[T] ======= Translate (Begin)\n");
 
   X86Compiler* cc = this->cc();
@@ -4944,7 +4944,7 @@ Error X86RAPipeline::translate() {
       if (node_->getType() == CBNode::kNodeLabel) {
         CBLabel* node = static_cast<CBLabel*>(node_);
         cc->_setCursor(node->getPrev());
-        switchState(node->getWorkData<RAData>()->state);
+        switchState(node->getPassData<RAData>()->state);
       }
 
 _NextGroup:
@@ -4955,11 +4955,11 @@ _NextGroup:
         node_ = jLink->getValue();
         jLink = jLink->getNext();
 
-        CBNode* jFlow = X86RAPipeline_getOppositeJccFlow(static_cast<CBJump*>(node_));
-        loadState(node_->getWorkData<RAData>()->state);
+        CBNode* jFlow = X86RAPass_getOppositeJccFlow(static_cast<CBJump*>(node_));
+        loadState(node_->getPassData<RAData>()->state);
 
-        if (jFlow->hasWorkData() && jFlow->getWorkData<RAData>()->state) {
-          X86RAPipeline_translateJump(this, static_cast<CBJump*>(node_), static_cast<CBLabel*>(jFlow));
+        if (jFlow->hasPassData() && jFlow->getPassData<RAData>()->state) {
+          X86RAPass_translateJump(this, static_cast<CBJump*>(node_), static_cast<CBLabel*>(jFlow));
 
           node_ = jFlow;
           if (node_->isTranslated())
@@ -4977,7 +4977,7 @@ _NextGroup:
     node_->_flags |= CBNode::kFlagIsTranslated;
     ASMJIT_TSEC({ this->_traceNode(this, node_, "[T] "); });
 
-    if (node_->hasWorkData()) {
+    if (node_->hasPassData()) {
       switch (node_->getType()) {
         // --------------------------------------------------------------------
         // [Align / Embed]
@@ -4993,8 +4993,8 @@ _NextGroup:
 
         case CBNode::kNodeLabel: {
           CBLabel* node = static_cast<CBLabel*>(node_);
-          ASMJIT_ASSERT(node->getWorkData<RAData>()->state == nullptr);
-          node->getWorkData<RAData>()->state = saveState();
+          ASMJIT_ASSERT(node->getPassData<RAData>()->state == nullptr);
+          node->getPassData<RAData>()->state = saveState();
           break;
         }
 
@@ -5007,10 +5007,10 @@ _NextGroup:
         case CBNode::kNodePushArg:
           // Update TiedReg's unuse flags based on liveness of the next node.
           if (!node_->isJcc()) {
-            X86RAData* raData = node_->getWorkData<X86RAData>();
-            BitArray* liveness;
+            X86RAData* raData = node_->getPassData<X86RAData>();
+            RABits* liveness;
 
-            if (raData && next && next->hasWorkData() && (liveness = next->getWorkData<RAData>()->liveness)) {
+            if (raData && next && next->hasPassData() && (liveness = next->getPassData<RAData>()->liveness)) {
               TiedReg* tiedArray = raData->tiedArray;
               uint32_t tiedTotal = raData->tiedTotal;
 
@@ -5018,7 +5018,7 @@ _NextGroup:
                 TiedReg* tied = &tiedArray[i];
                 VirtReg* vreg = tied->vreg;
 
-                if (!liveness->getBit(vreg->getLocalId()))
+                if (!liveness->getBit(vreg->_raId))
                   tied->flags |= TiedReg::kUnuse;
               }
             }
@@ -5048,9 +5048,9 @@ _NextGroup:
             }
 
             if (node->isJmp()) {
-              if (jTarget->hasWorkData() && jTarget->getWorkData<RAData>()->state) {
+              if (jTarget->hasPassData() && jTarget->getPassData<RAData>()->state) {
                 cc->_setCursor(node->getPrev());
-                switchState(jTarget->getWorkData<RAData>()->state);
+                switchState(jTarget->getPassData<RAData>()->state);
 
                 goto _NextGroup;
               }
@@ -5066,35 +5066,35 @@ _NextGroup:
                   ASMJIT_ASSERT(jNext->getType() == CBNode::kNodeLabel);
                   cc->_setCursor(node->getPrev());
                   intersectStates(
-                    jTarget->getWorkData<RAData>()->state,
-                    jNext->getWorkData<RAData>()->state);
+                    jTarget->getPassData<RAData>()->state,
+                    jNext->getPassData<RAData>()->state);
                 }
 
                 RAState* savedState = saveState();
-                node->getWorkData<RAData>()->state = savedState;
+                node->getPassData<RAData>()->state = savedState;
 
-                X86RAPipeline_translateJump(this, node, jTarget);
+                X86RAPass_translateJump(this, node, jTarget);
                 next = jNext;
               }
               else if (jNext->isTranslated()) {
                 ASMJIT_ASSERT(jNext->getType() == CBNode::kNodeLabel);
 
                 RAState* savedState = saveState();
-                node->getWorkData<RAData>()->state = savedState;
+                node->getPassData<RAData>()->state = savedState;
 
                 cc->_setCursor(node);
-                switchState(jNext->getWorkData<RAData>()->state);
+                switchState(jNext->getPassData<RAData>()->state);
                 next = jTarget;
               }
               else {
-                node->getWorkData<RAData>()->state = saveState();
-                next = X86RAPipeline_getJccFlow(node);
+                node->getPassData<RAData>()->state = saveState();
+                next = X86RAPass_getJccFlow(node);
               }
             }
           }
           else if (node_->isRet()) {
             ASMJIT_PROPAGATE(
-              X86RAPipeline_translateRet(this, static_cast<CCFuncRet*>(node_), func->getExitNode()));
+              X86RAPass_translateRet(this, static_cast<CCFuncRet*>(node_), func->getExitNode()));
           }
           break;
         }
@@ -5107,7 +5107,7 @@ _NextGroup:
           ASMJIT_ASSERT(node_ == func);
 
           X86FuncDecl* decl = func->getDecl();
-          X86RAData* raData = func->getWorkData<X86RAData>();
+          X86RAData* raData = func->getPassData<X86RAData>();
 
           uint32_t i;
           uint32_t argCount = func->_x86Decl.getNumArgs();
@@ -5164,9 +5164,9 @@ _NextGroup:
   }
 
 _Done:
-  ASMJIT_PROPAGATE(X86RAPipeline_initFunc(this, func));
-  ASMJIT_PROPAGATE(X86RAPipeline_patchFuncMem(this, func, stop));
-  ASMJIT_PROPAGATE(X86RAPipeline_translatePrologEpilog(this, func));
+  ASMJIT_PROPAGATE(X86RAPass_initFunc(this, func));
+  ASMJIT_PROPAGATE(X86RAPass_patchFuncMem(this, func, stop));
+  ASMJIT_PROPAGATE(X86RAPass_translatePrologEpilog(this, func));
 
   ASMJIT_TLOG("[T] ======= Translate (End)\n");
   return kErrorOk;

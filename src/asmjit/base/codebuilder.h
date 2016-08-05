@@ -158,7 +158,7 @@ public:
 
   Zone _nodeAllocator;                   //!< Node allocator.
   Zone _dataAllocator;                   //!< Data and string allocator (includes comments).
-  Zone _pipeAllocator;                   //!< Allocator used to pass to `CBPipeline`s.
+  Zone _pipeAllocator;                   //!< Allocator used to pass to `CBPass`s.
 
   PodVector<CBLabel*> _labelArray;       //!< Maps label indexes to `CBLabel` nodes.
 
@@ -171,20 +171,20 @@ public:
 };
 
 // ============================================================================
-// [asmjit::CBPipeline]
+// [asmjit::CBPass]
 // ============================================================================
 
 //! Code builder pipeline used for code transformations and lowering.
-class ASMJIT_VIRTAPI CBPipeline {
+class ASMJIT_VIRTAPI CBPass {
 public:
-  ASMJIT_NO_COPY(CBPipeline);
+  ASMJIT_NO_COPY(CBPass);
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API CBPipeline() noexcept;
-  ASMJIT_API virtual ~CBPipeline() noexcept;
+  ASMJIT_API CBPass() noexcept;
+  ASMJIT_API virtual ~CBPass() noexcept;
 
   // --------------------------------------------------------------------------
   // [Interface]
@@ -292,9 +292,9 @@ public:
     _flags = static_cast<uint16_t>(cb->_nodeFlags);
     _flowId = cb->_nodeFlowId;
     _inlineComment = nullptr;
-    _workData = nullptr;
+    _passData = nullptr;
   }
-  //! SHOULD NEVER BE CALLED - \ref CodeBuilder uses \ref Zone allocator.
+  //! Destroy the `CBNode` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBNode() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -361,15 +361,15 @@ public:
   ASMJIT_INLINE void resetInlineComment() noexcept { _inlineComment = nullptr; }
 
   //! Get if the node has associated work-data.
-  ASMJIT_INLINE bool hasWorkData() const noexcept { return _workData != nullptr; }
+  ASMJIT_INLINE bool hasPassData() const noexcept { return _passData != nullptr; }
   //! Get work-data - data used during processing & transformations.
   template<typename T>
-  ASMJIT_INLINE T* getWorkData() const noexcept { return (T*)_workData; }
+  ASMJIT_INLINE T* getPassData() const noexcept { return (T*)_passData; }
   //! Set work-data to `data`.
   template<typename T>
-  ASMJIT_INLINE void setWorkData(T* data) noexcept { _workData = (void*)data; }
+  ASMJIT_INLINE void setPassData(T* data) noexcept { _passData = (void*)data; }
   //! Reset work-data to null.
-  ASMJIT_INLINE void resetWorkData() noexcept { _workData = nullptr; }
+  ASMJIT_INLINE void resetPassData() noexcept { _passData = nullptr; }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -384,7 +384,7 @@ public:
   uint32_t _flowId;                      //!< Flow index.
 
   const char* _inlineComment;            //!< Inline comment or null if not used.
-  void* _workData;                       //!< Work-data used during processing & transformations phases.
+  void* _passData;                       //!< Data used by the current `CBPass`.
 };
 
 // ============================================================================
@@ -417,7 +417,7 @@ public:
     _updateMemOp();
   }
 
-  //! Destroy the `CBInst` instance.
+  //! Destroy the `CBInst` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBInst() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -580,7 +580,7 @@ public:
     _size = size;
   }
 
-  //! Destroy the `CBData` instance.
+  //! Destroy the `CBData` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBData() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -627,7 +627,7 @@ public:
     : CBNode(cb, kNodeAlign),
       _mode(mode),
       _alignment(alignment) {}
-  //! Destroy the `CBAlign` instance.
+  //! Destroy the `CBAlign` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBAlign() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -671,7 +671,7 @@ public:
       _id(id),
       _numRefs(0),
       _from(nullptr) {}
-  //! Destroy the `CBLabel` instance.
+  //! Destroy the `CBLabel` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBLabel() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -722,7 +722,7 @@ public:
     : CBNode(cb, kNodeLabelData),
       _id(id) {}
 
-  //! Destroy the `CBLabelData` instance.
+  //! Destroy the `CBLabelData` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBLabelData() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -758,7 +758,7 @@ public:
     : CBLabel(cb, id),
       _constPool(&cb->_dataAllocator) { _type = kNodeConstPool; }
 
-  //! Destroy the `CBConstPool` instance.
+  //! Destroy the `CBConstPool` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBConstPool() noexcept {}
 
   // --------------------------------------------------------------------------
@@ -799,7 +799,7 @@ public:
     _inlineComment = comment;
   }
 
-  //! Destroy the `CBComment` instance.
+  //! Destroy the `CBComment` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBComment() noexcept {}
 };
 
@@ -823,7 +823,7 @@ public:
     orFlags(kFlagIsRet);
   }
 
-  //! Destroy the `CBSentinel` instance.
+  //! Destroy the `CBSentinel` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBSentinel() noexcept {}
 };
 

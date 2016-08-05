@@ -250,7 +250,6 @@ asmjit_add_source(ASMJIT_SRC asmjit
 asmjit_add_source(ASMJIT_SRC asmjit/base
   assembler.cpp
   assembler.h
-  bitutils.h
   codebuilder.cpp
   codebuilder.h
   codecompiler.cpp

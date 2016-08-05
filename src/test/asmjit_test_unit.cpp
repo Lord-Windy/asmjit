@@ -156,8 +156,8 @@ static void dumpCpu(void) {
 // [DumpSizeOf]
 // ============================================================================
 
-#define DUMP_TYPE(_Type_) \
-  INFO("  %-26s: %u", #_Type_, static_cast<uint32_t>(sizeof(_Type_)))
+#define DUMP_TYPE(...) \
+  INFO("  %-26s: %u", #__VA_ARGS__, static_cast<uint32_t>(sizeof(__VA_ARGS__)))
 
 static void dumpSizeOf(void) {
   INFO("Size of built-in types:");
@@ -180,12 +180,15 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(CodeBuilder);
   DUMP_TYPE(CodeEmitter);
   DUMP_TYPE(CodeHolder);
-  DUMP_TYPE(CodeHolder::SectionEntry);
   DUMP_TYPE(CodeHolder::LabelEntry);
   DUMP_TYPE(CodeHolder::RelocEntry);
+  DUMP_TYPE(CodeHolder::SectionEntry);
   DUMP_TYPE(CodeSection);
   DUMP_TYPE(ConstPool);
+  DUMP_TYPE(PodList<void*>);
+  DUMP_TYPE(PodVector<void*>);
   DUMP_TYPE(Runtime);
+  DUMP_TYPE(StringBuilder);
   DUMP_TYPE(Zone);
   INFO("");
 
@@ -198,7 +201,7 @@ static void dumpSizeOf(void) {
   INFO("");
 
 #if !defined(ASMJIT_DISABLE_COMPILER)
-  INFO("SizeOf CodeCompiler:");
+  INFO("Size of CodeCompiler:");
   DUMP_TYPE(CodeCompiler);
   DUMP_TYPE(CBNode);
   DUMP_TYPE(CBInst);
@@ -208,8 +211,8 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(CBLabel);
   DUMP_TYPE(CBComment);
   DUMP_TYPE(CBSentinel);
-  DUMP_TYPE(CCFunc);
   DUMP_TYPE(CCCall);
+  DUMP_TYPE(CCFunc);
   DUMP_TYPE(FuncDecl);
   DUMP_TYPE(FuncInOut);
   DUMP_TYPE(FuncSignature);
@@ -221,7 +224,7 @@ static void dumpSizeOf(void) {
   // --------------------------------------------------------------------------
 
 #if defined(ASMJIT_BUILD_X86)
-  INFO("SizeOf X86/X64:");
+  INFO("Size of X86 related classes:");
   DUMP_TYPE(X86Assembler);
   DUMP_TYPE(X86Inst);
   DUMP_TYPE(X86Inst::ISignature);

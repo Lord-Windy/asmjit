@@ -123,33 +123,31 @@ VirtReg* CodeCompiler::newVirtReg(const VirtType& typeInfo, const char* name) no
     if (_vRegArray.willGrow(1) != kErrorOk || !(vreg = _vRegAllocator.allocT<VirtReg>()))
       return nullptr;
 
-    vreg->_name = noName;
     vreg->_id = Operand::packId(static_cast<uint32_t>(index));
-    vreg->_localId = kInvalidValue;
+    vreg->_regInfo.signature = typeInfo.getSignature();
 
+    vreg->_name = noName;
 #if !defined(ASMJIT_DISABLE_LOGGING)
     if (name && name[0] != '\0')
       vreg->_name = _dataAllocator.sdup(name);
 #endif // !ASMJIT_DISABLE_LOGGING
 
-    vreg->_regInfo.signature = typeInfo.getSignature();
     vreg->_typeId = static_cast<uint8_t>(typeInfo.getTypeId());
+    vreg->_size = typeInfo.getTypeSize();
+    vreg->_alignment = static_cast<uint8_t>(Utils::iMin<uint32_t>(typeInfo.getTypeSize(), 64));
     vreg->_priority = 10;
-
-    vreg->_state = VirtReg::kStateNone;
-    vreg->_physId = kInvalidReg;
     vreg->_isStack = false;
     vreg->_isMemArg = false;
-    vreg->_isCalculated = false;
+    vreg->_isMaterialized = false;
     vreg->_saveOnUnuse = false;
-    vreg->_modified = false;
-    vreg->_reserved0 = 0;
-    vreg->_alignment = static_cast<uint8_t>(Utils::iMin<uint32_t>(typeInfo.getTypeSize(), 64));
 
-    vreg->_size = typeInfo.getTypeSize();
-    vreg->_homeMask = 0;
-
+    // The following are only used by `RAPass`.
+    vreg->_raId = kInvalidValue;
     vreg->_memOffset = 0;
+    vreg->_homeMask = 0;
+    vreg->_state = VirtReg::kStateNone;
+    vreg->_physId = kInvalidReg;
+    vreg->_modified = false;
     vreg->_memCell = nullptr;
     vreg->_tied = nullptr;
 
