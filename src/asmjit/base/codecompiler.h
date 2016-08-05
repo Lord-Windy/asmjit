@@ -102,9 +102,9 @@ struct VirtReg {
     _priority = static_cast<uint8_t>(priority);
   }
 
-  //! Get variable state, only used by `RAContext`.
+  //! Get variable state, only used by `RAPipeline`.
   ASMJIT_INLINE uint32_t getState() const { return _state; }
-  //! Set variable state, only used by `RAContext`.
+  //! Set variable state, only used by `RAPipeline`.
   ASMJIT_INLINE void setState(uint32_t state) {
     ASMJIT_ASSERT(state <= 0xFF);
     _state = static_cast<uint8_t>(state);
@@ -166,7 +166,7 @@ struct VirtReg {
   uint8_t _priority;                     //!< Allocation priority.
 
   uint8_t _state;                        //!< Variable state (connected with actual `RAState)`.
-  uint8_t _physId;                       //!< Actual register index (only used by `RAContext)`, during translate.
+  uint8_t _physId;                       //!< Actual register index (only used by `RAPipeline)`, during translate.
 
   uint8_t _isStack : 1;                  //!< Whether the variable is only used as memory allocated on the stack.
   uint8_t _isMemArg : 1;                 //!< Whether the variable is a function argument passed through memory.
@@ -186,7 +186,7 @@ struct VirtReg {
   uint32_t _homeMask;                    //!< Mask of all registers variable has been allocated to.
 
   int32_t _memOffset;                    //!< Home memory offset.
-  RACell* _memCell;                      //!< Home memory cell, used by `RAContext` (initially nullptr).
+  RACell* _memCell;                      //!< Home memory cell, used by `RAPipeline` (initially nullptr).
 
   // --------------------------------------------------------------------------
   // [Members - Temporary Usage]
@@ -195,7 +195,7 @@ struct VirtReg {
   // These variables are only used during register allocation. They are
   // initialized by init() phase and reset by cleanup() phase.
 
-  //! Temporary link to TiedReg* used by the `RAContext` used in
+  //! Temporary link to TiedReg* used by the `RAPipeline` used in
   //! various phases, but always set back to nullptr when finished.
   //!
   //! This temporary data is designed to be used by algorithms that need to
@@ -642,20 +642,20 @@ public:
 };
 
 // ============================================================================
-// [asmjit::CCFuncCall]
+// [asmjit::CCCall]
 // ============================================================================
 
 //! Function call (CodeCompiler).
-class CCFuncCall : public CBInst {
+class CCCall : public CBInst {
 public:
-  ASMJIT_NO_COPY(CCFuncCall)
+  ASMJIT_NO_COPY(CCCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `CCFuncCall` instance.
-  ASMJIT_INLINE CCFuncCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+  //! Create a new `CCCall` instance.
+  ASMJIT_INLINE CCCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
     : CBInst(cb, instId, options, opArray, opCount),
       _decl(nullptr),
       _args(nullptr) {
@@ -666,8 +666,8 @@ public:
     orFlags(kFlagIsRemovable);
   }
 
-  //! Destroy the `CCFuncCall` instance.
-  ASMJIT_INLINE ~CCFuncCall() noexcept {}
+  //! Destroy the `CCCall` instance.
+  ASMJIT_INLINE ~CCCall() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -726,7 +726,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Create a new `CCPushArg` instance.
-  ASMJIT_INLINE CCPushArg(CodeBuilder* cb, CCFuncCall* call, VirtReg* src, VirtReg* cvt) noexcept
+  ASMJIT_INLINE CCPushArg(CodeBuilder* cb, CCCall* call, VirtReg* src, VirtReg* cvt) noexcept
     : CBNode(cb, kNodePushArg),
       _call(call),
       _src(src),
@@ -743,7 +743,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get the associated function-call.
-  ASMJIT_INLINE CCFuncCall* getCall() const noexcept { return _call; }
+  ASMJIT_INLINE CCCall* getCall() const noexcept { return _call; }
   //! Get source variable.
   ASMJIT_INLINE VirtReg* getSrcReg() const noexcept { return _src; }
   //! Get conversion variable.
@@ -753,7 +753,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  CCFuncCall* _call;                        //!< Associated `CCFuncCall`.
+  CCCall* _call;                         //!< Associated `CCCall`.
   VirtReg* _src;                         //!< Source variable.
   VirtReg* _cvt;                         //!< Temporary variable used for conversion (or null).
   uint32_t _args;                        //!< Affected arguments bit-array.
@@ -811,20 +811,6 @@ public:
   ASMJIT_INLINE void setMaxLookAhead(uint32_t val) noexcept {
     _maxLookAhead = val;
   }
-
-  // --------------------------------------------------------------------------
-  // [Token ID]
-  // --------------------------------------------------------------------------
-
-  //! \internal
-  //!
-  //! Reset the token-id generator.
-  ASMJIT_INLINE void _resetTokenGenerator() noexcept { _tokenGenerator = 0; }
-
-  //! \internal
-  //!
-  //! Generate a new unique token id.
-  ASMJIT_INLINE uint32_t _generateUniqueToken() noexcept { return ++_tokenGenerator; }
 
   // --------------------------------------------------------------------------
   // [Node-Factory]
@@ -935,19 +921,13 @@ public:
   const uint32_t* _typeIdMap;            //!< Mapping between arch-independent type-id and backend specific one.
   uint32_t _maxLookAhead;                //!< Maximum look-ahead of RA.
 
-  //! Processing token generator.
-  //!
-  //! Used to get a unique token that is then used to process `CBNode`s. See
-  //! `CodeCompiler::_getUniqueToken()` for more details.
-  uint32_t _tokenGenerator;
-
-  CCFunc* _func;                        //!< Current function.
+  CCFunc* _func;                         //!< Current function.
 
   Zone _vRegAllocator;                   //!< Allocates \ref VirtReg objects.
   PodVector<VirtReg*> _vRegArray;        //!< Stores array of \ref VirtReg pointers.
 
-  CBConstPool* _localConstPool;         //!< Local constant pool, flushed at the end of each function.
-  CBConstPool* _globalConstPool;        //!< Global constant pool, flushed at the end of the compilation.
+  CBConstPool* _localConstPool;          //!< Local constant pool, flushed at the end of each function.
+  CBConstPool* _globalConstPool;         //!< Global constant pool, flushed at the end of the compilation.
 };
 
 //! \}

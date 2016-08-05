@@ -358,10 +358,10 @@ struct Operand_ {
   // --------------------------------------------------------------------------
 
   union {
-    AnyData _any;                        //!< Base data.
-    RegData _reg;                        //!< Register or variable data.
-    MemData _mem;                        //!< Memory data.
-    ImmData _imm;                        //!< Immediate data.
+    AnyData _any;                        //!< Generic data.
+    RegData _reg;                        //!< Physical or virtual register data.
+    MemData _mem;                        //!< Memory address data.
+    ImmData _imm;                        //!< Immediate value data.
     LabelData _label;                    //!< Label data.
 
     uint32_t _signature;                 //!< Operand signature (first 32-bits).
@@ -731,7 +731,8 @@ public:
     _init_packed_d2_d3(0, 0);
   }
 
-  //! Get if this `Mem` is a home of a variable or stack-allocated memory, used by \ref CodeCompiler.
+  //! Get if this `Mem` is a home of a virtual register or if it's stack-allocated
+  //! memory, used by \ref CodeCompiler.
   ASMJIT_INLINE bool isRegHome() const noexcept { return (_mem.flags & kFlagIsRegHome) != 0; }
   //! Clear the reg-home bit, called by the \ref CodeCompiler to finalize the operand.
   ASMJIT_INLINE void clearRegHome() noexcept { _mem.flags &= ~kFlagIsRegHome; }

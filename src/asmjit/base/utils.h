@@ -950,13 +950,6 @@ struct Utils {
 
   static ASMJIT_INLINE void writeI64a(void* p, int64_t x) noexcept { writeI64x<8>(p, x); }
   static ASMJIT_INLINE void writeI64u(void* p, int64_t x) noexcept { writeI64x<0>(p, x); }
-
-  // --------------------------------------------------------------------------
-  // [GetTickCount]
-  // --------------------------------------------------------------------------
-
-  //! Get the current CPU tick count, used for benchmarking (1ms resolution).
-  static ASMJIT_API uint32_t getTickCount() noexcept;
 };
 
 // ============================================================================
@@ -1233,85 +1226,6 @@ union UInt64 {
     uint32_t hi, lo;
 #endif // ASMJIT_ARCH_LE
   };
-};
-
-// ============================================================================
-// [asmjit::Lock]
-// ============================================================================
-
-//! \internal
-//!
-//! Lock.
-struct Lock {
-  ASMJIT_NO_COPY(Lock)
-
-  // --------------------------------------------------------------------------
-  // [Windows]
-  // --------------------------------------------------------------------------
-
-#if ASMJIT_OS_WINDOWS
-  typedef CRITICAL_SECTION Handle;
-
-  //! Create a new `Lock` instance.
-  ASMJIT_INLINE Lock() noexcept { InitializeCriticalSection(&_handle); }
-  //! Destroy the `Lock` instance.
-  ASMJIT_INLINE ~Lock() noexcept { DeleteCriticalSection(&_handle); }
-
-  //! Lock.
-  ASMJIT_INLINE void lock() noexcept { EnterCriticalSection(&_handle); }
-  //! Unlock.
-  ASMJIT_INLINE void unlock() noexcept { LeaveCriticalSection(&_handle); }
-#endif // ASMJIT_OS_WINDOWS
-
-  // --------------------------------------------------------------------------
-  // [Posix]
-  // --------------------------------------------------------------------------
-
-#if ASMJIT_OS_POSIX
-  typedef pthread_mutex_t Handle;
-
-  //! Create a new `Lock` instance.
-  ASMJIT_INLINE Lock() noexcept { pthread_mutex_init(&_handle, nullptr); }
-  //! Destroy the `Lock` instance.
-  ASMJIT_INLINE ~Lock() noexcept { pthread_mutex_destroy(&_handle); }
-
-  //! Lock.
-  ASMJIT_INLINE void lock() noexcept { pthread_mutex_lock(&_handle); }
-  //! Unlock.
-  ASMJIT_INLINE void unlock() noexcept { pthread_mutex_unlock(&_handle); }
-#endif // ASMJIT_OS_POSIX
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Native handle.
-  Handle _handle;
-};
-
-// ============================================================================
-// [asmjit::AutoLock]
-// ============================================================================
-
-//! \internal
-//!
-//! Scoped lock.
-struct AutoLock {
-  ASMJIT_NO_COPY(AutoLock)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE AutoLock(Lock& target) noexcept : _target(target) { _target.lock(); }
-  ASMJIT_INLINE ~AutoLock() noexcept { _target.unlock(); }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! Reference to the `Lock`.
-  Lock& _target;
 };
 
 //! \}

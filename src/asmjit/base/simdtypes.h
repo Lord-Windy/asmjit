@@ -23,7 +23,7 @@ namespace asmjit {
 // [asmjit::Data64]
 // ============================================================================
 
-//! 64-bit data used by SIMD.
+//! 64-bit data useful for creating SIMD constants.
 union Data64 {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -294,7 +294,7 @@ union Data64 {
 // [asmjit::Data128]
 // ============================================================================
 
-//! 128-bit data used by SIMD.
+//! 128-bit data useful for creating SIMD constants.
 union Data128 {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -643,7 +643,7 @@ union Data128 {
 // [asmjit::Data256]
 // ============================================================================
 
-//! 256-bit data used by SIMD.
+//! 256-bit data useful for creating SIMD constants.
 union Data256 {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

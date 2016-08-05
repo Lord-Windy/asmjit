@@ -14,9 +14,9 @@
 // [Dependencies]
 #include "../base/assembler.h"
 #include "../base/codecompiler.h"
-#include "../base/compilercontext_p.h"
 #include "../base/cpuinfo.h"
 #include "../base/logging.h"
+#include "../base/regalloc_p.h"
 #include "../base/utils.h"
 #include <stdarg.h>
 
@@ -39,7 +39,6 @@ enum { kCompilerDefaultLookAhead = 64 };
 CodeCompiler::CodeCompiler() noexcept
   : CodeBuilder(),
     _maxLookAhead(kCompilerDefaultLookAhead),
-    _tokenGenerator(0),
     _typeIdMap(nullptr),
     _func(nullptr),
     _vRegAllocator(4096 - Zone::kZoneOverhead),
@@ -60,8 +59,6 @@ Error CodeCompiler::onAttach(CodeHolder* code) noexcept {
 
 Error CodeCompiler::onDetach(CodeHolder* code) noexcept {
   _maxLookAhead = kCompilerDefaultLookAhead;
-
-  _tokenGenerator = 0;
   _func = nullptr;
 
   _localConstPool = nullptr;

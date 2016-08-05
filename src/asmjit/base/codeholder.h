@@ -531,7 +531,7 @@ public:
   uint32_t _globalHints;                 //!< Global hints, propagated to all `CodeEmitter`s.
   uint32_t _globalOptions;               //!< Global options, propagated to all `CodeEmitter`s.
 
-  CodeEmitter* _emitters;                //!< List of attached `CodeEmitter`s.
+  CodeEmitter* _emitters;                //!< Linked-list of all attached `CodeEmitter`s.
   Assembler* _cgAsm;                     //!< Attached \ref Assembler (only one at a time).
 
   Logger* _logger;                       //!< Attached \ref Logger, used by all consumers.

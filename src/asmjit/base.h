@@ -24,6 +24,7 @@
 #include "./base/globals.h"
 #include "./base/logging.h"
 #include "./base/operand.h"
+#include "./base/osutils.h"
 #include "./base/runtime.h"
 #include "./base/simdtypes.h"
 #include "./base/string.h"

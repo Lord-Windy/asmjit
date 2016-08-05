@@ -87,11 +87,8 @@ public:
   ASMJIT_API virtual Label newLabel() override;
   ASMJIT_API virtual Error bind(const Label& label) override;
   ASMJIT_API virtual Error embed(const void* data, uint32_t size) override;
+  ASMJIT_API virtual Error embedLabel(const Label& label) override;
   ASMJIT_API virtual Error embedConstPool(const Label& label, const ConstPool& pool) override;
-
-  //! Embed absolute label address as data (4 or 8 bytes).
-  ASMJIT_API Error embedLabel(const Label& label);
-
   ASMJIT_API virtual Error comment(const char* s, size_t len = kInvalidIndex) override;
 
   // --------------------------------------------------------------------------

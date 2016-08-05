@@ -28,7 +28,7 @@ static const uint32_t kNumIterations = 5000;
 
 struct Performance {
   static inline uint32_t now() {
-    return Utils::getTickCount();
+    return OSUtils::getTickCount();
   }
 
   inline void reset() {

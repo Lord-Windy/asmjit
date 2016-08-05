@@ -196,6 +196,9 @@ public:
   //! Embed raw data into the code-buffer.
   virtual Error embed(const void* data, uint32_t size) = 0;
 
+  //! Embed absolute label address as data (4 or 8 bytes).
+  virtual Error embedLabel(const Label& label) = 0;
+
   //! Embed a constant pool into the code-buffer in the following steps:
   //!   1. Align by using kAlignData to the minimum `pool` alignment.
   //!   2. Bind `label` so it's bound to an aligned location.

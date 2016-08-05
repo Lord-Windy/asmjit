@@ -27,6 +27,7 @@ CodeBuilder::CodeBuilder(CodeHolder* code) noexcept
   : CodeEmitter(kTypeBuilder),
     _nodeAllocator(32768 - Zone::kZoneOverhead),
     _dataAllocator(8192  - Zone::kZoneOverhead),
+    _pipeAllocator(32768 - Zone::kZoneOverhead),
     _nodeFlowId(0),
     _nodeFlags(0),
     _firstNode(nullptr),
@@ -150,7 +151,7 @@ CBComment* CodeBuilder::newCommentNode(const char* s, size_t len) noexcept {
 }
 
 // ============================================================================
-// [asmjit::CodeBuilder - Node-Builder]
+// [asmjit::CodeBuilder - Code-Management]
 // ============================================================================
 
 CBNode* CodeBuilder::addNode(CBNode* node) noexcept {
@@ -359,16 +360,33 @@ Error CodeBuilder::bind(const Label& label) {
 }
 
 Error CodeBuilder::align(uint32_t mode, uint32_t alignment) {
+  if (_lastError) return _lastError;
+
   CBAlign* node = newAlignNode(mode, alignment);
-  if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
   return kErrorOk;
 }
 
 Error CodeBuilder::embed(const void* data, uint32_t size) {
+  if (_lastError) return _lastError;
+
   CBData* node = newDataNode(data, size);
-  if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::embedLabel(const Label& label) {
+  if (_lastError) return _lastError;
+
+  CBLabelData* node = newNodeT<CBLabelData>(label.getId());
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
   return kErrorOk;
@@ -384,7 +402,8 @@ Error CodeBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
   ASMJIT_PROPAGATE(bind(label));
 
   CBData* node = newDataNode(nullptr, static_cast<uint32_t>(pool.getSize()));
-  if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   pool.fill(node->getData());
   addNode(node);
@@ -392,8 +411,11 @@ Error CodeBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
 }
 
 Error CodeBuilder::comment(const char* s, size_t len) {
+  if (_lastError) return _lastError;
+
   CBComment* node = newCommentNode(s, len);
-  if (!node) return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
   addNode(node);
   return kErrorOk;
@@ -429,6 +451,13 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
         CBLabel* node = static_cast<CBLabel*>(node_);
         ASMJIT_PROPAGATE(
           dst->bind(node->getLabel()));
+        break;
+      }
+
+      case CBNode::kNodeLabelData: {
+        CBLabelData* node = static_cast<CBLabelData*>(node_);
+        ASMJIT_PROPAGATE(
+          dst->embedLabel(node->getLabel()));
         break;
       }
 
@@ -483,6 +512,13 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
 
   return kErrorOk;
 }
+
+// ============================================================================
+// [asmjit::CBPipeline]
+// ============================================================================
+
+CBPipeline::CBPipeline() noexcept {}
+CBPipeline::~CBPipeline() noexcept {}
 
 } // asmjit namespace
 

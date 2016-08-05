@@ -22,57 +22,15 @@
 //! - \ref asmjit_base "Base" - Base API (architecture independent).
 //! - \ref asmjit_x86 "X86/X64" - X86/X64 API.
 
-// ============================================================================
-// [asmjit_base]
-// ============================================================================
-
 //! \defgroup asmjit_base AsmJit Base API (architecture independent)
 //!
 //! \brief Base API.
 //!
 //! Base API contains all classes that are platform and architecture independent.
-//!
-//! Code-Generation and Operands
-//! ----------------------------
-//!
-//! List of the most useful code-generation and operand classes:
-//! - \ref asmjit::Assembler - Low-level code-generation.
-//! - \ref asmjit::CodeBuilder - Builder that allows to build and keep \ref CBNode instances
-//!   - \ref asmjit::CBNode - base class for any node:
-//!     - \ref asmjit::CBInst - Instruction/Jump.
-//!     - \ref asmjit::CBData - Data.
-//!     - \ref asmjit::CBAlign - Align directive.
-//!     - \ref asmjit::CBLabel - Label.
-//!     - \ref asmjit::CBComment - Comment.
-//!     - \ref asmjit::CBSentinel - Sentinel (used as a marker, has no other function).
-//!     - \ref asmjit::CCFunc - Function entry, compatible with \ref CBLabel (CodeCompiler).
-//!     - \ref asmjit::CCFuncRet - Function return (CodeCompiler).
-//!     - \ref asmjit::CCFuncCall - Function call (CodeCompiler).
-//!     - \ref asmjit::CCPushArg - Push stack argument (CodeCompiler).
-//!     - \ref asmjit::CCHint - Register allocator hint (CodeCompiler).
-//! - \ref asmjit::Runtime - Describes where the code is stored and how it's executed:
-//!   - \ref asmjit::HostRuntime - Runtime that runs on the host machine:
-//!     - \ref asmjit::JitRuntime - Runtime designed for JIT code generation and execution.
-//! - \ref asmjit::Operand - base class for all operands:
-//!   - \ref asmjit::Reg - Register operand (`Assembler` only).
-//!   - \ref asmjit::Mem - Memory operand.
-//!   - \ref asmjit::Imm - Immediate operand.
-//!   - \ref asmjit::Label - Label operand.
-
-// ============================================================================
-// [asmjit_x86]
-// ============================================================================
 
 //! \defgroup asmjit_x86 AsmJit X86/X64 API
 //!
 //! \brief X86/X64 API
-//!
-//! X86/X64 Code Generation
-//! -----------------------
-//!
-//! X86/X64 code generation is realized throught:
-//! - \ref X86Assembler - low-level code generation.
-//! - \ref X86Compiler - high-level code generation.
 //!
 //! X86/X64 Registers
 //! -----------------
@@ -184,9 +142,6 @@
 #if defined(ASMJIT_BUILD_ARM)
 #include "./arm.h"
 #endif // ASMJIT_BUILD_ARM
-
-// [Host]
-#include "./host.h"
 
 // [Guard]
 #endif // _ASMJIT_ASMJIT_H

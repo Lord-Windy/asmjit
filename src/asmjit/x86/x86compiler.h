@@ -27,8 +27,8 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-class X86CallNode;
-class X86FuncNode;
+class X86Func;
+class X86CCCall;
 
 //! \addtogroup asmjit_x86
 //! \{
@@ -41,20 +41,20 @@ struct X86TypeData {
 ASMJIT_VARAPI const X86TypeData _x86TypeData;
 
 // ============================================================================
-// [asmjit::X86FuncNode]
+// [asmjit::X86Func]
 // ============================================================================
 
 //! X86/X64 function node.
-class X86FuncNode : public CCFunc {
+class X86Func : public CCFunc {
 public:
-  ASMJIT_NO_COPY(X86FuncNode)
+  ASMJIT_NO_COPY(X86Func)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86FuncNode` instance.
-  ASMJIT_INLINE X86FuncNode(CodeBuilder* cb) noexcept : CCFunc(cb) {
+  //! Create a new `X86Func` instance.
+  ASMJIT_INLINE X86Func(CodeBuilder* cb) noexcept : CCFunc(cb) {
     _decl = &_x86Decl;
     _saveRestoreRegs.reset();
 
@@ -71,8 +71,8 @@ public:
       _stackFrameCopyGpIndex[i] = static_cast<uint8_t>(kInvalidReg);
   }
 
-  //! Destroy the `X86FuncNode` instance.
-  ASMJIT_INLINE ~X86FuncNode() noexcept {}
+  //! Destroy the `X86Func` instance.
+  ASMJIT_INLINE ~X86Func() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -164,28 +164,28 @@ public:
 };
 
 // ============================================================================
-// [asmjit::X86CallNode]
+// [asmjit::X86CCCall]
 // ============================================================================
 
 //! X86/X64 function-call node.
-class X86CallNode : public CCFuncCall {
+class X86CCCall : public CCCall {
 public:
-  ASMJIT_NO_COPY(X86CallNode)
+  ASMJIT_NO_COPY(X86CCCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86CallNode` instance.
-  ASMJIT_INLINE X86CallNode(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
-    : CCFuncCall(cb, instId, options, opArray, opCount) {
+  //! Create a new `X86CCCall` instance.
+  ASMJIT_INLINE X86CCCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+    : CCCall(cb, instId, options, opArray, opCount) {
 
     _decl = &_x86Decl;
     _usedArgs.reset();
   }
 
-  //! Destroy the `X86CallNode` instance.
-  ASMJIT_INLINE ~X86CallNode() noexcept {}
+  //! Destroy the `X86CCCall` instance.
+  ASMJIT_INLINE ~X86CCCall() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -197,12 +197,12 @@ public:
   }
 
   // --------------------------------------------------------------------------
-  // [Prototype]
+  // [Signature]
   // --------------------------------------------------------------------------
 
-  //! Set function prototype.
-  ASMJIT_INLINE Error setPrototype(const FuncPrototype& p) noexcept {
-    return _x86Decl.setPrototype(p);
+  //! Set function signature.
+  ASMJIT_INLINE Error setSignature(const FuncSignature& sign) noexcept {
+    return _x86Decl.setSignature(sign);
   }
 
   // --------------------------------------------------------------------------
@@ -214,7 +214,7 @@ public:
   //! Set return at `i` to `op`.
   ASMJIT_API bool _setRet(uint32_t i, const Operand_& op) noexcept;
 
-  //! Set argument at `i` to `reg` (FP registers only).
+  //! Set argument at `i` to `reg`.
   ASMJIT_INLINE bool setArg(uint32_t i, const Reg& reg) noexcept { return _setArg(i, reg); }
   //! Set argument at `i` to `imm`.
   ASMJIT_INLINE bool setArg(uint32_t i, const Imm& imm) noexcept { return _setArg(i, imm); }
@@ -232,7 +232,7 @@ public:
   //!
   //! NOTE: This bit-mask is not the same as `X86Func::_passed`. It contains
   //! only registers actually used to do the call while `X86Func::_passed`
-  //! mask contains all registers for all function prototype combinations.
+  //! mask contains all registers for all possible signatures (defined by ABI).
   X86RegMask _usedArgs;
 };
 
@@ -281,24 +281,24 @@ public:
   // [Func]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86FuncNode`.
-  ASMJIT_API X86FuncNode* newFunc(const FuncPrototype& p) noexcept;
+  //! Create a new `X86Func`.
+  ASMJIT_API X86Func* newFunc(const FuncSignature& sign) noexcept;
 
   using CodeCompiler::addFunc;
 
   //! Add a new function.
-  ASMJIT_API X86FuncNode* addFunc(const FuncPrototype& p);
+  ASMJIT_API X86Func* addFunc(const FuncSignature& sign);
 
   //! Emit a sentinel that marks the end of the current function.
   ASMJIT_API CBSentinel* endFunc();
 
-  //! Get the current function casted to \ref X86FuncNode.
+  //! Get the current function casted to \ref X86Func.
   //!
   //! This method can be called within `addFunc()` and `endFunc()` block to get
   //! current function you are working with. It's recommended to store `CCFunc`
   //! pointer returned by `addFunc<>` method, because this allows you in future
   //! implement function sections outside of the function itself.
-  ASMJIT_INLINE X86FuncNode* getFunc() const noexcept { return static_cast<X86FuncNode*>(_func); }
+  ASMJIT_INLINE X86Func* getFunc() const noexcept { return static_cast<X86Func*>(_func); }
 
   // --------------------------------------------------------------------------
   // [Ret]
@@ -313,10 +313,10 @@ public:
   // [Call]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86CallNode`.
-  ASMJIT_API X86CallNode* newCall(const Operand_& o0, const FuncPrototype& p) noexcept;
-  //! Add a new `X86CallNode`.
-  ASMJIT_API X86CallNode* addCall(const Operand_& o0, const FuncPrototype& p) noexcept;
+  //! Create a new `X86CCCall`.
+  ASMJIT_API X86CCCall* newCall(const Operand_& o0, const FuncSignature& sign) noexcept;
+  //! Add a new `X86CCCall`.
+  ASMJIT_API X86CCCall* addCall(const Operand_& o0, const FuncSignature& sign) noexcept;
 
   // --------------------------------------------------------------------------
   // [Args]
@@ -524,15 +524,15 @@ public:
   // --------------------------------------------------------------------------
 
   //! Call a function.
-  ASMJIT_INLINE X86CallNode* call(const X86Gp& dst, const FuncPrototype& p) { return addCall(dst, p); }
+  ASMJIT_INLINE X86CCCall* call(const X86Gp& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CallNode* call(const X86Mem& dst, const FuncPrototype& p) { return addCall(dst, p); }
+  ASMJIT_INLINE X86CCCall* call(const X86Mem& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CallNode* call(const Label& label, const FuncPrototype& p) { return addCall(label, p); }
+  ASMJIT_INLINE X86CCCall* call(const Label& label, const FuncSignature& sign) { return addCall(label, sign); }
   //! \overload
-  ASMJIT_INLINE X86CallNode* call(const Imm& dst, const FuncPrototype& p) { return addCall(dst, p); }
+  ASMJIT_INLINE X86CCCall* call(const Imm& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CallNode* call(uint64_t dst, const FuncPrototype& p) { return addCall(Imm(dst), p); }
+  ASMJIT_INLINE X86CCCall* call(uint64_t dst, const FuncSignature& sign) { return addCall(Imm(dst), sign); }
 
   //! Return.
   ASMJIT_INLINE CCFuncRet* ret() { return addRet(Operand(), Operand()); }

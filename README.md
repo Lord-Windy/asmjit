@@ -271,7 +271,7 @@ mem.hasIndex();                      // true.
 
 Making changes to memory operand is very comfortable when emitting loads and stores:
 
-```
+```c++
 using namespace asmjit;
 using namespace asmjit::x86;
 
@@ -563,9 +563,9 @@ CodeHolder code(ci);
 
 TODO: Maybe `CodeHolder::relocate()` is not the best name?
 
-### X86Assembler - Target-Specific ZAX/ZAB/... Registers
+### X86Assembler - Using Native Registers (zax/zbx/...)
 
-AsmJit's X86 code emitters always provide functions to construct machine-size registers. This feature is for people that want to write code targeting both 32-bit and 64-bit architectures at the same time. In AsmJit terminology these registers are named **zax**, **zcx**, **zdx**, **zbx**, **zsp**, **zbp**, **zsi**, and **zdi** (they are defined in this exact order by X86). They are accessible through `X86Assembler`, `X86Builder`, and `X86Compiler`. The following example illustrates how to use this feature:
+AsmJit's X86 code emitters always provide functions to construct machine-size registers of the target. This feature is for people that want to write code targeting both 32-bit and 64-bit. In AsmJit terminology these registers are named **zax**, **zcx**, **zdx**, **zbx**, **zsp**, **zbp**, **zsi**, and **zdi** (they are defined in this exact order by X86). They are accessible through `X86Assembler`, `X86Builder`, and `X86Compiler`. The following example illustrates how to use this feature:
 
 ```c++
 using namespace asmjit;
@@ -681,6 +681,18 @@ int main(int argc, char* argv[]) {
 ```
 
 If you run the example it would just work. As an experiment you can try removing `long_()` form to see what happens when wrong code is generated.
+
+### X86Assembler - Code Patching and REX Prefix
+
+In 64-bit mode there is one more thing to worry about when patching code - REX prefix. It's a single byte prefix designed to address registers with id from 9 to 15 and to override the default width of the operation from 32 to 64 bits. AsmJit, like other assemblers, only emits REX prefix when it's necessary. If the patched code only changes the immediate value as shown in the previous example then there is nothing to worry about as it doesn't change the logic behind emitting REX prefix, however, if the patched code changes register id or overrides the operation width then it's important to take care of REX prefix as well.
+
+AsmJit contains another instruction option that controls (forces) REX prefix - `rex()`. If you use it the instruction emitted will always use REX prefix even when it's encodable without it. The following list contains some instructions and their binary representations to illustrate when it's emitted:
+
+  * `  83C410` - `    add esp , 16` - 32-bit operation in 64-bit mode doesn't require REX prefix.
+  * `4083C410` - `rex add esp , 16` - 32-bit operation in 64-bit mode with forced REX prefix (0x40).
+  * `4883C410` - `    add rsp , 16` - 64-bit operation in 64-bit mode requires REX prefix (0x48).
+  * `4183C410` - `    add r12d, 16` - 32-bit operation in 64-bit mode using R12D requires REX prefix (0x41).
+  * `4983C410` - `    add r12 , 16` - 64-bit operation in 64-bit mode using R12  requires REX prefix (0x49).
 
 ### TODO
 

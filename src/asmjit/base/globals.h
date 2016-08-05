@@ -111,6 +111,8 @@ public:
   // [Init / Reset]
   // --------------------------------------------------------------------------
 
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _type != kTypeNone; }
+
   ASMJIT_API void init(uint32_t type, uint32_t mode = kModeNone) noexcept;
   ASMJIT_INLINE void reset() noexcept { _signature = 0; }
 
@@ -120,6 +122,13 @@ public:
 
   //! Get type of the architecture, see \ref Type.
   ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
+
+  //! Get if the architecture is 64-bit.
+  ASMJIT_INLINE bool is64Bit() const noexcept { return _gpSize >= 8; }
+  //! Get if the architecture is X86, X64, or X32.
+  ASMJIT_INLINE bool isX86Family() const noexcept { return _type >= kTypeX86 && _type <= kTypeX32; }
+  //! Get if the architecture is ARM32 or ARM64.
+  ASMJIT_INLINE bool isArmFamily() const noexcept { return _type >= kTypeArm32 && _type <= kTypeArm64; }
 
   //! Instruction-set mode.
   //!
@@ -143,9 +152,6 @@ public:
   //!
   //! No meaning yet.
   ASMJIT_INLINE uint32_t getMode() const noexcept { return _mode; }
-
-  //! Get if the architecture is 64-bit.
-  ASMJIT_INLINE bool is64Bit() const noexcept { return _gpSize >= 8; }
 
   //! Get a size of a general-purpose register.
   ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _gpSize; }

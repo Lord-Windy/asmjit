@@ -230,33 +230,6 @@ Error Assembler::embed(const void* data, uint32_t size) {
   return kErrorOk;
 }
 
-Error Assembler::embedConstPool(const Label& label, const ConstPool& pool) {
-  if (_lastError) return _lastError;
-
-  if (!isLabelValid(label))
-    return DebugUtils::errored(kErrorInvalidLabel);
-
-  ASMJIT_PROPAGATE(align(kAlignData, static_cast<uint32_t>(pool.getAlignment())));
-  ASMJIT_PROPAGATE(bind(label));
-
-  size_t size = pool.getSize();
-  if (getRemainingSpace() < size) {
-    Error err = _code->growBuffer(&_section->buffer, size);
-    if (ASMJIT_UNLIKELY(err)) return setLastError(err);
-  }
-
-  uint8_t* p = _bufferPtr;
-  pool.fill(p);
-
-#if !defined(ASMJIT_DISABLE_LOGGING)
-  if (_globalOptions & kOptionLoggingEnabled)
-    _code->_logger->logBinary(p, size);
-#endif // !ASMJIT_DISABLE_LOGGING
-
-  _bufferPtr += size;
-  return kErrorOk;
-}
-
 Error Assembler::embedLabel(const Label& label) {
   if (_lastError) return _lastError;
   ASMJIT_ASSERT(_code != nullptr);
@@ -306,6 +279,33 @@ Error Assembler::embedLabel(const Label& label) {
   ::memset(_bufferPtr, 0, gpSize);
   _bufferPtr += gpSize;
 
+  return kErrorOk;
+}
+
+Error Assembler::embedConstPool(const Label& label, const ConstPool& pool) {
+  if (_lastError) return _lastError;
+
+  if (!isLabelValid(label))
+    return DebugUtils::errored(kErrorInvalidLabel);
+
+  ASMJIT_PROPAGATE(align(kAlignData, static_cast<uint32_t>(pool.getAlignment())));
+  ASMJIT_PROPAGATE(bind(label));
+
+  size_t size = pool.getSize();
+  if (getRemainingSpace() < size) {
+    Error err = _code->growBuffer(&_section->buffer, size);
+    if (ASMJIT_UNLIKELY(err)) return setLastError(err);
+  }
+
+  uint8_t* p = _bufferPtr;
+  pool.fill(p);
+
+#if !defined(ASMJIT_DISABLE_LOGGING)
+  if (_globalOptions & kOptionLoggingEnabled)
+    _code->_logger->logBinary(p, size);
+#endif // !ASMJIT_DISABLE_LOGGING
+
+  _bufferPtr += size;
   return kErrorOk;
 }
 

@@ -376,24 +376,6 @@
 // [@CC}@]
 
 // [@CC_FEATURES{@]
-// \def ASMJIT_CC_HAS_NATIVE_CHAR
-// True if the C++ compiler treats char as a native type.
-//
-// \def ASMJIT_CC_HAS_NATIVE_WCHAR_T
-// True if the C++ compiler treats wchar_t as a native type.
-//
-// \def ASMJIT_CC_HAS_NATIVE_CHAR16_T
-// True if the C++ compiler treats char16_t as a native type.
-//
-// \def ASMJIT_CC_HAS_NATIVE_CHAR32_T
-// True if the C++ compiler treats char32_t as a native type.
-//
-// \def ASMJIT_CC_HAS_OVERRIDE
-// True if the C++ compiler supports override keyword.
-//
-// \def ASMJIT_CC_HAS_NOEXCEPT
-// True if the C++ compiler supports noexcept keyword.
-
 #if ASMJIT_CC_CLANG
 # define ASMJIT_CC_HAS_ATTRIBUTE               (1)
 # define ASMJIT_CC_HAS_BUILTIN                 (1)
@@ -427,6 +409,7 @@
 # define ASMJIT_CC_HAS_OVERRIDE                (__has_extension(__cxx_override_control__))
 # define ASMJIT_CC_HAS_RVALUE                  (__has_extension(__cxx_rvalue_references__))
 # define ASMJIT_CC_HAS_STATIC_ASSERT           (__has_extension(__cxx_static_assert__))
+# define ASMJIT_CC_HAS_VARIADIC_TEMPLATES      (__has_extension(__cxx_variadic_templates__))
 #endif
 
 #if ASMJIT_CC_CODEGEAR
@@ -458,6 +441,7 @@
 # define ASMJIT_CC_HAS_OVERRIDE                (0)
 # define ASMJIT_CC_HAS_RVALUE                  (ASMJIT_CC_CODEGEAR >= 0x0610)
 # define ASMJIT_CC_HAS_STATIC_ASSERT           (ASMJIT_CC_CODEGEAR >= 0x0610)
+# define ASMJIT_CC_HAS_VARIADIC_TEMPLATES      (0)
 #endif
 
 #if ASMJIT_CC_GCC
@@ -493,6 +477,7 @@
 # define ASMJIT_CC_HAS_OVERRIDE                (ASMJIT_CC_GCC_GE(4, 7, 0) && ASMJIT_CC_GCC_CXX0X)
 # define ASMJIT_CC_HAS_RVALUE                  (ASMJIT_CC_GCC_GE(4, 3, 0) && ASMJIT_CC_GCC_CXX0X)
 # define ASMJIT_CC_HAS_STATIC_ASSERT           (ASMJIT_CC_GCC_GE(4, 3, 0) && ASMJIT_CC_GCC_CXX0X)
+# define ASMJIT_CC_HAS_VARIADIC_TEMPLATES      (ASMJIT_CC_GCC_GE(4, 3, 0) && ASMJIT_CC_GCC_CXX0X)
 #endif
 
 #if ASMJIT_CC_MSC
@@ -528,6 +513,7 @@
 # define ASMJIT_CC_HAS_OVERRIDE                (ASMJIT_CC_MSC_GE(14, 0, 0))
 # define ASMJIT_CC_HAS_RVALUE                  (ASMJIT_CC_MSC_GE(16, 0, 0))
 # define ASMJIT_CC_HAS_STATIC_ASSERT           (ASMJIT_CC_MSC_GE(16, 0, 0))
+# define ASMJIT_CC_HAS_VARIADIC_TEMPLATES      (ASMJIT_CC_MSC_GE(18, 0, 0))
 #endif
 
 #if !ASMJIT_CC_HAS_ATTRIBUTE

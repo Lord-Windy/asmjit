@@ -13,8 +13,8 @@
 
 // [Dependencies]
 #include "../base/assembler.h"
-#include "../base/constpool.h"
 #include "../base/codeholder.h"
+#include "../base/constpool.h"
 #include "../base/operand.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
@@ -28,14 +28,15 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
+class CBNode;
 class CBAlign;
 class CBComment;
 class CBConstPool;
 class CBData;
 class CBInst;
 class CBJump;
-class CBNode;
 class CBLabel;
+class CBLabelData;
 class CBSentinel;
 
 //! \addtogroup asmjit_base
@@ -104,7 +105,7 @@ public:
   ASMJIT_API CBComment* newCommentNode(const char* s, size_t len) noexcept;
 
   // --------------------------------------------------------------------------
-  // [Node-Builder]
+  // [Code-Management]
   // --------------------------------------------------------------------------
 
   //! Add `node` after the current and set current to `node`.
@@ -141,6 +142,7 @@ public:
   ASMJIT_API virtual Error bind(const Label& label) override;
   ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
   ASMJIT_API virtual Error embed(const void* data, uint32_t size) override;
+  ASMJIT_API virtual Error embedLabel(const Label& label) override;
   ASMJIT_API virtual Error embedConstPool(const Label& label, const ConstPool& pool) override;
   ASMJIT_API virtual Error comment(const char* s, size_t len = kInvalidIndex) override;
 
@@ -156,14 +158,46 @@ public:
 
   Zone _nodeAllocator;                   //!< Node allocator.
   Zone _dataAllocator;                   //!< Data and string allocator (includes comments).
-  PodVector<CBLabel*> _labelArray;      //!< CBLabel array.
+  Zone _pipeAllocator;                   //!< Allocator used to pass to `CBPipeline`s.
 
-  CBNode* _firstNode;                   //!< First node of the current section.
-  CBNode* _lastNode;                    //!< Last node of the current section.
-  CBNode* _cursor;                      //!< Current node (cursor).
+  PodVector<CBLabel*> _labelArray;       //!< Maps label indexes to `CBLabel` nodes.
+
+  CBNode* _firstNode;                    //!< First node of the current section.
+  CBNode* _lastNode;                     //!< Last node of the current section.
+  CBNode* _cursor;                       //!< Current node (cursor).
 
   uint32_t _nodeFlowId;                  //!< Flow-id assigned to each new node.
   uint32_t _nodeFlags;                   //!< Flags assigned to each new node.
+};
+
+// ============================================================================
+// [asmjit::CBPipeline]
+// ============================================================================
+
+//! Code builder pipeline used for code transformations and lowering.
+class ASMJIT_VIRTAPI CBPipeline {
+public:
+  ASMJIT_NO_COPY(CBPipeline);
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API CBPipeline() noexcept;
+  ASMJIT_API virtual ~CBPipeline() noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Interface]
+  // --------------------------------------------------------------------------
+
+  //! Process the code stored in CodeBuffer `cb`.
+  //!
+  //! This is the only function that is called by the `CodeBuilder` to process
+  //! the code. It passes the CodeBuilder itself (`cb`) and also a zone memory
+  //! allocator `zone`, which will be reset after the `process()` returns. The
+  //! allocator should be used for all allocations as it's fast and everything
+  //! it allocates will be released at once when `process()` returns.
+  virtual Error process(CodeBuilder* cb, Zone* zone) noexcept = 0;
 };
 
 // ============================================================================
@@ -194,19 +228,20 @@ public:
     kNodeData       = 2,                 //!< Node is \ref CBData.
     kNodeAlign      = 3,                 //!< Node is \ref CBAlign.
     kNodeLabel      = 4,                 //!< Node is \ref CBLabel.
-    kNodeComment    = 5,                 //!< Node is \ref CBComment.
-    kNodeSentinel   = 6,                 //!< Node is \ref CBSentinel.
-    kNodeConstPool  = 7,                 //!< Node is \ref CBConstPool.
+    kNodeLabelData  = 5,                 //!< Node is \ref CBLabelData.
+    kNodeConstPool  = 6,                 //!< Node is \ref CBConstPool.
+    kNodeComment    = 7,                 //!< Node is \ref CBComment.
+    kNodeSentinel   = 8,                 //!< Node is \ref CBSentinel.
 
     // [CodeCompiler]
     kNodeFunc       = 16,                //!< Node is \ref CCFunc (considered as \ref CBLabel by \ref CodeBuilder).
     kNodeFuncExit   = 17,                //!< Node is \ref CCFuncRet.
-    kNodeCall       = 18,                //!< Node is \ref CCFuncCall.
+    kNodeCall       = 18,                //!< Node is \ref CCCall.
     kNodePushArg    = 19,                //!< Node is \ref CCPushArg.
     kNodeHint       = 20,                //!< Node is \ref CCHint.
 
     // [UserDefined]
-    kNodeUser       = 32                 //!< First ID of a user-defined node.
+    kNodeUser       = 32                 //!< First id of a user-defined node.
   };
 
   // --------------------------------------------------------------------------
@@ -217,7 +252,7 @@ public:
     //! The node has been translated by the CodeCompiler.
     kFlagIsTranslated = 0x0001,
 
-    //! If the node can be safely removed by CodeCompiler in case it's unreachable.
+    //! If the node can be safely removed (has no effect).
     kFlagIsRemovable = 0x0004,
 
     //! If the node is informative only and can be safely removed.
@@ -258,7 +293,6 @@ public:
     _flowId = cb->_nodeFlowId;
     _inlineComment = nullptr;
     _workData = nullptr;
-    _tokenId = 0;
   }
   //! SHOULD NEVER BE CALLED - \ref CodeBuilder uses \ref Zone allocator.
   ASMJIT_INLINE ~CBNode() noexcept {}
@@ -337,16 +371,12 @@ public:
   //! Reset work-data to null.
   ASMJIT_INLINE void resetWorkData() noexcept { _workData = nullptr; }
 
-  ASMJIT_INLINE bool matchesToken(uint32_t id) const noexcept { return _tokenId == id; }
-  ASMJIT_INLINE uint32_t getTokenId() const noexcept { return _tokenId; }
-  ASMJIT_INLINE void setTokenId(uint32_t id) noexcept { _tokenId = id; }
-
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  CBNode* _prev;                        //!< Previous node.
-  CBNode* _next;                        //!< Next node.
+  CBNode* _prev;                         //!< Previous node.
+  CBNode* _next;                         //!< Next node.
 
   uint8_t _type;                         //!< Node type, see \ref NodeType.
   uint8_t _opCount;                      //!< Count of operands or zero.
@@ -355,18 +385,6 @@ public:
 
   const char* _inlineComment;            //!< Inline comment or null if not used.
   void* _workData;                       //!< Work-data used during processing & transformations phases.
-
-  //! Processing token.
-  //!
-  //! Used by some algorithms to mark nodes as visited. If the token is
-  //! generated in an incrementing way the visitor can just mark nodes it
-  //! visits and them compare the `CBNode`s token with its local token.
-  //! If they are equal the node has been visited by exactly this visitor.
-  //! Then the visitor doesn't need to clean things up as the next time the
-  //! token will be different.
-  uint32_t _tokenId;
-
-  // TODO: 32-bit gap
 };
 
 // ============================================================================
@@ -684,7 +702,82 @@ public:
 
   uint32_t _id;                          //!< Label id.
   uint32_t _numRefs;                     //!< Count of jumps here.
-  CBJump* _from;                        //!< Linked-list of nodes that can jump here.
+  CBJump* _from;                         //!< Linked-list of nodes that can jump here.
+};
+
+// ============================================================================
+// [asmjit::CBLabelData]
+// ============================================================================
+
+class CBLabelData : public CBNode {
+public:
+  ASMJIT_NO_COPY(CBLabelData)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `CBLabelData` instance.
+  ASMJIT_INLINE CBLabelData(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
+    : CBNode(cb, kNodeLabelData),
+      _id(id) {}
+
+  //! Destroy the `CBLabelData` instance.
+  ASMJIT_INLINE ~CBLabelData() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Interface]
+  // --------------------------------------------------------------------------
+
+  //! Get the label id.
+  ASMJIT_INLINE uint32_t getId() const noexcept { return _id; }
+  //! Get the label as `Label` operand.
+  ASMJIT_INLINE Label getLabel() const noexcept { return Label(_id); }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  uint32_t _id;
+};
+
+// ============================================================================
+// [asmjit::CBConstPool]
+// ============================================================================
+
+class CBConstPool : public CBLabel {
+public:
+  ASMJIT_NO_COPY(CBConstPool)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `CBConstPool` instance.
+  ASMJIT_INLINE CBConstPool(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
+    : CBLabel(cb, id),
+      _constPool(&cb->_dataAllocator) { _type = kNodeConstPool; }
+
+  //! Destroy the `CBConstPool` instance.
+  ASMJIT_INLINE ~CBConstPool() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Interface]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE ConstPool& getConstPool() noexcept { return _constPool; }
+  ASMJIT_INLINE const ConstPool& getConstPool() const noexcept { return _constPool; }
+
+  //! See \ref ConstPool::add().
+  ASMJIT_INLINE Error add(const void* data, size_t size, size_t& dstOffset) noexcept {
+    return _constPool.add(data, size, dstOffset);
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  ConstPool _constPool;
 };
 
 // ============================================================================
@@ -732,45 +825,6 @@ public:
 
   //! Destroy the `CBSentinel` instance.
   ASMJIT_INLINE ~CBSentinel() noexcept {}
-};
-
-// ============================================================================
-// [asmjit::CBConstPool]
-// ============================================================================
-
-class CBConstPool : public CBLabel {
-public:
-  ASMJIT_NO_COPY(CBConstPool)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `CBConstPool` instance.
-  ASMJIT_INLINE CBConstPool(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
-    : CBLabel(cb, id),
-      _constPool(&cb->_dataAllocator) { _type = kNodeConstPool; }
-
-  //! Destroy the `CBConstPool` instance.
-  ASMJIT_INLINE ~CBConstPool() noexcept {}
-
-  // --------------------------------------------------------------------------
-  // [Interface]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE ConstPool& getConstPool() noexcept { return _constPool; }
-  ASMJIT_INLINE const ConstPool& getConstPool() const noexcept { return _constPool; }
-
-  //! See \ref ConstPool::add().
-  ASMJIT_INLINE Error add(const void* data, size_t size, size_t& dstOffset) noexcept {
-    return _constPool.add(data, size, dstOffset);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  ConstPool _constPool;
 };
 
 //! \}

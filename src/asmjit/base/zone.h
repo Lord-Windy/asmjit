@@ -96,9 +96,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get the default block size.
-  ASMJIT_INLINE size_t getBlockSize() const noexcept {
-    return _blockSize;
-  }
+  ASMJIT_INLINE size_t getBlockSize() const noexcept { return _blockSize; }
 
   // --------------------------------------------------------------------------
   // [Alloc]
@@ -139,7 +137,7 @@ public:
     uint8_t* ptr = cur->pos;
     size_t remainingBytes = (size_t)(cur->end - ptr);
 
-    if (remainingBytes < size)
+    if (ASMJIT_UNLIKELY(remainingBytes < size))
       return _alloc(size);
 
     cur->pos += size;

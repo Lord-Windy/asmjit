@@ -69,7 +69,7 @@ static ASMJIT_INLINE uint32_t hostDetectNaturalStackAlignment() noexcept {
 Runtime::Runtime() noexcept
   : _codeInfo(),
     _runtimeType(kRuntimeNone),
-    _allocType(kVMemAllocFreeable) {}
+    _allocType(VMemMgr::kAllocFreeable) {}
 Runtime::~Runtime() noexcept {}
 
 // ============================================================================

@@ -444,7 +444,7 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
   return kErrorOk;
 }
 
-Error X86FuncDecl::setPrototype(const FuncPrototype& p) {
+Error X86FuncDecl::setSignature(const FuncSignature& p) {
   uint32_t callConv = p.getCallConv();
   uint32_t arch = x86GetArchFromCConv(callConv);
 

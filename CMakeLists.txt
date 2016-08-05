@@ -242,7 +242,6 @@ asmjit_add_source(ASMJIT_SRC asmjit
   asmjit.h
   base.h
   build.h
-  host.h
 
   arm.h
   x86.h
@@ -260,8 +259,6 @@ asmjit_add_source(ASMJIT_SRC asmjit/base
   codeemitter.h
   codeholder.cpp
   codeholder.h
-  compilercontext.cpp
-  compilercontext_p.h
   constpool.cpp
   constpool.h
   containers.cpp
@@ -275,6 +272,10 @@ asmjit_add_source(ASMJIT_SRC asmjit/base
   logging.h
   operand.cpp
   operand.h
+  osutils.cpp
+  osutils.h
+  regalloc.cpp
+  regalloc_p.h
   runtime.cpp
   runtime.h
   simdtypes.h
@@ -305,8 +306,6 @@ asmjit_add_source(ASMJIT_SRC asmjit/x86
   x86assembler.h
   x86compiler.cpp
   x86compiler.h
-  x86compilercontext.cpp
-  x86compilercontext_p.h
   x86func.cpp
   x86func.h
   x86inst.cpp
@@ -317,6 +316,8 @@ asmjit_add_source(ASMJIT_SRC asmjit/x86
   x86operand.cpp
   x86operand_regs.cpp
   x86operand.h
+  x86regalloc.cpp
+  x86regalloc_p.h
 )
 
 # =============================================================================

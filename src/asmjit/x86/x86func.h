@@ -92,7 +92,7 @@ struct X86FuncDecl : public FuncDecl {
   //! This will set function calling convention and setup arguments variables.
   //!
   //! NOTE: This function will allocate variables, it can be called only once.
-  ASMJIT_API Error setPrototype(const FuncPrototype& p);
+  ASMJIT_API Error setSignature(const FuncSignature& p);
 
   // --------------------------------------------------------------------------
   // [Reset]

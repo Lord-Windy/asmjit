@@ -15,7 +15,7 @@
 #include "../base/utils.h"
 #include "../x86/x86assembler.h"
 #include "../x86/x86compiler.h"
-#include "../x86/x86compilercontext_p.h"
+#include "../x86/x86regalloc_p.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -97,10 +97,10 @@ const X86TypeData _x86TypeData = {
 #undef SIGNATURE_OF
 
 // ============================================================================
-// [asmjit::X86CallNode - Arg / Ret]
+// [asmjit::X86CCCall - Arg / Ret]
 // ============================================================================
 
-bool X86CallNode::_setArg(uint32_t i, const Operand_& op) noexcept {
+bool X86CCCall::_setArg(uint32_t i, const Operand_& op) noexcept {
   if ((i & ~kFuncArgHi) >= _x86Decl.getNumArgs())
     return false;
 
@@ -108,7 +108,7 @@ bool X86CallNode::_setArg(uint32_t i, const Operand_& op) noexcept {
   return true;
 }
 
-bool X86CallNode::_setRet(uint32_t i, const Operand_& op) noexcept {
+bool X86CCCall::_setRet(uint32_t i, const Operand_& op) noexcept {
   if (i >= 2)
     return false;
 
@@ -171,34 +171,11 @@ Error X86Compiler::finalize() {
     _globalConstPool = nullptr;
   }
 
-  CBNode* node = _firstNode;
-  if (!node) return kErrorOk;
+  X86RAPipeline ra;
+  Error err = ra.process(this, &_pipeAllocator);
+  if (ASMJIT_UNLIKELY(err)) return setLastError(err);
 
-  Error err = kErrorOk;
-  X86Context ctx(this);
-
-  // Find all functions and use the `X86Context` to translate/emit them.
-  do {
-    _resetTokenGenerator();
-    if (node->getType() == CBNode::kNodeFunc) {
-      X86FuncNode* func = static_cast<X86FuncNode*>(node);
-      node = func->getEnd();
-
-      err = ctx.compile(func);
-      if (err != kErrorOk) break;
-    }
-
-    do {
-      node = node->getNext();
-    } while (node && node->getType() != CBNode::kNodeFunc);
-
-    ctx.cleanup();
-    ctx.reset(false);
-
-    if (err != kErrorOk)
-      break;
-  } while (node);
-
+  // TODO: There must be possibility to attach more assemblers, this is not so nice.
   if (_code->_cgAsm) {
     return serialize(_code->_cgAsm);
   }
@@ -328,10 +305,10 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
 // [asmjit::X86Compiler - Func]
 // ============================================================================
 
-X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
+X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   Error err;
 
-  X86FuncNode* func = newNodeT<X86FuncNode>();
+  X86Func* func = newNodeT<X86Func>();
   if (!func) goto _NoMemory;
 
   err = registerLabelNode(func);
@@ -347,7 +324,7 @@ X86FuncNode* X86Compiler::newFunc(const FuncPrototype& p) noexcept {
   if (!func->_exitNode || !func->_end) goto _NoMemory;
 
   // Function prototype.
-  err = func->_x86Decl.setPrototype(p);
+  err = func->_x86Decl.setSignature(sign);
   if (err != kErrorOk) {
     setLastError(err);
     return nullptr;
@@ -379,19 +356,19 @@ _NoMemory:
   return nullptr;
 }
 
-X86FuncNode* X86Compiler::addFunc(const FuncPrototype& p) {
-  X86FuncNode* func = newFunc(p);
+X86Func* X86Compiler::addFunc(const FuncSignature& sign) {
+  X86Func* func = newFunc(sign);
 
   if (!func) {
     setLastError(DebugUtils::errored(kErrorNoHeapMemory));
     return nullptr;
   }
 
-  return static_cast<X86FuncNode*>(addFunc(func));
+  return static_cast<X86Func*>(addFunc(func));
 }
 
 CBSentinel* X86Compiler::endFunc() {
-  X86FuncNode* func = getFunc();
+  X86Func* func = getFunc();
   if (!func) {
     // TODO:
     return nullptr;
@@ -436,26 +413,26 @@ CCFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept 
 // [asmjit::X86Compiler - Call]
 // ============================================================================
 
-X86CallNode* X86Compiler::newCall(const Operand_& o0, const FuncPrototype& p) noexcept {
+X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) noexcept {
   Error err;
   uint32_t nArgs;
 
-  X86CallNode* node = _nodeAllocator.allocT<X86CallNode>(sizeof(X86CallNode) + sizeof(Operand));
-  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CallNode));
+  X86CCCall* node = _nodeAllocator.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
+  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CCCall));
 
   if (ASMJIT_UNLIKELY(!node))
     goto _NoMemory;
 
   opArray[0].copyFrom(o0);
-  new (node) X86CallNode(this, X86Inst::kIdCall, 0, opArray, 1);
+  new (node) X86CCCall(this, X86Inst::kIdCall, 0, opArray, 1);
 
-  if ((err = node->_x86Decl.setPrototype(p)) != kErrorOk) {
+  if ((err = node->_x86Decl.setSignature(sign)) != kErrorOk) {
     setLastError(err);
     return nullptr;
   }
 
   // If there are no arguments skip the allocation.
-  if ((nArgs = p.getNumArgs()) == 0)
+  if ((nArgs = sign.getNumArgs()) == 0)
     return node;
 
   node->_args = static_cast<Operand*>(_nodeAllocator.alloc(nArgs * sizeof(Operand)));
@@ -469,10 +446,10 @@ _NoMemory:
   return nullptr;
 }
 
-X86CallNode* X86Compiler::addCall(const Operand_& o0, const FuncPrototype& p) noexcept {
-  X86CallNode* node = newCall(o0, p);
+X86CCCall* X86Compiler::addCall(const Operand_& o0, const FuncSignature& sign) noexcept {
+  X86CCCall* node = newCall(o0, sign);
   if (!node) return nullptr;
-  return static_cast<X86CallNode*>(addNode(node));
+  return static_cast<X86CCCall*>(addNode(node));
 }
 
 // ============================================================================
@@ -480,7 +457,7 @@ X86CallNode* X86Compiler::addCall(const Operand_& o0, const FuncPrototype& p) no
 // ============================================================================
 
 Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
-  X86FuncNode* func = getFunc();
+  X86Func* func = getFunc();
 
   if (!func)
     return setLastError(DebugUtils::errored(kErrorInvalidState));

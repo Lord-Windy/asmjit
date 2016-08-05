@@ -1737,7 +1737,7 @@ public:
     Label L_Exit = c.newLabel();
 
     static const char token[kTokenSize] = "-+:|abcdefghijklmnopqrstuvwxyz|";
-    X86CallNode* call;
+    X86CCCall* call;
 
     c.lea(p1, s1);
     c.lea(p2, s2);
@@ -1986,7 +1986,7 @@ public:
     X86Gp fn = c.newIntPtr("fn");
     c.mov(fn, imm_ptr(calledFunc));
 
-    X86CallNode* call = c.call(fn, FuncSignature3<int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature3<int, int, int, int>(kCallConvHost));
     call->setArg(0, v2);
     call->setArg(1, v1);
     call->setArg(2, v0);
@@ -2032,7 +2032,7 @@ public:
     c.setArg(0, var);
 
     c.mov(fn, imm_ptr(calledFunc));
-    X86CallNode* call;
+    X86CCCall* call;
 
     call = c.call(fn, FuncSignature1<int, int>(kCallConvHostFastCall));
     call->setArg(0, var);
@@ -2110,7 +2110,7 @@ public:
     c.mov(vj, 0x1E);
 
     // Call function.
-    X86CallNode* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
     call->setArg(0, va);
     call->setArg(1, vb);
     call->setArg(2, vc);
@@ -2168,7 +2168,7 @@ public:
     c.mov(a, 3);
 
     // Call function.
-    X86CallNode* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
     call->setArg(0, a);
     call->setArg(1, a);
     call->setArg(2, a);
@@ -2221,7 +2221,7 @@ public:
     c.mov(fn, imm_ptr(X86Test_CallManyArgs::calledFunc));
 
     // Call function.
-    X86CallNode* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
     call->setArg(0, imm(0x03));
     call->setArg(1, imm(0x12));
     call->setArg(2, imm(0xA0));
@@ -2287,7 +2287,7 @@ public:
     c.mov(fn, imm_ptr(calledFunc));
 
     // Call function.
-    X86CallNode* call = c.call(fn, FuncSignature10<int, void*, void*, void*, void*, void*, void*, void*, void*, void*, void*>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, void*, void*, void*, void*, void*, void*, void*, void*, void*, void*>(kCallConvHost));
     call->setArg(0, imm(0x01));
     call->setArg(1, imm(0x02));
     call->setArg(2, imm(0x03));
@@ -2349,7 +2349,7 @@ public:
     c.mov(fn, imm_ptr(calledFunc));
 
     // Call function.
-    X86CallNode* call = c.call(fn, FuncSignature2<float, float, float>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature2<float, float, float>(kCallConvHost));
 
     call->setArg(0, a);
     call->setArg(1, b);
@@ -2402,7 +2402,7 @@ public:
     X86Gp fn = c.newIntPtr("fn");
     c.mov(fn, imm_ptr(calledFunc));
 
-    X86CallNode* call = c.call(fn, FuncSignature2<double, double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature2<double, double, double>(kCallConvHost));
 
     call->setArg(0, a);
     call->setArg(1, b);
@@ -2443,7 +2443,7 @@ public:
     X86Gp y = c.newInt32("y");
     X86Gp op = c.newInt32("op");
 
-    X86CallNode* call;
+    X86CCCall* call;
     X86Gp result;
 
     c.addFunc(FuncSignature3<int, int, int, int>(kCallConvHost));
@@ -2540,7 +2540,7 @@ public:
       X86Gp ret = c.newInt32("ret");
       X86Gp ptr = c.newIntPtr("ptr");
       X86Gp idx = c.newInt32("idx");
-      X86CallNode* call;
+      X86CCCall* call;
 
       c.mov(ptr, buf);
       c.mov(idx, static_cast<int>(i));
@@ -2600,7 +2600,7 @@ public:
     X86Gp val = c.newInt32("val");
     Label skip = c.newLabel();
 
-    X86FuncNode* func = c.addFunc(FuncSignature1<int, int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<int, int>(kCallConvHost));
     c.setArg(0, val);
 
     c.cmp(val, 1);
@@ -2610,7 +2610,7 @@ public:
     c.mov(tmp, val);
     c.dec(tmp);
 
-    X86CallNode* call = c.call(func->getLabel(), FuncSignature1<int, int>(kCallConvHost));
+    X86CCCall* call = c.call(func->getLabel(), FuncSignature1<int, int>(kCallConvHost));
     call->setArg(0, tmp);
     call->setRet(0, tmp);
     c.mul(c.newInt32(), val, tmp);
@@ -2652,7 +2652,7 @@ public:
     X86Gp val = c.newInt32("val");
     Label skip = c.newLabel();
 
-    X86FuncNode* func = c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
 
     X86Gp a = c.newInt32("a");
     X86Gp b = c.newInt32("b");
@@ -2664,7 +2664,7 @@ public:
     c.alloc(a, x86::eax);
     c.alloc(b, x86::ebx);
 
-    X86CallNode* call = c.call(imm_ptr(dummy), FuncSignature2<void, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(imm_ptr(dummy), FuncSignature2<void, int, int>(kCallConvHost));
     call->setArg(0, a);
     call->setArg(1, b);
 
@@ -2701,7 +2701,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    X86FuncNode* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
 
     X86Gp p = c.newIntPtr("p");
     X86Gp fn = c.newIntPtr("fn");
@@ -2713,7 +2713,7 @@ public:
     c.movsd(arg, x86::ptr(p));
     c.mov(fn, imm_ptr(op));
 
-    X86CallNode* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
     call->setArg(0, arg);
     call->setRet(0, ret);
 
@@ -2752,7 +2752,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    X86FuncNode* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
 
     X86Gp p = c.newIntPtr("p");
     X86Gp fn = c.newIntPtr("fn");
@@ -2764,7 +2764,7 @@ public:
     c.movsd(arg, x86::ptr(p));
     c.mov(fn, imm_ptr(op));
 
-    X86CallNode* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
     call->setArg(0, arg);
     call->setRet(0, ret);
 
@@ -2810,12 +2810,12 @@ public:
 
     funcPrototype.setCallConv(kCallConvHost);
     funcPrototype.setRet(VirtType::kIdF64);
-    X86FuncNode* func = c.addFunc(funcPrototype);
+    X86Func* func = c.addFunc(funcPrototype);
 
     FuncSignatureX callPrototype;
     callPrototype.setCallConv(kCallConvHost);
     callPrototype.setRet(VirtType::kIdF64);
-    X86CallNode* call = c.call(imm_ptr(calledFunc), callPrototype);
+    X86CCCall* call = c.call(imm_ptr(calledFunc), callPrototype);
 
     X86Xmm ret = c.newXmmSd("ret");
     call->setRet(0, ret);
@@ -2854,7 +2854,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    X86FuncNode* func = c.addFunc(FuncSignature0<int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature0<int>(kCallConvHost));
 
     X86Gp pFn = c.newIntPtr("pFn");
     X86Gp vars[16];
@@ -2874,7 +2874,7 @@ public:
       c.mov(vars[i], 1);
     }
 
-    X86CallNode* call = c.call(pFn, FuncSignature0<void>(kCallConvHost));
+    X86CCCall* call = c.call(pFn, FuncSignature0<void>(kCallConvHost));
 
     for (i = 1; i < regCount; i++) {
       if (vars[i].isValid())
@@ -3049,8 +3049,8 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    X86FuncNode* f1 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
-    X86FuncNode* f2 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    X86Func* f1 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    X86Func* f2 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
 
     {
       X86Gp a = c.newInt32("a");
@@ -3060,7 +3060,7 @@ public:
       c.setArg(0, a);
       c.setArg(1, b);
 
-      X86CallNode* call = c.call(f2->getLabel(), FuncSignature2<int, int, int>(kCallConvHost));
+      X86CCCall* call = c.call(f2->getLabel(), FuncSignature2<int, int, int>(kCallConvHost));
       call->setArg(0, a);
       call->setArg(1, b);
       call->setRet(0, a);

@@ -12,8 +12,8 @@
 #if !defined(ASMJIT_DISABLE_LOGGING)
 
 // [Dependencies]
-#include "../x86/x86logging.h"
 #include "../x86/x86inst.h"
+#include "../x86/x86logging.h"
 #include "../x86/x86operand.h"
 
 // [Api-Begin]

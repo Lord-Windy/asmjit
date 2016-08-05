@@ -366,7 +366,7 @@ ASMJIT_TYPE_ID(DoubleType        , VirtType::kIdF64);
 // [asmjit::FuncInOut]
 // ============================================================================
 
-//! Function in/out - argument or return value translated from `FuncPrototype`.
+//! Function in/out - argument or return value translated from `FuncSignature`.
 struct FuncInOut {
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -409,7 +409,7 @@ struct FuncInOut {
 };
 
 // ============================================================================
-// [asmjit::FuncPrototype]
+// [asmjit::FuncSignature]
 // ============================================================================
 
 //! Function prototype.
@@ -418,7 +418,7 @@ struct FuncInOut {
 //! of arguments and their types. Function prototype is a low level structure
 //! which doesn't contain platform specific or calling convention specific
 //! information. Function prototype is used to create a `FuncDecl`.
-struct FuncPrototype {
+struct FuncSignature {
   // --------------------------------------------------------------------------
   // [Setup]
   // --------------------------------------------------------------------------
@@ -481,7 +481,7 @@ struct FuncPrototype {
 
 // TODO: Rename to `DynamicFuncSignature`
 //! Custom function builder for up to 32 function arguments.
-struct FuncSignatureX : public FuncPrototype {
+struct FuncSignatureX : public FuncSignature {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
@@ -537,7 +537,7 @@ struct FuncSignatureX : public FuncPrototype {
 
 //! Function prototype (no args).
 template<typename RET>
-struct FuncSignature0 : public FuncPrototype {
+struct FuncSignature0 : public FuncSignature {
   ASMJIT_INLINE FuncSignature0(uint32_t callConv = kCallConvHost) noexcept {
     setup(callConv, T(RET), nullptr, 0);
   }
@@ -545,7 +545,7 @@ struct FuncSignature0 : public FuncPrototype {
 
 //! Function prototype (1 argument).
 template<typename RET, typename P0>
-struct FuncSignature1 : public FuncPrototype {
+struct FuncSignature1 : public FuncSignature {
   ASMJIT_INLINE FuncSignature1(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -554,7 +554,7 @@ struct FuncSignature1 : public FuncPrototype {
 
 //! Function prototype (2 arguments).
 template<typename RET, typename P0, typename P1>
-struct FuncSignature2 : public FuncPrototype {
+struct FuncSignature2 : public FuncSignature {
   ASMJIT_INLINE FuncSignature2(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -563,7 +563,7 @@ struct FuncSignature2 : public FuncPrototype {
 
 //! Function prototype (3 arguments).
 template<typename RET, typename P0, typename P1, typename P2>
-struct FuncSignature3 : public FuncPrototype {
+struct FuncSignature3 : public FuncSignature {
   ASMJIT_INLINE FuncSignature3(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -572,7 +572,7 @@ struct FuncSignature3 : public FuncPrototype {
 
 //! Function prototype (4 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3>
-struct FuncSignature4 : public FuncPrototype {
+struct FuncSignature4 : public FuncSignature {
   ASMJIT_INLINE FuncSignature4(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -581,7 +581,7 @@ struct FuncSignature4 : public FuncPrototype {
 
 //! Function prototype (5 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4>
-struct FuncSignature5 : public FuncPrototype {
+struct FuncSignature5 : public FuncSignature {
   ASMJIT_INLINE FuncSignature5(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -590,7 +590,7 @@ struct FuncSignature5 : public FuncPrototype {
 
 //! Function prototype (6 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5>
-struct FuncSignature6 : public FuncPrototype {
+struct FuncSignature6 : public FuncSignature {
   ASMJIT_INLINE FuncSignature6(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4), T(P5) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -599,7 +599,7 @@ struct FuncSignature6 : public FuncPrototype {
 
 //! Function prototype (7 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6>
-struct FuncSignature7 : public FuncPrototype {
+struct FuncSignature7 : public FuncSignature {
   ASMJIT_INLINE FuncSignature7(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4), T(P5), T(P6) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -608,7 +608,7 @@ struct FuncSignature7 : public FuncPrototype {
 
 //! Function prototype (8 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7>
-struct FuncSignature8 : public FuncPrototype {
+struct FuncSignature8 : public FuncSignature {
   ASMJIT_INLINE FuncSignature8(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4), T(P5), T(P6), T(P7) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -617,7 +617,7 @@ struct FuncSignature8 : public FuncPrototype {
 
 //! Function prototype (9 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7, typename P8>
-struct FuncSignature9 : public FuncPrototype {
+struct FuncSignature9 : public FuncSignature {
   ASMJIT_INLINE FuncSignature9(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4), T(P5), T(P6), T(P7), T(P8) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
@@ -626,13 +626,23 @@ struct FuncSignature9 : public FuncPrototype {
 
 //! Function prototype (10 arguments).
 template<typename RET, typename P0, typename P1, typename P2, typename P3, typename P4, typename P5, typename P6, typename P7, typename P8, typename P9>
-struct FuncSignature10 : public FuncPrototype {
+struct FuncSignature10 : public FuncSignature {
   ASMJIT_INLINE FuncSignature10(uint32_t callConv = kCallConvHost) noexcept {
     static const uint32_t args[] = { T(P0), T(P1), T(P2), T(P3), T(P4), T(P5), T(P6), T(P7), T(P8), T(P9) };
     setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
   }
 };
 #undef T
+
+#if ASMJIT_CC_HAS_VARIADIC_TEMPLATES
+template<typename RET, typename... ARGS>
+struct FuncSignatureT : public FuncSignature {
+  ASMJIT_INLINE FuncSignatureT(uint32_t callConv = kCallConvHost) noexcept {
+    static const uint32_t args[] = { (TypeId<ARGS>::kId)... };
+    setup(callConv, TypeId<RET>::kId, args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+#endif // ASMJIT_CC_HAS_VARIADIC_TEMPLATES
 
 // ============================================================================
 // [asmjit::FuncDecl]

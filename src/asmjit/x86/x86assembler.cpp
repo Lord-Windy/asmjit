@@ -3650,7 +3650,6 @@ EmitModSib_LabelRip_X86:
         }
       }
       else {
-EmitModSib_LabelRip_X64:
         dispOffset = rmMem->getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
           // [RIP].
