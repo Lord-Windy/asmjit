@@ -69,6 +69,12 @@ struct VirtReg {
 
   //! Get the virtual-register id.
   ASMJIT_INLINE uint32_t getId() const noexcept { return _id; }
+  //! Get a register signature of this virtual register.
+  ASMJIT_INLINE uint32_t getSignature() const { return _regInfo.signature; }
+  //! Get a physical register type.
+  ASMJIT_INLINE uint32_t getRegType() const { return _regInfo.regType; }
+  //! Get a physical register class.
+  ASMJIT_INLINE uint32_t getRegClass() const { return _regInfo.regClass; }
 
   //! Get virtual-register's name.
   ASMJIT_INLINE const char* getName() const noexcept { return _name; }
@@ -77,11 +83,6 @@ struct VirtReg {
   //! Get virtual-register's alignment.
   ASMJIT_INLINE uint32_t getAlignment() const { return _alignment; }
 
-  ASMJIT_INLINE uint32_t getSignature() const { return _regInfo.signature; }
-  //! Get a physical register type.
-  ASMJIT_INLINE uint32_t getRegType() const { return _regInfo.regType; }
-  //! Get a physical register class.
-  ASMJIT_INLINE uint32_t getRegClass() const { return _regInfo.regClass; }
   //! Get a virtual type.
   ASMJIT_INLINE uint32_t getTypeId() const { return _typeId; }
 

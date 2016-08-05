@@ -1821,8 +1821,7 @@ Error X86RAPass::fetch() {
     LNK->refCount++; \
     REG->_tied = LNK; \
     \
-    if (ASMJIT_UNLIKELY(assignRAId(REG) != kErrorOk)) \
-      goto NoMem; \
+    if (assignRAId(REG) != kErrorOk) goto NoMem; \
     tiedCount.add(REG->getRegClass()); \
   } while (0)
 
@@ -1835,8 +1834,7 @@ Error X86RAPass::fetch() {
       LNK->setup(REG, 0, 0, NEW_ALLOCABLE); \
       REG->_tied = LNK; \
       \
-      if (ASMJIT_UNLIKELY(assignRAId(REG) != kErrorOk)) \
-        goto NoMem; \
+      if (assignRAId(REG) != kErrorOk) goto NoMem; \
       tiedCount.add(REG->getRegClass()); \
     } \
     \

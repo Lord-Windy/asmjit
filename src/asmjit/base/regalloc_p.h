@@ -301,22 +301,11 @@ struct RAData {
   ASMJIT_INLINE RAData(uint32_t tiedTotal) noexcept
     : liveness(nullptr),
       state(nullptr),
-      tiedTotal(tiedTotal),
-      tokenId(0) {}
+      tiedTotal(tiedTotal) {}
 
   RABits* liveness;                      //!< Liveness bits (populated by liveness-analysis).
   RAState* state;                        //!< Optional saved \ref RAState.
   uint32_t tiedTotal;                    //!< Total count of \ref TiedReg regs.
-
-  //! Processing token.
-  //!
-  //! Used by some algorithms to mark nodes as visited. If the token is
-  //! generated in an incrementing way the visitor can just mark nodes it
-  //! visits and them compare the `CBNode`s token with its local token.
-  //! If they are equal the node has been visited by exactly this visitor.
-  //! Then the visitor doesn't need to clean things up as the next time the
-  //! token will be different.
-  uint32_t tokenId;
 };
 
 // ============================================================================
@@ -369,14 +358,14 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get function.
-  ASMJIT_INLINE CCFunc* getFunc() const { return _func; }
+  ASMJIT_INLINE CCFunc* getFunc() const noexcept { return _func; }
   //! Get stop node.
-  ASMJIT_INLINE CBNode* getStop() const { return _stop; }
+  ASMJIT_INLINE CBNode* getStop() const noexcept { return _stop; }
 
   //! Get extra block.
-  ASMJIT_INLINE CBNode* getExtraBlock() const { return _extraBlock; }
+  ASMJIT_INLINE CBNode* getExtraBlock() const noexcept { return _extraBlock; }
   //! Set extra block.
-  ASMJIT_INLINE void setExtraBlock(CBNode* node) { _extraBlock = node; }
+  ASMJIT_INLINE void setExtraBlock(CBNode* node) noexcept { _extraBlock = node; }
 
   // --------------------------------------------------------------------------
   // [State]
@@ -401,7 +390,7 @@ public:
   // [Context]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Error assignRAId(VirtReg* vreg) {
+  ASMJIT_INLINE Error assignRAId(VirtReg* vreg) noexcept {
     // Likely as a single virtual register would be mostly used more than once,
     // this means that each virtual register will hit one bad case (doesn't
     // have id) and then all likely cases.

@@ -299,8 +299,8 @@ public:
   // [Arch]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE bool isX64() const { return _zsp.getSize() == 16; }
-  ASMJIT_INLINE uint32_t getGpSize() const { return _zsp.getSize(); }
+  ASMJIT_INLINE bool isX64() const noexcept { return _zsp.getSize() == 16; }
+  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _zsp.getSize(); }
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -692,7 +692,7 @@ public:
   RACell* _stackFrameCell;
 
   //! Global allocable registers mask.
-  uint32_t _gaRegs[X86Reg::kClassCount];
+  uint32_t _gaRegs[X86Reg::_kClassManagedCount];
 
   //! Function arguments base pointer (register).
   uint8_t _argBaseReg;

@@ -41,23 +41,16 @@ namespace asmjit {
 
 // Windows specific implementation using `VirtualAllocEx` and `VirtualFree`.
 #if ASMJIT_OS_WINDOWS
-// AsmJit allows to pass null handle to `OSUtils::[alloc|release]ProcessMemory`.
-// This function is just a convenient way to convert such handle to the current
-// process handle.
-ASMJIT_INLINE HANDLE OSUtils_GetSafeProcessHandle(HANDLE hCurrent, HANDLE hAny) const noexcept {
-  return hAny ? hAny : hCurrent;
-}
-
 static ASMJIT_NOINLINE const VMemInfo& OSUtils_GetVMemInfo() noexcept {
   static VMemInfo vmi;
 
-  if (ASMJIT_UNLIKELY(!vmi.hProcess)) {
+  if (ASMJIT_UNLIKELY(!vmi.hCurrentProcess)) {
     SYSTEM_INFO info;
     ::GetSystemInfo(&info);
 
     vmi.pageSize = Utils::alignToPowerOf2<uint32_t>(info.dwPageSize);
     vmi.pageGranularity = info.dwAllocationGranularity;
-    vmi.hProcess = ::GetCurrentProcess();
+    vmi.hCurrentProcess = ::GetCurrentProcess();
   }
 
   return vmi;
@@ -65,11 +58,11 @@ static ASMJIT_NOINLINE const VMemInfo& OSUtils_GetVMemInfo() noexcept {
 
 VMemInfo OSUtils::getVirtualMemoryInfo() noexcept { return OSUtils_GetVMemInfo(); }
 
-void* OSUtils::alloc(size_t size, size_t* allocated, uint32_t flags) noexcept {
+void* OSUtils::allocVirtualMemory(size_t size, size_t* allocated, uint32_t flags) noexcept {
   return allocProcessMemory(static_cast<HANDLE>(0), size, allocated, flags);
 }
 
-Error OSUtils::release(void* p, size_t size) noexcept {
+Error OSUtils::releaseVirtualMemory(void* p, size_t size) noexcept {
   return releaseProcessMemory(static_cast<HANDLE>(0), p, size);
 }
 
@@ -78,7 +71,7 @@ void* OSUtils::allocProcessMemory(HANDLE hProcess, size_t size, size_t* allocate
     return nullptr;
 
   const VMemInfo& vmi = OSUtils_GetVMemInfo();
-  hProcess = OSUtils_getSafeProcessHandle(vmi.hCurrentProcess, hProcess);
+  if (!hProcess) hProcess = vmi.hCurrentProcess;
 
   // VirtualAllocEx rounds the allocated size to a page size automatically,
   // but we need the `alignedSize` so we can store the real allocated size
@@ -103,7 +96,7 @@ void* OSUtils::allocProcessMemory(HANDLE hProcess, size_t size, size_t* allocate
 
 Error OSUtils::releaseProcessMemory(HANDLE hProcess, void* p, size_t size) noexcept {
   const VMemInfo& vmi = OSUtils_GetVMemInfo();
-  hProcess = OSUtils_getSafeProcessHandle(vmi.hCurrentProcess, hProcess);
+  if (!hProcess) hProcess = vmi.hCurrentProcess;
 
   if (ASMJIT_UNLIKELY(!::VirtualFreeEx(hProcess, p, 0, MEM_RELEASE)))
     return DebugUtils::errored(kErrorInvalidState);

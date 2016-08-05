@@ -129,8 +129,6 @@ Error RAPass::prepare(CCFunc* func) noexcept {
   _memAllTotal = 0;
   _annotationLength = 12;
 
-  _state = nullptr;
-
   return kErrorOk;
 }
 
@@ -458,6 +456,7 @@ Visit:
       else {
         // Read-Only or Read/Write.
         bTmp->setBit(raId);
+        bCur->setBit(raId);
       }
     }
 
