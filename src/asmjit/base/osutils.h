@@ -96,7 +96,7 @@ struct OSUtils {
 //!
 //! Lock.
 struct Lock {
-  ASMJIT_NO_COPY(Lock)
+  ASMJIT_NONCOPYABLE(Lock)
 
   // --------------------------------------------------------------------------
   // [Windows]
@@ -150,7 +150,7 @@ struct Lock {
 //!
 //! Scoped lock.
 struct AutoLock {
-  ASMJIT_NO_COPY(AutoLock)
+  ASMJIT_NONCOPYABLE(AutoLock)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

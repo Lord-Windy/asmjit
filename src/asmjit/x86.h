@@ -13,6 +13,7 @@
 
 #include "./x86/x86assembler.h"
 #include "./x86/x86compiler.h"
+#include "./x86/x86emitter.h"
 #include "./x86/x86func.h"
 #include "./x86/x86inst.h"
 #include "./x86/x86logging.h"

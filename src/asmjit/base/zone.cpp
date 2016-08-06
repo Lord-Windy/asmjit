@@ -18,15 +18,32 @@
 namespace asmjit {
 
 //! Zero size block used by `Zone` that doesn't have any memory allocated.
-static const Zone::Block Zone_zeroBlock = { nullptr, nullptr, nullptr, nullptr, { 0 } };
+static const Zone::Block ZoneZeroBlock = { nullptr, nullptr, 0, { 0 } };
+
+static ASMJIT_INLINE uint32_t ZoneGetAlignmentOffsetFromAlignment(uint32_t x) noexcept {
+  switch (x) {
+    case 0 : return 0;
+    case 1 : return 1;
+    case 2 : return 2;
+    case 4 : return 3;
+    case 8 : return 4;
+    case 16: return 5;
+    case 32: return 6;
+    case 64: return 7;
+    default: return 0;
+  }
+}
 
 // ============================================================================
 // [asmjit::Zone - Construction / Destruction]
 // ============================================================================
 
-Zone::Zone(size_t blockSize) noexcept
-  : _block(const_cast<Zone::Block*>(&Zone_zeroBlock)),
-    _blockSize(blockSize) {}
+Zone::Zone(uint32_t blockSize, uint32_t blockAlignment) noexcept
+  : _ptr(nullptr),
+    _end(nullptr),
+    _block(const_cast<Zone::Block*>(&ZoneZeroBlock)),
+    _blockSize(blockSize),
+    _blockAlignmentShift(ZoneGetAlignmentOffsetFromAlignment(blockAlignment)) {}
 
 Zone::~Zone() noexcept {
   reset(true);
@@ -40,7 +57,7 @@ void Zone::reset(bool releaseMemory) noexcept {
   Block* cur = _block;
 
   // Can't be altered.
-  if (cur == &Zone_zeroBlock)
+  if (cur == &ZoneZeroBlock)
     return;
 
   if (releaseMemory) {
@@ -51,22 +68,25 @@ void Zone::reset(bool releaseMemory) noexcept {
       Block* prev = cur->prev;
       ASMJIT_FREE(cur);
       cur = prev;
-    } while (cur);
+    } while (cur != nullptr);
 
     cur = next;
-    while (cur) {
+    while (cur != nullptr) {
       next = cur->next;
       ASMJIT_FREE(cur);
       cur = next;
     }
 
-    _block = const_cast<Zone::Block*>(&Zone_zeroBlock);
+    _ptr = nullptr;
+    _end = nullptr;
+    _block = const_cast<Zone::Block*>(&ZoneZeroBlock);
   }
   else {
-    while (cur->prev)
+    while (cur->prev != nullptr)
       cur = cur->prev;
 
-    cur->pos = cur->data;
+    _ptr = cur->data;
+    _end = _ptr + cur->size;
     _block = cur;
   }
 }
@@ -77,54 +97,71 @@ void Zone::reset(bool releaseMemory) noexcept {
 
 void* Zone::_alloc(size_t size) noexcept {
   Block* curBlock = _block;
+  uint8_t* p;
+
   size_t blockSize = Utils::iMax<size_t>(_blockSize, size);
+  size_t blockAlignment = getBlockAlignment();
 
   // The `_alloc()` method can only be called if there is not enough space
   // in the current block, see `alloc()` implementation for more details.
-  ASMJIT_ASSERT(curBlock == &Zone_zeroBlock || curBlock->getRemainingSize() < size);
+  ASMJIT_ASSERT(curBlock == &ZoneZeroBlock || getRemainingSize() < size);
 
-  // If the `Zone` has been reset the current block doesn't have to be the
+  // If the `Zone` has been cleared the current block doesn't have to be the
   // last one. Check if there is a block that can be used instead of allocating
   // a new one. If there is a `next` block it's completely unused, we don't have
   // to check for remaining bytes.
   Block* next = curBlock->next;
-  if (next && next->getBlockSize() >= size) {
-    next->pos = next->data + size;
+  if (next != nullptr && next->size >= size) {
+    p = Utils::alignTo(next->data, blockAlignment);
+
     _block = next;
-    return static_cast<void*>(next->data);
+    _ptr = p + size;
+    _end = next->data + next->size;
+
+    return static_cast<void*>(p);
   }
 
   // Prevent arithmetic overflow.
-  if (blockSize > ~static_cast<size_t>(0) - sizeof(Block)) return nullptr;
+  if (blockSize > (~static_cast<size_t>(0) - sizeof(Block) - blockAlignment))
+    return nullptr;
 
-  Block* newBlock = static_cast<Block*>(ASMJIT_ALLOC(sizeof(Block) - sizeof(void*) + blockSize));
-  if (!newBlock) return nullptr;
+  Block* newBlock = static_cast<Block*>(ASMJIT_ALLOC(sizeof(Block) - sizeof(void*) + blockSize + blockAlignment));
+  if (newBlock == nullptr)
+    return nullptr;
 
-  newBlock->pos = newBlock->data + size;
-  newBlock->end = newBlock->data + blockSize;
+  // Align the pointer to `blockAlignment` and adjust the size of this block
+  // accordingly. It's the same as using `blockAlignment - Utils::alignDiff()`,
+  // just written differently.
+  p = Utils::alignTo(newBlock->data, blockAlignment);
+  newBlock->size = blockSize + blockAlignment - (size_t)(p - newBlock->data);
+
   newBlock->prev = nullptr;
   newBlock->next = nullptr;
 
-  if (curBlock != &Zone_zeroBlock) {
+  if (curBlock != &ZoneZeroBlock) {
     newBlock->prev = curBlock;
     curBlock->next = newBlock;
 
     // Does only happen if there is a next block, but the requested memory
     // can't fit into it. In this case a new buffer is allocated and inserted
     // between the current block and the next one.
-    if (next) {
+    if (next != nullptr) {
       newBlock->next = next;
       next->prev = newBlock;
     }
   }
 
   _block = newBlock;
-  return static_cast<void*>(newBlock->data);
+  _ptr = p + size;
+  _end = newBlock->data + blockSize + blockAlignment;
+
+  return static_cast<void*>(p);
 }
 
 void* Zone::allocZeroed(size_t size) noexcept {
   void* p = alloc(size);
-  if (p) ::memset(p, 0, size);
+  if (ASMJIT_LIKELY(p))
+    ::memset(p, 0, size);
   return p;
 }
 
@@ -168,6 +205,7 @@ char* Zone::sformat(const char* fmt, ...) noexcept {
   va_end(ap);
   return static_cast<char*>(dup(buf, len));
 }
+
 
 } // asmjit namespace
 

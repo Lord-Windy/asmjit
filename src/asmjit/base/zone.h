@@ -29,35 +29,23 @@ namespace asmjit {
 //! incrementing a pointer. It allocates blocks of memory by using standard
 //! C library `malloc/free`, but divides these blocks into smaller segments
 //! requirested by calling `Zone::alloc()` and friends.
-//!
-//! Zone memory allocators are designed to allocate data structures that have
-//! a short lifetime. Data structures used by CodeEmitter (and all classes that
-//! inherit it) are small and all have a very short life-time. It's much faster
-//! (and easier) to use an incremental memory allocator like Zone to allocate
-//! them and deallocate them all at once when the data is no longer needed.
 class Zone {
 public:
   //! \internal
   //!
   //! A single block of memory.
   struct Block {
-    //! Get the size of the block.
-    ASMJIT_INLINE size_t getBlockSize() const noexcept { return (size_t)(end - data); }
-    //! Get count of remaining bytes in the block.
-    ASMJIT_INLINE size_t getRemainingSize() const noexcept { return (size_t)(end - pos); }
-
-    uint8_t* pos;                        //!< Current data pointer (pointer to the first available byte).
-    uint8_t* end;                        //!< End data pointer (pointer to the first invalid byte).
-    Block* prev;                         //!< Pointer to the previous block.
-    Block* next;                         //!< Pointer to the next block.
-    uint8_t data[sizeof(void*)];         //!< Start of the data.
+    Block* prev;                         //!< Link to the previous block.
+    Block* next;                         //!< Link to the next block.
+    size_t size;                         //!< Size of the block.
+    uint8_t data[sizeof(void*)];         //!< Data.
   };
 
   enum {
     //! Zone allocator overhead.
     kZoneOverhead =
-      kMemAllocOverhead
-        + static_cast<int>(sizeof(Block) - sizeof(void*))
+      kMemAllocOverhead +
+        static_cast<int>(sizeof(Zone::Block) - sizeof(void*))
   };
 
   // --------------------------------------------------------------------------
@@ -74,7 +62,7 @@ public:
   //! It's not required, but it's good practice to set `blockSize` to a
   //! reasonable value that depends on the usage of `Zone`. Greater block sizes
   //! are generally safer and performs better than unreasonably low values.
-  ASMJIT_API Zone(size_t blockSize) noexcept;
+  ASMJIT_API Zone(uint32_t blockSize, uint32_t blockAlignment = 0) noexcept;
 
   //! Destroy the `Zone` instance.
   //!
@@ -96,7 +84,27 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get the default block size.
-  ASMJIT_INLINE size_t getBlockSize() const noexcept { return _blockSize; }
+  ASMJIT_INLINE uint32_t getBlockSize() const noexcept { return _blockSize; }
+  //! Get the default block alignment.
+  ASMJIT_INLINE uint32_t getBlockAlignment() const noexcept { return (uint32_t)1 << _blockAlignmentShift; }
+  //! Get remaining size of the current block.
+  ASMJIT_INLINE size_t getRemainingSize() const noexcept { return (size_t)(_end - _ptr); }
+
+  //! Get the current zone cursor (dangerous).
+  //!
+  //! This is a function that can be used to get exclusive access to the current
+  //! block's memory buffer.
+  ASMJIT_INLINE uint8_t* getCursor() noexcept { return _ptr; }
+  //! Get the end of the current zone block, only useful if you use `getCursor()`.
+  ASMJIT_INLINE uint8_t* getEnd() noexcept { return _end; }
+
+  //! Set the current zone cursor to `p` (must match the current block).
+  //!
+  //! This is a counterpart of `getZoneCursor()`.
+  ASMJIT_INLINE void setCursor(uint8_t* p) noexcept {
+    ASMJIT_ASSERT(p >= _ptr && p <= _end);
+    _ptr = p;
+  }
 
   // --------------------------------------------------------------------------
   // [Alloc]
@@ -117,8 +125,11 @@ public:
   //! Zone zone(65536 - Zone::kZoneOverhead);
   //!
   //! // Create your objects using zone object allocating, for example:
-  //! Object* obj = zone.allocT<Object>();
-  //! if (!obj) { /* Handle out of memory */ }
+  //! Object* obj = static_cast<Object*>( zone.alloc(sizeof(Object)) );
+  //
+  //! if (obj == nullptr) {
+  //!   // Handle out of memory error.
+  //! }
   //!
   //! // Placement `new` and `delete` operators can be used to instantiate it.
   //! new(obj) Object();
@@ -132,18 +143,28 @@ public:
   //! zone.reset();
   //! ~~~
   ASMJIT_INLINE void* alloc(size_t size) noexcept {
-    Block* cur = _block;
-
-    uint8_t* ptr = cur->pos;
-    size_t remainingBytes = (size_t)(cur->end - ptr);
+    uint8_t* ptr = _ptr;
+    size_t remainingBytes = (size_t)(_end - ptr);
 
     if (ASMJIT_UNLIKELY(remainingBytes < size))
       return _alloc(size);
 
-    cur->pos += size;
-    ASMJIT_ASSERT(cur->pos <= cur->end);
+    _ptr += size;
+    ASMJIT_ASSERT(_ptr <= _end);
 
-    return (void*)ptr;
+    return static_cast<void*>(ptr);
+  }
+
+  //! Allocate `size` bytes without any checks.
+  //!
+  //! Can only be called if `getRemainingSize()` returns size at least equal
+  //! to `size`.
+  ASMJIT_INLINE void* allocNoCheck(size_t size) noexcept {
+    ASMJIT_ASSERT((size_t)(_end - _ptr) >= size);
+
+    uint8_t* ptr = _ptr;
+    _ptr += size;
+    return static_cast<void*>(ptr);
   }
 
   //! Allocate `size` bytes of zeroed memory.
@@ -153,11 +174,21 @@ public:
 
   //! Like `alloc()`, but the return pointer is casted to `T*`.
   template<typename T>
-  ASMJIT_INLINE T* allocT(size_t size = sizeof(T)) noexcept { return static_cast<T*>(alloc(size)); }
+  ASMJIT_INLINE T* allocT(size_t size = sizeof(T)) noexcept {
+    return static_cast<T*>(alloc(size));
+  }
+
+  //! Like `allocNoCheck()`, but the return pointer is casted to `T*`.
+  template<typename T>
+  ASMJIT_INLINE T* allocNoCheckT(size_t size = sizeof(T)) noexcept {
+    return static_cast<T*>(allocNoCheck(size));
+  }
 
   //! Like `allocZeroed()`, but the return pointer is casted to `T*`.
   template<typename T>
-  ASMJIT_INLINE T* allocZeroedT(size_t size = sizeof(T)) noexcept { return static_cast<T*>(allocZeroed(size)); }
+  ASMJIT_INLINE T* allocZeroedT(size_t size = sizeof(T)) noexcept {
+    return static_cast<T*>(allocZeroed(size));
+  }
 
   //! \internal
   ASMJIT_API void* _alloc(size_t size) noexcept;
@@ -175,10 +206,18 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! The current block.
-  Block* _block;
+  uint8_t* _ptr;                         //!< Pointer in the current block's buffer.
+  uint8_t* _end;                         //!< End of the current block's buffer.
+  Block* _block;                         //!< Current block.
+
   //! Default block size.
-  size_t _blockSize;
+#if ASMJIT_ARCH_64BIT
+  uint32_t _blockSize;                   //!< Default size of a newly allocated block.
+  uint32_t _blockAlignmentShift;         //!< Minimum alignment of each block.
+#else
+  uint32_t _blockSize : 29;              //!< Default size of a newly allocated block.
+  uint32_t _blockAlignmentShift : 3;     //!< Minimum alignment of each block.
+#endif
 };
 
 //! \}

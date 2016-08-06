@@ -277,7 +277,7 @@ struct CodeBuffer {
 //! attached code generators.
 class ASMJIT_VIRTAPI CodeHolder {
 public:
-  ASMJIT_NO_COPY(CodeHolder)
+  ASMJIT_NONCOPYABLE(CodeHolder)
 
   //! Code or data section entry.
   struct SectionEntry {

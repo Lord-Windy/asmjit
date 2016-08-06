@@ -34,7 +34,7 @@ namespace asmjit {
 //! \sa CodeCompiler.
 class ASMJIT_VIRTAPI Assembler : public CodeEmitter {
 public:
-  ASMJIT_NO_COPY(Assembler)
+  ASMJIT_NONCOPYABLE(Assembler)
   typedef CodeEmitter Base;
 
   // --------------------------------------------------------------------------

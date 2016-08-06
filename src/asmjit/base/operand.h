@@ -145,18 +145,7 @@ struct Operand_ {
     uint8_t reserved_2_1;                //!< Must be zero.
     uint8_t size;                        //!< Size of the immediate (or 0 to autodetect).
     uint32_t id;                         //!< Immediate id (always `kInvalidValue`).
-    union {
-      int8_t   _i8[8];                   //!< 8x8-bit signed integers.
-      uint8_t  _u8[8];                   //!< 8x8-bit unsigned integers.
-      int16_t  _i16[4];                  //!< 4x16-bit signed integers.
-      uint16_t _u16[4];                  //!< 4x16-bit unsigned integers.
-      int32_t  _i32[2];                  //!< 2x32-bit signed integers.
-      uint32_t _u32[2];                  //!< 2x32-bit unsigned integers.
-      int64_t  _i64[1];                  //!< 1x64-bit signed integers
-      uint64_t _u64[1];                  //!< 1x64-bit unsigned integers.
-      float    _f32[2];                  //!< 2x32-bit floating points.
-      double   _f64[1];                  //!< 1x64-bit floating points.
-    } value;
+    UInt64 value;                        //!< Immediate value.
   };
 
   //! Label operand data.
@@ -896,13 +885,13 @@ public:
   //! Create a new immediate value (initial value is 0).
   Imm() noexcept : Operand(NoInit) {
     _init_packed_op_b1_b2_sz_id(kOpImm, 0, 0, 0, kInvalidValue);
-    _imm.value._i64[0] = 0;
+    _imm.value.i64 = 0;
   }
 
   //! Create a new signed immediate value, assigning the value to `val`.
   explicit Imm(int64_t val) noexcept : Operand(NoInit) {
     _init_packed_op_b1_b2_sz_id(kOpImm, 0, 0, 0, kInvalidValue);
-    _imm.value._i64[0] = val;
+    _imm.value.i64 = val;
   }
 
   //! Create a new immediate value from `other`.
@@ -918,36 +907,47 @@ public:
   ASMJIT_INLINE Imm clone() const noexcept { return Imm(*this); }
 
   //! Get whether the immediate can be casted to 8-bit signed integer.
-  ASMJIT_INLINE bool isInt8() const noexcept { return Utils::isInt8(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isInt8() const noexcept { return Utils::isInt8(_imm.value.i64); }
   //! Get whether the immediate can be casted to 8-bit unsigned integer.
-  ASMJIT_INLINE bool isUInt8() const noexcept { return Utils::isUInt8(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isUInt8() const noexcept { return Utils::isUInt8(_imm.value.i64); }
 
   //! Get whether the immediate can be casted to 16-bit signed integer.
-  ASMJIT_INLINE bool isInt16() const noexcept { return Utils::isInt16(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isInt16() const noexcept { return Utils::isInt16(_imm.value.i64); }
   //! Get whether the immediate can be casted to 16-bit unsigned integer.
-  ASMJIT_INLINE bool isUInt16() const noexcept { return Utils::isUInt16(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isUInt16() const noexcept { return Utils::isUInt16(_imm.value.i64); }
 
   //! Get whether the immediate can be casted to 32-bit signed integer.
-  ASMJIT_INLINE bool isInt32() const noexcept { return Utils::isInt32(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isInt32() const noexcept { return Utils::isInt32(_imm.value.i64); }
   //! Get whether the immediate can be casted to 32-bit unsigned integer.
-  ASMJIT_INLINE bool isUInt32() const noexcept { return Utils::isUInt32(_imm.value._i64[0]); }
+  ASMJIT_INLINE bool isUInt32() const noexcept { return Utils::isUInt32(_imm.value.i64); }
 
   //! Get immediate value as 8-bit signed integer.
-  ASMJIT_INLINE int8_t getInt8() const noexcept { return _imm.value._i8[_ASMJIT_ARCH_INDEX(8, 0)]; }
+  ASMJIT_INLINE int8_t getInt8() const noexcept { return static_cast<int8_t>(_imm.value.i32Lo & 0xFF); }
   //! Get immediate value as 8-bit unsigned integer.
-  ASMJIT_INLINE uint8_t getUInt8() const noexcept { return _imm.value._u8[_ASMJIT_ARCH_INDEX(8, 0)]; }
+  ASMJIT_INLINE uint8_t getUInt8() const noexcept { return static_cast<uint8_t>(_imm.value.u32Lo & 0xFFU); }
   //! Get immediate value as 16-bit signed integer.
-  ASMJIT_INLINE int16_t getInt16() const noexcept { return _imm.value._i16[_ASMJIT_ARCH_INDEX(4, 0)]; }
+  ASMJIT_INLINE int16_t getInt16() const noexcept { return static_cast<int16_t>(_imm.value.i32Lo & 0xFFFF);}
   //! Get immediate value as 16-bit unsigned integer.
-  ASMJIT_INLINE uint16_t getUInt16() const noexcept { return _imm.value._u16[_ASMJIT_ARCH_INDEX(4, 0)]; }
+  ASMJIT_INLINE uint16_t getUInt16() const noexcept { return static_cast<uint16_t>(_imm.value.u32Lo & 0xFFFFU);}
+
   //! Get immediate value as 32-bit signed integer.
-  ASMJIT_INLINE int32_t getInt32() const noexcept { return _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 0)]; }
+  ASMJIT_INLINE int32_t getInt32() const noexcept { return _imm.value.i32Lo; }
+  //! Get low 32-bit signed integer.
+  ASMJIT_INLINE int32_t getInt32Lo() const noexcept { return _imm.value.i32Lo; }
+  //! Get high 32-bit signed integer.
+  ASMJIT_INLINE int32_t getInt32Hi() const noexcept { return _imm.value.i32Hi; }
+
   //! Get immediate value as 32-bit unsigned integer.
-  ASMJIT_INLINE uint32_t getUInt32() const noexcept { return _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)]; }
+  ASMJIT_INLINE uint32_t getUInt32() const noexcept { return _imm.value.u32Lo; }
+  //! Get low 32-bit signed integer.
+  ASMJIT_INLINE uint32_t getUInt32Lo() const noexcept { return _imm.value.u32Lo; }
+  //! Get high 32-bit signed integer.
+  ASMJIT_INLINE uint32_t getUInt32Hi() const noexcept { return _imm.value.u32Hi; }
+
   //! Get immediate value as 64-bit signed integer.
-  ASMJIT_INLINE int64_t getInt64() const noexcept { return _imm.value._i64[0]; }
+  ASMJIT_INLINE int64_t getInt64() const noexcept { return _imm.value.i64; }
   //! Get immediate value as 64-bit unsigned integer.
-  ASMJIT_INLINE uint64_t getUInt64() const noexcept { return _imm.value._u64[0]; }
+  ASMJIT_INLINE uint64_t getUInt64() const noexcept { return _imm.value.u64; }
 
   //! Get immediate value as `intptr_t`.
   ASMJIT_INLINE intptr_t getIntPtr() const noexcept {
@@ -965,169 +965,74 @@ public:
       return static_cast<uintptr_t>(getUInt32());
   }
 
-  //! Get low 32-bit signed integer.
-  ASMJIT_INLINE int32_t getInt32Lo() const noexcept { return _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 0)]; }
-  //! Get low 32-bit signed integer.
-  ASMJIT_INLINE uint32_t getUInt32Lo() const noexcept { return _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)]; }
-  //! Get high 32-bit signed integer.
-  ASMJIT_INLINE int32_t getInt32Hi() const noexcept { return _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 1)]; }
-  //! Get high 32-bit signed integer.
-  ASMJIT_INLINE uint32_t getUInt32Hi() const noexcept { return _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)]; }
-
   //! Set immediate value to 8-bit signed integer `val`.
-  ASMJIT_INLINE Imm& setInt8(int8_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._i64[0] = static_cast<int64_t>(val);
-    }
-    else {
-      int32_t val32 = static_cast<int32_t>(val);
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 0)] = val32;
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 1)] = val32 >> 31;
-    }
-    return *this;
-  }
-
+  ASMJIT_INLINE void setInt8(int8_t val) noexcept { _imm.value.i64 = static_cast<int64_t>(val); }
   //! Set immediate value to 8-bit unsigned integer `val`.
-  ASMJIT_INLINE Imm& setUInt8(uint8_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._u64[0] = static_cast<uint64_t>(val);
-    }
-    else {
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)] = static_cast<uint32_t>(val);
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
-    }
-    return *this;
-  }
+  ASMJIT_INLINE void setUInt8(uint8_t val) noexcept { _imm.value.u64 = static_cast<uint64_t>(val); }
 
   //! Set immediate value to 16-bit signed integer `val`.
-  ASMJIT_INLINE Imm& setInt16(int16_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._i64[0] = static_cast<int64_t>(val);
-    }
-    else {
-      int32_t val32 = static_cast<int32_t>(val);
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 0)] = val32;
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 1)] = val32 >> 31;
-    }
-    return *this;
-  }
-
+  ASMJIT_INLINE void setInt16(int16_t val) noexcept { _imm.value.i64 = static_cast<int64_t>(val); }
   //! Set immediate value to 16-bit unsigned integer `val`.
-  ASMJIT_INLINE Imm& setUInt16(uint16_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._u64[0] = static_cast<uint64_t>(val);
-    }
-    else {
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)] = static_cast<uint32_t>(val);
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
-    }
-    return *this;
-  }
+  ASMJIT_INLINE void setUInt16(uint16_t val) noexcept { _imm.value.u64 = static_cast<uint64_t>(val); }
 
   //! Set immediate value to 32-bit signed integer `val`.
-  ASMJIT_INLINE Imm& setInt32(int32_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._i64[0] = static_cast<int64_t>(val);
-    }
-    else {
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 0)] = val;
-      _imm.value._i32[_ASMJIT_ARCH_INDEX(2, 1)] = val >> 31;
-    }
-    return *this;
-  }
-
+  ASMJIT_INLINE void setInt32(int32_t val) noexcept { _imm.value.i64 = static_cast<int64_t>(val); }
   //! Set immediate value to 32-bit unsigned integer `val`.
-  ASMJIT_INLINE Imm& setUInt32(uint32_t val) noexcept {
-    if (ASMJIT_ARCH_64BIT) {
-      _imm.value._u64[0] = static_cast<uint64_t>(val);
-    }
-    else {
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)] = val;
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
-    }
-    return *this;
-  }
+  ASMJIT_INLINE void setUInt32(uint32_t val) noexcept { _imm.value.u64 = static_cast<uint64_t>(val); }
 
   //! Set immediate value to 64-bit signed integer `val`.
-  ASMJIT_INLINE Imm& setInt64(int64_t val) noexcept {
-    _imm.value._i64[0] = val;
-    return *this;
-  }
-
+  ASMJIT_INLINE void setInt64(int64_t val) noexcept { _imm.value.i64 = val; }
   //! Set immediate value to 64-bit unsigned integer `val`.
-  ASMJIT_INLINE Imm& setUInt64(uint64_t val) noexcept {
-    _imm.value._u64[0] = val;
-    return *this;
-  }
-
+  ASMJIT_INLINE void setUInt64(uint64_t val) noexcept { _imm.value.u64 = val; }
   //! Set immediate value to intptr_t `val`.
-  ASMJIT_INLINE Imm& setIntPtr(intptr_t val) noexcept {
-    _imm.value._i64[0] = static_cast<int64_t>(val);
-    return *this;
-  }
-
+  ASMJIT_INLINE void setIntPtr(intptr_t val) noexcept { _imm.value.i64 = static_cast<int64_t>(val); }
   //! Set immediate value to uintptr_t `val`.
-  ASMJIT_INLINE Imm& setUIntPtr(uintptr_t val) noexcept {
-    _imm.value._u64[0] = static_cast<uint64_t>(val);
-    return *this;
-  }
+  ASMJIT_INLINE void setUIntPtr(uintptr_t val) noexcept { _imm.value.u64 = static_cast<uint64_t>(val); }
 
   //! Set immediate value as unsigned type to `val`.
-  ASMJIT_INLINE Imm& setPtr(void* p) noexcept {
-    return setIntPtr((uint64_t)p);
-  }
-
+  ASMJIT_INLINE void setPtr(void* p) noexcept { setIntPtr((uint64_t)p); }
   //! Set immediate value to `val`.
   template<typename T>
-  ASMJIT_INLINE Imm& setValue(T val) noexcept {
-    return setIntPtr((int64_t)val);
-  }
+  ASMJIT_INLINE void setValue(T val) noexcept { setIntPtr((int64_t)val); }
 
   // --------------------------------------------------------------------------
   // [Float]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Imm& setFloat(float f) noexcept {
-    _imm.value._f32[_ASMJIT_ARCH_INDEX(2, 0)] = f;
-    _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
-    return *this;
+  ASMJIT_INLINE void setFloat(float f) noexcept {
+    _imm.value.f32Lo = f;
+    _imm.value.u32Hi = 0;
   }
 
-  ASMJIT_INLINE Imm& setDouble(double d) noexcept {
-    _imm.value._f64[0] = d;
-    return *this;
+  ASMJIT_INLINE void setDouble(double d) noexcept {
+    _imm.value.f64 = d;
   }
 
   // --------------------------------------------------------------------------
   // [Truncate]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Imm& truncateTo8Bits() noexcept {
+  ASMJIT_INLINE void truncateTo8Bits() noexcept {
     if (ASMJIT_ARCH_64BIT) {
-      _imm.value._u64[0] &= static_cast<uint64_t>(0x000000FFU);
+      _imm.value.u64   &= static_cast<uint64_t>(0x000000FFU);
     }
     else {
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)] &= 0x000000FFU;
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
+      _imm.value.u32Lo &= 0x000000FFU;
+      _imm.value.u32Hi  = 0;
     }
-    return *this;
   }
 
-  ASMJIT_INLINE Imm& truncateTo16Bits() noexcept {
+  ASMJIT_INLINE void truncateTo16Bits() noexcept {
     if (ASMJIT_ARCH_64BIT) {
-      _imm.value._u64[0] &= static_cast<uint64_t>(0x0000FFFFU);
+      _imm.value.u64   &= static_cast<uint64_t>(0x0000FFFFU);
     }
     else {
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 0)] &= 0x0000FFFFU;
-      _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
+      _imm.value.u32Lo &= 0x0000FFFFU;
+      _imm.value.u32Hi  = 0;
     }
-    return *this;
   }
 
-  ASMJIT_INLINE Imm& truncateTo32Bits() noexcept {
-    _imm.value._u32[_ASMJIT_ARCH_INDEX(2, 1)] = 0;
-    return *this;
-  }
+  ASMJIT_INLINE void truncateTo32Bits() noexcept { _imm.value.u32Hi = 0; }
 
   // --------------------------------------------------------------------------
   // [Operator Overload]

@@ -83,12 +83,12 @@ enum ODATA_ {
   ODATA_O_7     = 7 << X86Inst::kOpCode_O_Shift,
 
   // REX/VEX.
-  ODATA_L__     = 0,                                  // L is unspecified.
-  ODATA_L_x     = 0,                                  // L is based on operand(s).
-  ODATA_L_I     = 0,                                  // L is ignored (LIG).
-  ODATA_L_0     = 0,                                  // L has to be zero (L.128).
-  ODATA_L_1     = X86Inst::kOpCode_L_256,             // L has to be one (L.256).
-  ODATA_L_2     = X86Inst::kOpCode_L_512,             // L has to be two (L.512).
+  ODATA_LL__    = 0,                                  // L is unspecified.
+  ODATA_LL_x    = 0,                                  // L is based on operand(s).
+  ODATA_LL_I    = 0,                                  // L is ignored (LIG).
+  ODATA_LL_0    = 0,                                  // L has to be zero (L.128).
+  ODATA_LL_1    = X86Inst::kOpCode_LL_256,            // L has to be one (L.256).
+  ODATA_LL_2    = X86Inst::kOpCode_LL_512,            // L has to be two (L.512).
 
   ODATA_W__     = 0,                                  // W is unspecified.
   ODATA_W_x     = 0,                                  // W is based on operand(s).
@@ -139,8 +139,8 @@ enum ODATA_ {
   ((PREFIX) | (OPCODE) | (O) | (L) | (W) | (EvexW) | (N) | (TT) | \
    (VEX && ((PREFIX) & X86Inst::kOpCode_MM_Mask) != X86Inst::kOpCode_MM_0F ? int(X86Inst::kOpCode_MM_ForceVex3) : 0))
 
-#define O(PREFIX, OPCODE, O, L, W, EvexW, N, TT) (O_ENCODE(0, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_L_##L, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
-#define V(PREFIX, OPCODE, O, L, W, EvexW, N, TT) (O_ENCODE(1, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_L_##L, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
+#define O(PREFIX, OPCODE, O, LL, W, EvexW, N, TT) (O_ENCODE(0, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_LL_##LL, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
+#define V(PREFIX, OPCODE, O, LL, W, EvexW, N, TT) (O_ENCODE(1, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_LL_##LL, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
 
 #define O_FPU(PREFIX, OPCODE, O) (ODATA_FPU_##PREFIX | (0x##OPCODE & 0xFFU) | ((0x##OPCODE >> 8) << X86Inst::kOpCode_FPU_2B_Shift) | ODATA_O_##O)
 
@@ -300,7 +300,7 @@ const X86Inst _x86InstData[] = {
   INST(Daa             , "daa"             , Enc(X86Op)             , O(000000,27,_,_,_,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UWWXWX__), 0 , 0 , 0 , 0 , 368, 1 , 60 ),
   INST(Das             , "das"             , Enc(X86Op)             , O(000000,2F,_,_,_,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UWWXWX__), 0 , 0 , 0 , 0 , 368, 1 , 60 ),
   INST(Dec             , "dec"             , Enc(X86IncDec)         , O(000000,FE,1,_,x,_,_,_  ), O(000000,48,_,_,x,_,_,_  ), F(RW)|F(Lock)                         , EF(WWWWW___), 0 , 0 , 0 , 0 , 255, 2 , 61 ),
-  INST(Div             , "div"             , Enc(X86M_OptB_MulDiv)  , O(000000,F6,6,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UUUUUU__), 0 , 0 , 0 , 0 , 111, 4 , 62 ),
+  INST(Div             , "div"             , Enc(X86M_Bx_MulDiv)    , O(000000,F6,6,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UUUUUU__), 0 , 0 , 0 , 0 , 111, 4 , 62 ),
   INST(Divpd           , "divpd"           , Enc(ExtRm)             , O(660F00,5E,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 288, 1 , 4  ),
   INST(Divps           , "divps"           , Enc(ExtRm)             , O(000F00,5E,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 288, 1 , 5  ),
   INST(Divsd           , "divsd"           , Enc(ExtRm)             , O(F20F00,5E,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 345, 1 , 4  ),
@@ -413,7 +413,7 @@ const X86Inst _x86InstData[] = {
   INST(Haddps          , "haddps"          , Enc(ExtRm)             , O(F20F00,7C,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 288, 1 , 5  ),
   INST(Hsubpd          , "hsubpd"          , Enc(ExtRm)             , O(660F00,7D,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 288, 1 , 4  ),
   INST(Hsubps          , "hsubps"          , Enc(ExtRm)             , O(F20F00,7D,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 288, 1 , 5  ),
-  INST(Idiv            , "idiv"            , Enc(X86M_OptB_MulDiv)  , O(000000,F6,7,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UUUUUU__), 0 , 0 , 0 , 0 , 115, 4 , 62 ),
+  INST(Idiv            , "idiv"            , Enc(X86M_Bx_MulDiv)    , O(000000,F6,7,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(UUUUUU__), 0 , 0 , 0 , 0 , 115, 4 , 62 ),
   INST(Imul            , "imul"            , Enc(X86Imul)           , O(000000,F6,5,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(WUUUUW__), 0 , 0 , 0 , 0 , 33 , 10, 89 ),
   INST(Inc             , "inc"             , Enc(X86IncDec)         , O(000000,FE,0,_,x,_,_,_  ), O(000000,40,_,_,x,_,_,_  ), F(RW)|F(Lock)                         , EF(WWWWW___), 0 , 0 , 0 , 0 , 255, 2 , 90 ),
   INST(Insertps        , "insertps"        , Enc(ExtRmi)            , O(660F3A,21,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 354, 1 , 14 ),
@@ -568,16 +568,16 @@ const X86Inst _x86InstData[] = {
   INST(Movups          , "movups"          , Enc(ExtMov)            , O(000F00,10,_,_,_,_,_,_  ), O(000F00,11,_,_,_,_,_,_  ), F(WO)                                 , EF(________), 0 , 16, 4 , 4 , 63 , 2 , 174),
   INST(Movzx           , "movzx"           , Enc(X86MovsxMovzx)     , O(000F00,B6,_,_,x,_,_,_  ), 0                         , F(WO)                                 , EF(________), 0 , 0 , 0 , 0 , 281, 2 , 171),
   INST(Mpsadbw         , "mpsadbw"         , Enc(ExtRmi)            , O(660F3A,42,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 2 , 1 , 290, 1 , 175),
-  INST(Mul             , "mul"             , Enc(X86M_OptB_MulDiv)  , O(000000,F6,4,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(WUUUUW__), 0 , 0 , 0 , 0 , 33 , 4 , 62 ),
+  INST(Mul             , "mul"             , Enc(X86M_Bx_MulDiv)    , O(000000,F6,4,_,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(WUUUUW__), 0 , 0 , 0 , 0 , 33 , 4 , 62 ),
   INST(Mulpd           , "mulpd"           , Enc(ExtRm)             , O(660F00,59,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 288, 1 , 4  ),
   INST(Mulps           , "mulps"           , Enc(ExtRm)             , O(000F00,59,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 288, 1 , 5  ),
   INST(Mulsd           , "mulsd"           , Enc(ExtRm)             , O(F20F00,59,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 345, 1 , 4  ),
   INST(Mulss           , "mulss"           , Enc(ExtRm)             , O(F30F00,59,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 346, 1 , 5  ),
   INST(Mulx            , "mulx"            , Enc(VexRvmZDX_Wx)      , V(F20F38,F6,_,0,x,_,_,_  ), 0                         , F(RW)|F(Special)                      , EF(________), 0 , 0 , 0 , 0 , 283, 2 , 176),
   INST(Mwait           , "mwait"           , Enc(X86Op)             , O(000F01,C9,_,_,_,_,_,_  ), 0                         , F(RO)|F(Volatile)|F(Special)          , EF(________), 0 , 0 , 0 , 0 , 0  , 0 , 139),
-  INST(Neg             , "neg"             , Enc(X86M_OptB)         , O(000000,F6,3,_,x,_,_,_  ), 0                         , F(RW)|F(Lock)                         , EF(WWWWWW__), 0 , 0 , 0 , 0 , 256, 1 , 177),
+  INST(Neg             , "neg"             , Enc(X86M_Bx)           , O(000000,F6,3,_,x,_,_,_  ), 0                         , F(RW)|F(Lock)                         , EF(WWWWWW__), 0 , 0 , 0 , 0 , 256, 1 , 177),
   INST(Nop             , "nop"             , Enc(X86Op)             , O(000000,90,_,_,_,_,_,_  ), 0                         , 0                                     , EF(________), 0 , 0 , 0 , 0 , 285, 2 , 178),
-  INST(Not             , "not"             , Enc(X86M_OptB)         , O(000000,F6,2,_,x,_,_,_  ), 0                         , F(RW)|F(Lock)                         , EF(________), 0 , 0 , 0 , 0 , 256, 1 , 179),
+  INST(Not             , "not"             , Enc(X86M_Bx)           , O(000000,F6,2,_,x,_,_,_  ), 0                         , F(RW)|F(Lock)                         , EF(________), 0 , 0 , 0 , 0 , 256, 1 , 179),
   INST(Or              , "or"              , Enc(X86Arith)          , O(000000,08,1,_,x,_,_,_  ), 0                         , F(RW)|F(Lock)                         , EF(WWWUWW__), 0 , 0 , 0 , 0 , 13 , 10, 3  ),
   INST(Orpd            , "orpd"            , Enc(ExtRm)             , O(660F00,56,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 8 , 8 , 288, 1 , 4  ),
   INST(Orps            , "orps"            , Enc(ExtRm)             , O(000F00,56,_,_,_,_,_,_  ), 0                         , F(RW)                                 , EF(________), 0 , 0 , 4 , 4 , 288, 1 , 5  ),
@@ -1634,7 +1634,7 @@ const X86Inst::ExtendedData _x86InstExtendedData[] = {
   { Enc(ExtRm_Wx)           , 0  , 8  , 0  , 4  , 0x00, 0x00, 0, F(WO)                                 , 0                          },
   { Enc(X86Op)              , 0  , 0  , 0  , 0  , 0x28, 0x3F, 0, F(RW)|F(Special)                      , 0                          },
   { Enc(X86IncDec)          , 0  , 0  , 0  , 0  , 0x00, 0x1F, 0, F(RW)|F(Lock)                         , O(000000,48,_,_,x,_,_,_  ) },
-  { Enc(X86M_OptB_MulDiv)   , 0  , 0  , 0  , 0  , 0x00, 0x3F, 0, F(RW)|F(Special)                      , 0                          },
+  { Enc(X86M_Bx_MulDiv)     , 0  , 0  , 0  , 0  , 0x00, 0x3F, 0, F(RW)|F(Special)                      , 0                          },
   { Enc(X86Op)              , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, F(Volatile)                           , 0                          },
   { Enc(X86Enter)           , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, F(Volatile)|F(Special)                , 0                          },
   { Enc(ExtExtract)         , 0  , 8  , 4  , 4  , 0x00, 0x00, 0, F(WO)                                 , 0                          },
@@ -1749,9 +1749,9 @@ const X86Inst::ExtendedData _x86InstExtendedData[] = {
   { Enc(ExtMov)             , 0  , 16 , 4  , 4  , 0x00, 0x00, 0, F(WO)                                 , O(000F00,11,_,_,_,_,_,_  ) },
   { Enc(ExtRmi)             , 0  , 0  , 2  , 1  , 0x00, 0x00, 0, F(RW)                                 , 0                          },
   { Enc(VexRvmZDX_Wx)       , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, F(RW)|F(Special)                      , 0                          },
-  { Enc(X86M_OptB)          , 0  , 0  , 0  , 0  , 0x00, 0x3F, 0, F(RW)|F(Lock)                         , 0                          },
+  { Enc(X86M_Bx)            , 0  , 0  , 0  , 0  , 0x00, 0x3F, 0, F(RW)|F(Lock)                         , 0                          },
   { Enc(X86Op)              , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, 0                                     , 0                          },
-  { Enc(X86M_OptB)          , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, F(RW)|F(Lock)                         , 0                          },
+  { Enc(X86M_Bx)            , 0  , 0  , 0  , 0  , 0x00, 0x00, 0, F(RW)|F(Lock)                         , 0                          },
   { Enc(ExtRm_P)            , 0  , 0  , 1  , 1  , 0x00, 0x00, 0, F(RW)                                 , 0                          },
   { Enc(ExtRm_P)            , 0  , 0  , 4  , 4  , 0x00, 0x00, 0, F(RW)                                 , 0                          },
   { Enc(ExtRm_P)            , 0  , 0  , 2  , 2  , 0x00, 0x00, 0, F(RW)                                 , 0                          },

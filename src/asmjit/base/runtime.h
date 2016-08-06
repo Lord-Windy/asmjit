@@ -33,7 +33,7 @@ class CodeHolder;
 //! Base runtime.
 class ASMJIT_VIRTAPI Runtime {
 public:
-  ASMJIT_NO_COPY(Runtime)
+  ASMJIT_NONCOPYABLE(Runtime)
 
   ASMJIT_ENUM(RuntimeType) {
     kRuntimeNone = 0,
@@ -113,7 +113,7 @@ public:
 //! Runtime designed to be used in the same process the code is generated in.
 class ASMJIT_VIRTAPI HostRuntime : public Runtime {
 public:
-  ASMJIT_NO_COPY(HostRuntime)
+  ASMJIT_NONCOPYABLE(HostRuntime)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -149,7 +149,7 @@ public:
 //! Runtime designed to store and execute code generated at runtime (JIT).
 class ASMJIT_VIRTAPI JitRuntime : public HostRuntime {
 public:
-  ASMJIT_NO_COPY(JitRuntime)
+  ASMJIT_NONCOPYABLE(JitRuntime)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

@@ -278,7 +278,7 @@ struct X86RAState : RAState {
 //! register allocation.
 class X86RAPass : public RAPass {
 public:
-  ASMJIT_NO_COPY(X86RAPass)
+  ASMJIT_NONCOPYABLE(X86RAPass)
   typedef RAPass Base;
 
   // --------------------------------------------------------------------------

@@ -48,7 +48,7 @@ class CBSentinel;
 
 class ASMJIT_VIRTAPI CodeBuilder : public CodeEmitter {
 public:
-  ASMJIT_NO_COPY(CodeBuilder)
+  ASMJIT_NONCOPYABLE(CodeBuilder)
   typedef CodeEmitter Base;
 
   // --------------------------------------------------------------------------
@@ -177,7 +177,7 @@ public:
 //! Code builder pipeline used for code transformations and lowering.
 class ASMJIT_VIRTAPI CBPass {
 public:
-  ASMJIT_NO_COPY(CBPass);
+  ASMJIT_NONCOPYABLE(CBPass);
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -213,7 +213,7 @@ public:
 //! can lower to basic nodes.
 class CBNode {
 public:
-  ASMJIT_NO_COPY(CBNode)
+  ASMJIT_NONCOPYABLE(CBNode)
 
   // --------------------------------------------------------------------------
   // [Type]
@@ -396,7 +396,7 @@ public:
 //! Wraps an instruction with its options and operands.
 class CBInst : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBInst)
+  ASMJIT_NONCOPYABLE(CBInst)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -524,7 +524,7 @@ Update:
 //! Extension of `CBInst` node, which stores more information about the jump.
 class CBJump : public CBInst {
 public:
-  ASMJIT_NO_COPY(CBJump)
+  ASMJIT_NONCOPYABLE(CBJump)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -562,7 +562,7 @@ public:
 //! no analysis nor byte-order conversion is performed on RAW data.
 class CBData : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBData)
+  ASMJIT_NONCOPYABLE(CBData)
   enum { kInlineBufferSize = 12 };
 
   // --------------------------------------------------------------------------
@@ -616,7 +616,7 @@ public:
 //! Wraps `.align` directive.
 class CBAlign : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBAlign)
+  ASMJIT_NONCOPYABLE(CBAlign)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -659,7 +659,7 @@ public:
 //! Label (CodeBuilder).
 class CBLabel : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBLabel)
+  ASMJIT_NONCOPYABLE(CBLabel)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -711,7 +711,7 @@ public:
 
 class CBLabelData : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBLabelData)
+  ASMJIT_NONCOPYABLE(CBLabelData)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -747,7 +747,7 @@ public:
 
 class CBConstPool : public CBLabel {
 public:
-  ASMJIT_NO_COPY(CBConstPool)
+  ASMJIT_NONCOPYABLE(CBConstPool)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -787,7 +787,7 @@ public:
 //! Comment (CodeBuilder).
 class CBComment : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBComment)
+  ASMJIT_NONCOPYABLE(CBComment)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -812,7 +812,7 @@ public:
 //! Sentinel is a marker that is completely ignored by the code builder.
 class CBSentinel : public CBNode {
 public:
-  ASMJIT_NO_COPY(CBSentinel)
+  ASMJIT_NONCOPYABLE(CBSentinel)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

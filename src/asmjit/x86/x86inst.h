@@ -1562,7 +1562,9 @@ struct X86Inst {
 
   //! X86/X64 instruction options.
   ASMJIT_ENUM(Options) {
-    // NOTE: Don't collide with bits used by CodeEmitter::kOptionReservedMask.
+    // NOTE: Don't collide with bits used by CodeEmitter::Options.
+
+    // CodeEmitter opts.  = 0x000003F3U
 
     kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
     kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).
@@ -1570,9 +1572,10 @@ struct X86Inst {
     kOptionShortForm      = 0x00000400U, //!< Emit short-form of the instruction.
     kOptionLongForm       = 0x00000800U, //!< Emit long-form of the instruction.
 
-    kOptionTaken          = 0x00001000U, //!< LCC likely to be taken (historic, only takes effect on P4).
+    kOptionTaken          = 0x00001000U, //!< JCC likely to be taken (historic, only takes effect on P4).
     kOptionNotTaken       = 0x00002000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
     kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
+    kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
 
     kOptionSAE            = 0x00020000U, //!< EVEX 'suppress-all-exceptions' {sae}.
     kOptionRC             = 0x00040000U, //!< EVEX 'rounding-control' {rc} and {sae}.
@@ -1594,73 +1597,6 @@ struct X86Inst {
 
   //! \internal
   //!
-  //! X86/X64 instruction flags.
-  ASMJIT_ENUM(InstFlags) {
-    kInstFlagNone         = 0x00000000U, //!< No flags.
-
-    kInstFlagRO           = 0x00000001U, //!< The first operand is read (read-only without `kInstFlagWO`).
-    kInstFlagWO           = 0x00000002U, //!< The first operand is written (write-only without `kInstFlagRO`).
-    kInstFlagRW           = 0x00000003U, //!< The first operand is read-write.
-
-    kInstFlagXchg         = 0x00000004U, //!< Instruction is an exchange like instruction (xchg, xadd).
-    kInstFlagFlow         = 0x00000008U, //!< Control-flow instruction (jmp, jcc, call, ret).
-
-    kInstFlagFp           = 0x00000010U, //!< Instruction accesses FPU register(s).
-    kInstFlagLock         = 0x00000020U, //!< Instruction can be prefixed by using the LOCK prefix.
-    kInstFlagSpecial      = 0x00000040U, //!< Instruction requires special handling (implicit operands), used by \ref Compiler.
-
-    //! Instruction always performs memory access.
-    //!
-    //! This flag is always combined with `kInstFlagSpecial` and describes
-    //! that there is an implicit address which is accessed (usually EDI/RDI
-    //! and/or ESI/RSI).
-    kInstFlagSpecialMem   = 0x00000080U,
-
-    kInstFlagFPU_M2       = 0x00000100U, //!< FPU instruction can address word_ptr (shared with M10).
-    kInstFlagFPU_M10      = 0x00000100U, //!< FPU instruction can address tword_ptr (shared with M2).
-    kInstFlagFPU_M4       = 0x00000200U, //!< FPU instruction can address dword_ptr.
-    kInstFlagFPU_M8       = 0x00000400U, //!< FPU instruction can address qword_ptr.
-
-    kInstFlagZeroIfMem    = 0x00001000U, //!< Cleans the rest of destination if source is memory (movss, movsd).
-    kInstFlagVolatile     = 0x00002000U, //!< Hint for instruction scheduler to not reorder this instruction.
-
-    // NOTE: If both `kInstFlagVex` and `kInstFlagEvex` flags are specified it
-    // means that the instructions is both AVX and AVX512 and can be encoded by
-    // either VEX or EVEX prefix. In that case AsmJit checks global options and
-    // also instruction options to decide whether to emit EVEX prefix or not.
-
-    // ------------------------------------------------------------------------
-    // [VEX/EVEX VSIB]
-    // ------------------------------------------------------------------------
-
-    kInstFlagVM           = 0x00004000U, //!< Instruction uses vector memory index (VSIB).
-    kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
-    kInstFlagVex_VM       = 0x0000C000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
-
-    kInstFlagEvex         = 0x00010000U, //!< Instruction can be encoded by EVEX (AVX-512).
-    kInstFlagEvex0        = 0U,          //!< Used inside macros.
-
-    kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
-    kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0z..k7z}.
-    kInstFlagEvexB        = 0x00080000U, //!< Supports broadcast b32|b64.
-    kInstFlagEvexSAE      = 0x00100000U, //!< Supports 'suppress-all-exceptions' {sae}.
-    kInstFlagEvexRC       = 0x00200000U, //!< Supports 'rounding-control' {rc} with implicit {sae},
-    kInstFlagEvexVL       = 0x00400000U, //!< Supports access to XMMYMM registers (AVX512-VL).
-
-    kInstFlagEvexSet_Shift= 24,
-    kInstFlagEvexSet_Mask = 0x0F000000U, //!< AVX-512 feature set required to execute the instruction.
-    kInstFlagEvexSet_F_   = 0x00000000U, //!< Supported by AVX512-F (no extra requirements).
-    kInstFlagEvexSet_CD   = 0x01000000U, //!< Supported by AVX512-CD.
-    kInstFlagEvexSet_PF   = 0x02000000U, //!< Supported by AVX512-PF.
-    kInstFlagEvexSet_ER   = 0x03000000U, //!< Supported by AVX512-ER.
-    kInstFlagEvexSet_DQ   = 0x04000000U, //!< Supported by AVX512-DQ.
-    kInstFlagEvexSet_BW   = 0x05000000U, //!< Supported by AVX512-BW.
-    kInstFlagEvexSet_IFMA = 0x06000000U, //!< Supported by AVX512-IFMA.
-    kInstFlagEvexSet_VBMI = 0x07000000U  //!< Supported by AVX512-VBMI.
-  };
-
-  //! \internal
-  //!
   //! X86/X64 instruction encoding, used by \ref X86Assembler.
   ASMJIT_ENUM(Encoding) {
     kEncodingNone = 0,                   //!< Never used.
@@ -1669,8 +1605,8 @@ struct X86Inst {
     kEncodingX86OpAx,                    //!< X86 [OP] (implicit or explicit '?AX' form).
     kEncodingX86OpDxAx,                  //!< X86 [OP] (implicit or explicit '?DX, ?AX' form).
     kEncodingX86M,                       //!< X86 [M] (handles 2|4|8-bytes size).
-    kEncodingX86M_OptB,                  //!< X86 [M] (handles single-byte size).
-    kEncodingX86M_OptB_MulDiv,           //!< X86 [M] (like OptB, handles implicit|explicit MUL|DIV|IDIV).
+    kEncodingX86M_Bx,                    //!< X86 [M] (handles single-byte size).
+    kEncodingX86M_Bx_MulDiv,             //!< X86 [M] (like Bx, handles implicit|explicit MUL|DIV|IDIV).
     kEncodingX86M_Only,                  //!< X86 [M] (restricted to memory operand of any size).
     kEncodingX86Rm,                      //!< X86 [RM] (doesn't handle single-byte size).
     kEncodingX86Arith,                   //!< X86 adc, add, and, cmp, or, sbb, sub, xor.
@@ -1711,7 +1647,7 @@ struct X86Inst {
     kEncodingFpuStsw,                    //!< FPU fnstsw, Fstsw.
     kEncodingExtRm,                      //!< EXT [RM].
     kEncodingExtRmXMM0,                  //!< EXT [RM<XMM0>].
-    kEncodingExtRmZDI,                   //!< EXT [RM<EDI|RDI>].
+    kEncodingExtRmZDI,                   //!< EXT [RM<ZDI>].
     kEncodingExtRm_P,                    //!< EXT [RM] (propagates 66H if the instruction uses XMM register).
     kEncodingExtRm_Wx,                   //!< EXT [RM] (propagates REX.W if GPQ is used).
     kEncodingExtRmRi,                    //!< EXT [RM|RI].
@@ -1784,52 +1720,135 @@ struct X86Inst {
 
   //! \internal
   //!
+  //! X86/X64 instruction flags.
+  ASMJIT_ENUM(InstFlags) {
+    kInstFlagNone         = 0x00000000U, //!< No flags.
+
+    kInstFlagRO           = 0x00000001U, //!< The first operand is read (read-only without `kInstFlagWO`).
+    kInstFlagWO           = 0x00000002U, //!< The first operand is written (write-only without `kInstFlagRO`).
+    kInstFlagRW           = 0x00000003U, //!< The first operand is read-write.
+
+    kInstFlagXchg         = 0x00000004U, //!< Instruction is an exchange like instruction (xchg, xadd).
+    kInstFlagFlow         = 0x00000008U, //!< Control-flow instruction (jmp, jcc, call, ret).
+
+    kInstFlagFp           = 0x00000010U, //!< Instruction accesses FPU register(s).
+    kInstFlagLock         = 0x00000020U, //!< Instruction can be prefixed by using the LOCK prefix.
+    kInstFlagSpecial      = 0x00000040U, //!< Instruction requires special handling (implicit operands), used by \ref Compiler.
+
+    //! Instruction always performs memory access.
+    //!
+    //! This flag is always combined with `kInstFlagSpecial` and describes
+    //! that there is an implicit address which is accessed (usually EDI/RDI
+    //! and/or ESI/RSI).
+    kInstFlagSpecialMem   = 0x00000080U,
+
+    kInstFlagFPU_M10      = 0x00000100U, //!< FPU instruction can address tword_ptr (shared with M2).
+    kInstFlagFPU_M2       = 0x00000100U, //!< FPU instruction can address word_ptr (shared with M10).
+    kInstFlagFPU_M4       = 0x00000200U, //!< FPU instruction can address dword_ptr.
+    kInstFlagFPU_M8       = 0x00000400U, //!< FPU instruction can address qword_ptr.
+
+    kInstFlagZeroIfMem    = 0x00001000U, //!< Cleans the rest of destination if source is memory (movss, movsd).
+    kInstFlagVolatile     = 0x00002000U, //!< Hint for instruction scheduler to not reorder this instruction.
+
+    // ------------------------------------------------------------------------
+    // [VEX/EVEX VSIB]
+    // ------------------------------------------------------------------------
+
+    // NOTE: If both `kInstFlagVex` and `kInstFlagEvex` flags are specified it
+    // means that the instructions is defined by both AVX and AVX512, and can be
+    // encoded by either VEX or EVEX prefix. In that case AsmJit checks global
+    // options and also instruction options to decide whether to emit EVEX prefix
+    // or not.
+
+    kInstFlagVM           = 0x00004000U, //!< Instruction uses a vector memory index (VSIB).
+    kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
+    kInstFlagVex_VM       = 0x0000C000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
+
+    kInstFlagEvex         = 0x00010000U, //!< Instruction can be encoded by EVEX (AVX-512).
+    kInstFlagEvex0        = 0U,          //!< Used inside macros.
+
+    kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
+    kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0z..k7z}.
+    kInstFlagEvexB        = 0x00080000U, //!< Supports broadcast b32|b64.
+    kInstFlagEvexSAE      = 0x00100000U, //!< Supports 'suppress-all-exceptions' {sae}.
+    kInstFlagEvexRC       = 0x00200000U, //!< Supports 'rounding-control' {rc} with implicit {sae},
+    kInstFlagEvexVL       = 0x00400000U, //!< Supports access to XMM|YMM registers (AVX512-VL).
+
+    kInstFlagEvexSet_Shift= 24,
+    kInstFlagEvexSet_Mask = 0x0F000000U, //!< AVX-512 feature set required to execute the instruction.
+    kInstFlagEvexSet_F_   = 0x00000000U, //!< Supported by AVX512-F (no extra requirements).
+    kInstFlagEvexSet_CD   = 0x01000000U, //!< Supported by AVX512-CD.
+    kInstFlagEvexSet_PF   = 0x02000000U, //!< Supported by AVX512-PF.
+    kInstFlagEvexSet_ER   = 0x03000000U, //!< Supported by AVX512-ER.
+    kInstFlagEvexSet_DQ   = 0x04000000U, //!< Supported by AVX512-DQ.
+    kInstFlagEvexSet_BW   = 0x05000000U, //!< Supported by AVX512-BW.
+    kInstFlagEvexSet_IFMA = 0x06000000U, //!< Supported by AVX512-IFMA.
+    kInstFlagEvexSet_VBMI = 0x07000000U  //!< Supported by AVX512-VBMI.
+  };
+
+  //! \internal
+  //!
   //! X86/X64 instruction opcode data.
   //!
   //! This schema is AsmJit specific and has been designed to allow encoding of
   //! all X86 instructions available. X86, MMX, and SSE+ instructions always use
-  //! `MMMMM` and `PP` fields, which are encoded to corresponding prefixes needed
-  //! by X86 or SIMD instructions. AVX+ instructions embed `MMMMM` and `PP` fields
-  //! in a VEX prefix.
+  //! 'MM' and 'PP' fields, which are encoded to corresponding prefixes needed
+  //! by X86 or SIMD instructions. AVX+ instructions embed 'MMMMM' and 'PP' fields
+  //! in a VEX prefix, and AVX-512 instructions embed 'MM' and 'PP' in EVEX prefix.
   //!
   //! The instruction opcode definition uses 1 or 2 bytes as an opcode value. 1
   //! byte is needed by most of the instructions, 2 bytes are only used by legacy
   //! X87-FPU instructions. This means that a second byte is free to by used by
-  //! instructions encoded by using VEX or EVEX prefix.
+  //! instructions encoded by using VEX and/or EVEX prefix.
   //!
   //! The fields description:
   //!
-  //! - `MMMMM` field is used to encode prefixes needed by the instruction or as
-  //!   a part of VEX/EVEX prefix.
+  //! - 'MM' field is used to encode prefixes needed by the instruction or as
+  //!   a part of VEX/EVEX prefix. Described as 'mm' and 'mmmmm' in instruction
+  //!   manuals.
   //!
-  //! - `PP` field is used to encode prefixes needed by the instruction or as a
-  //!   part of VEX/EVEX prefix.
+  //!   NOTE: Since 'MM' field is defined as 'mmmmm' (5 bits), but only 2 least
+  //!   significant bits are used by VEX and EVEX prefixes, and additional 4th
+  //!   bit is used by XOP prefix, AsmJit uses the 3rd and 5th bit for it's own
+  //!   purposes. These bits will probably never be used in future encodings as
+  //!   AVX512 uses only '000mm' from 'mmmmm'.
   //!
-  //! - `L` field is used exclusively by AVX+ and AVX512+ instruction sets. It
-  //!   describes vector size, which is 128-bit for XMM register `L_128`, 256
-  //!   for YMM register `L_256` and 512-bit for ZMM register `L_512`. The `L`
-  //!   field is omitted in case that instruction supports multiple vector lengths,
-  //!   however, if the instruction requires specific `L` value it must be
-  //!   specified as a part of the opcode.
+  //! - 'PP' field is used to encode prefixes needed by the instruction or as a
+  //!   part of VEX/EVEX prefix. Described as 'pp' in instruction manuals.
   //!
-  //! - `W` field is the most complicated. It was added by 64-bit architecture
+  //! - 'LL' field is used exclusively by AVX+ and AVX512+ instruction sets. It
+  //!   describes vector size, which is 'L.128' for XMM register, 'L.256' for
+  //!   for YMM register, and 'L.512' for ZMM register. The 'LL' field is omitted
+  //!   in case that instruction supports multiple vector lengths, however, if the
+  //!   instruction requires specific `L` value it must be specified as a part of
+  //!   the opcode.
+  //!
+  //!   NOTE: 'LL' having value '11' is not defined yet.
+  //!
+  //! - 'W' field is the most complicated. It was added by 64-bit architecture
   //!   to promote default operation width (instructions that perform 32-bit
   //!   operation by default require to override the width to 64-bit explicitly).
   //!   There is nothing wrong on this, however, some instructions introduced
-  //!   implicit `W` override, for example a `cdqe` instruction is basically a
-  //!   `cwde` instruction with overridden `W` (set to 1). There are some others
+  //!   implicit 'W' override, for example a 'cdqe' instruction is basically a
+  //!   'cwde' instruction with overridden 'W' (set to 1). There are some others
   //!   in the base X86 instruction set. More recent instruction sets started
-  //!   using `W` field more often:
+  //!   using 'W' field more often:
   //!
-  //!   - AVX instructions started using `W` field as an extended opcode for FMA,
-  //!     GATHER, PERM, and other instructions. It also uses `W` field to override
-  //!     the default operation width in instructions like `vmovq`.
+  //!   - AVX instructions started using 'W' field as an extended opcode for FMA,
+  //!     GATHER, PERM, and other instructions. It also uses 'W' field to override
+  //!     the default operation width in instructions like 'vmovq'.
   //!
-  //!   - AVX-512 instructions started using `W` field as an extended opcode for
-  //!     all new instructions. This wouldn't have been an issue if the `W` field
+  //!   - AVX-512 instructions started using 'W' field as an extended opcode for
+  //!     all new instructions. This wouldn't have been an issue if the 'W' field
   //!     of AVX-512 have matched AVX, but this is not always the case.
   //!
-  //! - `O` field is an extended opcode field (3 bits) embedded in ModR/M BYTE.
+  //! - 'O' field is an extended opcode field (3 bits) embedded in ModR/M BYTE.
+  //!
+  //! - 'CDSHL' and 'CDTT' fields describe 'compressed-displacement'. 'CDSHL' is
+  //!   defined for each instruction that is AVX-512 encodable (EVEX) and contains
+  //!   a base N shift (base shift to perform the calculation). The 'CDTT' field
+  //!   is derived from instruction specification and describes additional shift
+  //!   to calculate the final 'CDSHL' that will be used in SIB byte.
   //!
   //! NOTE: Don't reorder any fields here, the shifts and masks were defined
   //! carefully to make encoding of X86|X64 instructions fast, especially to
@@ -1891,7 +1910,7 @@ struct X86Inst {
     kOpCode_MM_ForceEvex  = 0x10U << kOpCode_MM_Shift, // Force 4-BYTE EVEX prefix.
 
     // ------------------------------------------------------------------------
-    // [FPU_2B (Secondary OpCode Byte)]
+    // [FPU_2B (Second-Byte of OpCode used by FPU)]
     // ------------------------------------------------------------------------
 
     // Second byte opcode. This BYTE is ONLY used by FPU instructions and
@@ -2012,11 +2031,11 @@ struct X86Inst {
     //
     // If the instruction set manual describes an instruction by `LIG` it means
     // that the `L` field is ignored and AsmJit defaults to `0` in such case.
-    kOpCode_L_Shift       = 29,
-    kOpCode_L_Mask        = 0x03U << kOpCode_L_Shift,
-    kOpCode_L_128         = 0x00U << kOpCode_L_Shift,
-    kOpCode_L_256         = 0x01U << kOpCode_L_Shift,
-    kOpCode_L_512         = 0x02U << kOpCode_L_Shift
+    kOpCode_LL_Shift      = 29,
+    kOpCode_LL_Mask       = 0x03U << kOpCode_LL_Shift,
+    kOpCode_LL_128        = 0x00U << kOpCode_LL_Shift,
+    kOpCode_LL_256        = 0x01U << kOpCode_LL_Shift,
+    kOpCode_LL_512        = 0x02U << kOpCode_LL_Shift
   };
 
   //! X86/X64 condition codes.
@@ -2156,8 +2175,8 @@ struct X86Inst {
 
   //! Supported architectures.
   enum ArchMask {
-    kArchMaskX86          = 0x01,        //!< X86 allowed.
-    kArchMaskX64          = 0x02         //!< X64 allowed.
+    kArchMaskX86          = 0x01,        //!< X86 encoding supported.
+    kArchMaskX64          = 0x02         //!< X64 encoding supported.
   };
 
   //! Instruction's operand flags.
@@ -2311,6 +2330,9 @@ struct X86Inst {
     //! dead by simply checking if the instruction overwrites all remaining
     //! bytes.
     ASMJIT_INLINE uint32_t getWriteSize() const noexcept { return _writeSize; }
+
+    //! Get if the instruction defines secondary opcode.
+    ASMJIT_INLINE bool hasSecondaryOpcode() const noexcept { return _secondaryOpCode != 0; }
 
     //! Get the secondary instruction opcode, see \ref OpCodeBits.
     //!

@@ -912,11 +912,13 @@ _Move64:
         uint32_t hi = imm.getUInt32Hi();
 
         // Lo-Part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.truncateTo32Bits());
+        imm.truncateTo32Bits();
+        cc()->emit(X86Inst::kIdMov, mem, imm);
         mem.addOffsetLo32(gpSize);
 
         // Hi-Part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.setUInt32(hi));
+        imm.setUInt32(hi);
+        cc()->emit(X86Inst::kIdMov, mem, imm);
       }
       else {
         cc()->emit(X86Inst::kIdMov, mem, imm);
@@ -941,15 +943,18 @@ _Move64:
         uint32_t hi = imm.getUInt32Hi();
 
         // Lo part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.truncateTo32Bits());
+        imm.truncateTo32Bits();
+        cc()->emit(X86Inst::kIdMov, mem, imm);
         mem.addOffsetLo32(gpSize);
 
         // Hi part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.setUInt32(hi));
+        imm.setUInt32(hi);
+        cc()->emit(X86Inst::kIdMov, mem, imm);
         mem.addOffsetLo32(gpSize);
 
         // Zero part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.setUInt32(0));
+        imm.setUInt32(0);
+        cc()->emit(X86Inst::kIdMov, mem, imm);
         mem.addOffsetLo32(gpSize);
 
         cc()->emit(X86Inst::kIdMov, mem, imm);
@@ -960,7 +965,8 @@ _Move64:
         mem.addOffsetLo32(gpSize);
 
         // Zero part.
-        cc()->emit(X86Inst::kIdMov, mem, imm.setUInt32(0));
+        imm.setUInt32(0);
+        cc()->emit(X86Inst::kIdMov, mem, imm);
       }
       break;
 

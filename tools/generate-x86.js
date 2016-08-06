@@ -48,7 +48,7 @@ x86db.addInstructions([
   ["imul"  , "r64, ib"    , "RM"   , "REX.W 6B /r ib"     , "X64 OF=W SF=W ZF=U AF=U PF=U CF=W"],
   ["imul"  , "r16, iw"    , "RM"   , "66 69 /r iw"        , "ANY OF=W SF=W ZF=U AF=U PF=U CF=W"],
   ["imul"  , "r32, id"    , "RM"   , "69 /r id"           , "ANY OF=W SF=W ZF=U AF=U PF=U CF=W"],
-  ["imul"  , "r64, id"    , "RM"   , "REX.W 69 /r id"     , "X64 OF=W SF=W ZF=U AF=U PF=U CF=W"],
+  ["imul"  , "r64, id"    , "RM"   , "REX.W 69 /r id"     , "X64 OF=W SF=W ZF=U AF=U PF=U CF=W"]
 ]);
 
 // ----------------------------------------------------------------------------

@@ -148,6 +148,17 @@ struct Utils {
   static ASMJIT_INLINE T iMax(const T& a, const T& b) noexcept { return a > b ? a : b; }
 
   // --------------------------------------------------------------------------
+  // [Swap]
+  // --------------------------------------------------------------------------
+
+  template<typename T>
+  static ASMJIT_INLINE void swap(T& a, T& b) noexcept {
+    T tmp = a;
+    a = b;
+    b = tmp;
+  }
+
+  // --------------------------------------------------------------------------
   // [InInterval]
   // --------------------------------------------------------------------------
 
@@ -449,15 +460,16 @@ struct Utils {
   // [Alignment]
   // --------------------------------------------------------------------------
 
-  template<typename T>
-  static ASMJIT_INLINE bool isAligned(T base, T alignment) noexcept {
-    return (base % alignment) == 0;
+  template<typename X, typename Y>
+  static ASMJIT_INLINE bool isAligned(X base, Y alignment) noexcept {
+    typedef typename IntTraitsPrivate<sizeof(X), 0>::UnsignedType U;
+    return ((U)base % (U)alignment) == 0;
   }
 
-  //! Align `base` to `alignment`.
-  template<typename T>
-  static ASMJIT_INLINE T alignTo(T base, T alignment) noexcept {
-    return (base + (alignment - 1)) & ~(alignment - 1);
+  template<typename X, typename Y>
+  static ASMJIT_INLINE X alignTo(X x, Y alignment) noexcept {
+    typedef typename IntTraitsPrivate<sizeof(X), 0>::UnsignedType U;
+    return (X)( ((U)x + (U)(alignment - 1)) & ~(static_cast<U>(alignment) - 1) );
   }
 
   template<typename T>
@@ -1212,20 +1224,30 @@ union UInt64 {
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! 64-bit unsigned value.
-  uint64_t u64;
+  int8_t   i8[8];                        //!< 8-bit signed integer (8x).
+  uint8_t  u8[8];                        //!< 8-bit unsigned integer (8x).
 
-  uint32_t u32[2];
-  uint16_t u16[4];
-  uint8_t u8[8];
+  int16_t  i16[4];                       //!< 16-bit signed integer (4x).
+  uint16_t u16[4];                       //!< 16-bit unsigned integer (4x).
 
-  struct {
+  int32_t  i32[2];                       //!< 32-bit signed integer (2x).
+  uint32_t u32[2];                       //!< 32-bit unsigned integer (2x).
+
+  int64_t  i64;                          //!< 64-bit signed integer.
+  uint64_t u64;                          //!< 64-bit unsigned integer.
+
+  float    f32[2];                       //!< 32-bit floating point (2x).
+  double   f64;                          //!< 64-bit floating point.
+
 #if ASMJIT_ARCH_LE
-    uint32_t lo, hi;
+  struct { float    f32Lo, f32Hi; };
+  struct { int32_t  i32Lo, i32Hi; };
+  struct { uint32_t u32Lo, u32Hi; };
 #else
-    uint32_t hi, lo;
+  struct { float    f32Hi, f32Lo; };
+  struct { int32_t  i32Hi, i32Lo; };
+  struct { uint32_t u32Hi, u32Lo; };
 #endif // ASMJIT_ARCH_LE
-  };
 };
 
 //! \}

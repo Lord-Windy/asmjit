@@ -324,7 +324,7 @@ struct RAState {};
 //! Register allocator pipeline used by \ref CodeCompiler.
 struct RAPass : public CBPass {
 public:
-  ASMJIT_NO_COPY(RAPass)
+  ASMJIT_NONCOPYABLE(RAPass)
 
   typedef void (ASMJIT_CDECL* TraceNodeFunc)(RAPass* self, CBNode* node_, const char* prefix);
 

@@ -846,10 +846,8 @@ typedef unsigned __int64 uint64_t;
 #endif
 
 #if ASMJIT_ARCH_LE
-# define _ASMJIT_ARCH_INDEX(total, index) (index)
 # define ASMJIT_PACK32_4x8(A, B, C, D) ((A) + ((B) << 8) + ((C) << 16) + ((D) << 24))
 #else
-# define _ASMJIT_ARCH_INDEX(total, index) ((total) - 1 - (index))
 # define ASMJIT_PACK32_4x8(A, B, C, D) ((D) + ((C) << 8) + ((B) << 16) + ((A) << 24))
 #endif
 
@@ -863,11 +861,31 @@ typedef unsigned __int64 uint64_t;
 # endif
 #endif // !ASMJIT_ALLOC && !ASMJIT_REALLOC && !ASMJIT_FREE
 
-#define ASMJIT_NO_COPY(...) \
-private: \
-  ASMJIT_INLINE __VA_ARGS__(const __VA_ARGS__& other) ASMJIT_NOEXCEPT; \
-  ASMJIT_INLINE __VA_ARGS__& operator=(const __VA_ARGS__& other) ASMJIT_NOEXCEPT; \
+#if ASMJIT_CC_HAS_DELETE_FUNCTION
+#define ASMJIT_NONCONSTRUCTIBLE(...)                         \
+private:                                                     \
+  __VA_ARGS__() = delete;                                    \
+  __VA_ARGS__(const __VA_ARGS__& other) = delete;            \
+  __VA_ARGS__& operator=(const __VA_ARGS__& other) = delete; \
 public:
+#define ASMJIT_NONCOPYABLE(...)                              \
+private:                                                     \
+  __VA_ARGS__(const __VA_ARGS__& other) = delete;            \
+  __VA_ARGS__& operator=(const __VA_ARGS__& other) = delete; \
+public:
+#else
+#define ASMJIT_NONCONSTRUCTIBLE(...)                         \
+private:                                                     \
+  inline __VA_ARGS__();                                      \
+  inline __VA_ARGS__(const __VA_ARGS__& other);              \
+  inline __VA_ARGS__& operator=(const __VA_ARGS__& other);   \
+public:
+#define ASMJIT_NONCOPYABLE(...)                              \
+private:                                                     \
+  inline __VA_ARGS__(const __VA_ARGS__& other);              \
+  inline __VA_ARGS__& operator=(const __VA_ARGS__& other);   \
+public:
+#endif // ASMJIT_CC_HAS_DELETE_FUNCTION
 
 // ============================================================================
 // [asmjit::Build - Relative Path]

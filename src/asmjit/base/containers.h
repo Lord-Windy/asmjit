@@ -27,7 +27,7 @@ namespace asmjit {
 template <typename T>
 class PodList {
 public:
-  ASMJIT_NO_COPY(PodList<T>)
+  ASMJIT_NONCOPYABLE(PodList<T>)
 
   // --------------------------------------------------------------------------
   // [Link]
@@ -168,7 +168,7 @@ public:
 template <typename T>
 class PodVector : public PodVectorBase {
 public:
-  ASMJIT_NO_COPY(PodVector<T>)
+  ASMJIT_NONCOPYABLE(PodVector<T>)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -334,7 +334,7 @@ public:
 template<typename T, size_t N>
 class PodVectorTmp : public PodVector<T> {
 public:
-  ASMJIT_NO_COPY(PodVectorTmp<T, N>)
+  ASMJIT_NONCOPYABLE(PodVectorTmp<T, N>)
 
   // --------------------------------------------------------------------------
   // [StaticData]

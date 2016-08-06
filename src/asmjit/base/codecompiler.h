@@ -190,7 +190,7 @@ struct VirtReg {
 //! Hint for register allocator (CodeCompiler).
 class CCHint : public CBNode {
 public:
-  ASMJIT_NO_COPY(CCHint)
+  ASMJIT_NONCOPYABLE(CCHint)
 
   //! Hint type.
   ASMJIT_ENUM(Hint) {
@@ -257,7 +257,7 @@ public:
 //! Function entry (CodeCompiler).
 class CCFunc : public CBLabel {
 public:
-  ASMJIT_NO_COPY(CCFunc)
+  ASMJIT_NONCOPYABLE(CCFunc)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -441,7 +441,7 @@ public:
 //! AIR function return.
 class CCFuncRet : public CBNode {
 public:
-  ASMJIT_NO_COPY(CCFuncRet)
+  ASMJIT_NONCOPYABLE(CCFuncRet)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -486,7 +486,7 @@ public:
 //! Function call (CodeCompiler).
 class CCCall : public CBInst {
 public:
-  ASMJIT_NO_COPY(CCCall)
+  ASMJIT_NONCOPYABLE(CCCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -557,7 +557,7 @@ public:
 //! Push argument before a function call (CodeCompiler).
 class CCPushArg : public CBNode {
 public:
-  ASMJIT_NO_COPY(CCPushArg)
+  ASMJIT_NONCOPYABLE(CCPushArg)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -618,7 +618,7 @@ public:
 //! machine code.
 class ASMJIT_VIRTAPI CodeCompiler : public CodeBuilder {
 public:
-  ASMJIT_NO_COPY(CodeCompiler)
+  ASMJIT_NONCOPYABLE(CodeCompiler)
   typedef CodeBuilder Base;
 
   // --------------------------------------------------------------------------

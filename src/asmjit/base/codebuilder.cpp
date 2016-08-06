@@ -426,6 +426,7 @@ Error CodeBuilder::comment(const char* s, size_t len) {
 // ============================================================================
 
 Error CodeBuilder::serialize(CodeEmitter* dst) {
+  Error err = kErrorOk;
   CBNode* node_ = getFirstNode();
 
   do {
@@ -434,37 +435,32 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
     switch (node_->getType()) {
       case CBNode::kNodeAlign: {
         CBAlign* node = static_cast<CBAlign*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->align(node->getMode(), node->getAlignment()));
+        err = dst->align(node->getMode(), node->getAlignment());
         break;
       }
 
       case CBNode::kNodeData: {
         CBData* node = static_cast<CBData*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->embed(node->getData(), node->getSize()));
+        err = dst->embed(node->getData(), node->getSize());
         break;
       }
 
       case CBNode::kNodeFunc:
       case CBNode::kNodeLabel: {
         CBLabel* node = static_cast<CBLabel*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->bind(node->getLabel()));
+        err = dst->bind(node->getLabel());
         break;
       }
 
       case CBNode::kNodeLabelData: {
         CBLabelData* node = static_cast<CBLabelData*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->embedLabel(node->getLabel()));
+        err = dst->embedLabel(node->getLabel());
         break;
       }
 
       case CBNode::kNodeConstPool: {
         CBConstPool* node = static_cast<CBConstPool*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->embedConstPool(node->getLabel(), node->getConstPool()));
+        err = dst->embedConstPool(node->getLabel(), node->getConstPool());
         break;
       }
 
@@ -483,23 +479,24 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
         const Operand_* o2 = &dst->_none;
         const Operand_* o3 = &dst->_none;
 
-        if (opCount > 0) o0 = &opArray[0];
-        if (opCount > 1) o1 = &opArray[1];
-        if (opCount > 2) o2 = &opArray[2];
-        if (opCount > 3) o3 = &opArray[3];
-        if (opCount > 4) dst->setOp4(opArray[4]);
-        if (opCount > 5) dst->setOp5(opArray[5]);
+        switch (opCount) {
+          case 6: dst->_op5 = opArray[5]; options |= CodeEmitter::kOptionHasOp5; ASMJIT_FALLTHROUGH;
+          case 5: dst->_op4 = opArray[4]; options |= CodeEmitter::kOptionHasOp4; ASMJIT_FALLTHROUGH;
+          case 4: o3 = &opArray[3]; ASMJIT_FALLTHROUGH;
+          case 3: o2 = &opArray[2]; ASMJIT_FALLTHROUGH;
+          case 2: o1 = &opArray[1]; ASMJIT_FALLTHROUGH;
+          case 1: o0 = &opArray[0]; ASMJIT_FALLTHROUGH;
+          case 0: break;
+        }
 
         dst->setOptions(options);
-        ASMJIT_PROPAGATE(
-          dst->_emit(instId, *o0, *o1, *o2, *o3));
+        err = dst->_emit(instId, *o0, *o1, *o2, *o3);
         break;
       }
 
       case CBNode::kNodeComment: {
         CBComment* node = static_cast<CBComment*>(node_);
-        ASMJIT_PROPAGATE(
-          dst->comment(node->getInlineComment()));
+        err = dst->comment(node->getInlineComment());
         break;
       }
 
@@ -507,10 +504,11 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
         break;
     }
 
+    if (err) break;
     node_ = node_->getNext();
   } while (node_);
 
-  return kErrorOk;
+  return err;
 }
 
 // ============================================================================

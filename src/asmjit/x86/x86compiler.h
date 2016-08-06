@@ -47,7 +47,7 @@ ASMJIT_VARAPI const X86TypeData _x86TypeData;
 //! X86/X64 function node.
 class X86Func : public CCFunc {
 public:
-  ASMJIT_NO_COPY(X86Func)
+  ASMJIT_NONCOPYABLE(X86Func)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -170,7 +170,7 @@ public:
 //! X86/X64 function-call node.
 class X86CCCall : public CCCall {
 public:
-  ASMJIT_NO_COPY(X86CCCall)
+  ASMJIT_NONCOPYABLE(X86CCCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -243,10 +243,10 @@ public:
 //! Architecture-dependent \ref CodeCompiler targeting X86 and X64.
 class ASMJIT_VIRTAPI X86Compiler
   : public CodeCompiler,
-    public X86EmitExplicit<X86Compiler> {
+    public X86EmitterExplicitT<X86Compiler> {
 
 public:
-  ASMJIT_NO_COPY(X86Compiler)
+  ASMJIT_NONCOPYABLE(X86Compiler)
   typedef CodeCompiler Base;
 
   // --------------------------------------------------------------------------

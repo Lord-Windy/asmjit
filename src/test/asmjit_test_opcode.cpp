@@ -67,7 +67,8 @@ int main(int argc, char* argv[]) {
       info.useRex1 ? "true" : "false",
       info.useRex2 ? "true" : "false");
 
-    CodeHolder code(CodeInfo(info.arch));
+    CodeHolder code;
+    code.init(CodeInfo(info.arch));
     code.setLogger(&logger);
     code.setErrorHandler(&eh);
 

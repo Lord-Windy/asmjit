@@ -99,6 +99,12 @@ public:
     kModeNone = 0                        //!< Default mode (or no specific mode).
   };
 
+  ASMJIT_ENUM(X86Mode) {
+    kX86ModeLegacy      = 0,             //!< Legacy (the most compatible) mode.
+    kX86ModeAVX         = 1,             //!< AVX mode.
+    kX86ModeAVX512F     = 2              //!< AVX512F mode.
+  };
+
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------

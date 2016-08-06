@@ -130,7 +130,6 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang)$")
   endif()
 
   np_detect_options(ASMJIT_CC_OPTIONS
-    "-fno-exceptions"
     "-fno-tree-vectorize"
     "-fvisibility=hidden"
     "-Winconsistent-missing-override")
@@ -305,6 +304,7 @@ asmjit_add_source(ASMJIT_SRC asmjit/x86
   x86assembler.h
   x86compiler.cpp
   x86compiler.h
+  x86emitter.h
   x86func.cpp
   x86func.h
   x86inst.cpp

@@ -114,7 +114,7 @@ public:
 //! or disable logging.
 class ASMJIT_VIRTAPI Logger {
 public:
-  ASMJIT_NO_COPY(Logger)
+  ASMJIT_NONCOPYABLE(Logger)
 
   // --------------------------------------------------------------------------
   // [Options]
@@ -190,7 +190,7 @@ public:
 //! Logger that can log to a `FILE*` stream.
 class ASMJIT_VIRTAPI FileLogger : public Logger {
 public:
-  ASMJIT_NO_COPY(FileLogger)
+  ASMJIT_NONCOPYABLE(FileLogger)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
@@ -236,7 +236,7 @@ public:
 //! Logger that stores everything in an internal string buffer.
 class ASMJIT_VIRTAPI StringLogger : public Logger {
 public:
-  ASMJIT_NO_COPY(StringLogger)
+  ASMJIT_NONCOPYABLE(StringLogger)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

@@ -33,7 +33,7 @@ namespace asmjit {
 //! logging or HTML output.
 class StringBuilder {
 public:
-  ASMJIT_NO_COPY(StringBuilder)
+  ASMJIT_NONCOPYABLE(StringBuilder)
 
   //! \internal
   //!
@@ -203,7 +203,7 @@ public:
 template<size_t N>
 class StringBuilderTmp : public StringBuilder {
 public:
-  ASMJIT_NO_COPY(StringBuilderTmp<N>)
+  ASMJIT_NONCOPYABLE(StringBuilderTmp<N>)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

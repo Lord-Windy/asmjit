@@ -26,7 +26,7 @@ namespace asmjit {
 //! Constant pool.
 class ConstPool {
 public:
-  ASMJIT_NO_COPY(ConstPool)
+  ASMJIT_NONCOPYABLE(ConstPool)
 
   enum {
     kIndex1 = 0,
