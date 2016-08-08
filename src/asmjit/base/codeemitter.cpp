@@ -88,6 +88,15 @@ Error CodeEmitter::onDetach(CodeHolder* code) noexcept {
 // [asmjit::CodeEmitter - Finalize]
 // ============================================================================
 
+Label CodeEmitter::getLabelByName(const char* name, size_t nameLength, uint32_t parentId) noexcept {
+  return Label(_code ? _code->getLabelIdByName(name, nameLength, parentId)
+                     : static_cast<uint32_t>(kInvalidValue));
+}
+
+// ============================================================================
+// [asmjit::CodeEmitter - Finalize]
+// ============================================================================
+
 Error CodeEmitter::finalize() {
   // Finalization does nothing by default, overridden by `X86Compiler`.
   return kErrorOk;

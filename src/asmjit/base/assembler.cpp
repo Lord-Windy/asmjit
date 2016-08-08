@@ -121,7 +121,17 @@ Label Assembler::newLabel() {
   if (!_lastError) {
     ASMJIT_ASSERT(_code != nullptr);
     Error err = _code->newLabelId(id);
-    if (err) setLastError(err);
+    if (ASMJIT_UNLIKELY(err)) setLastError(err);
+  }
+  return Label(id);
+}
+
+Label Assembler::newNamedLabel(const char* name, size_t nameLength, uint32_t type, uint32_t parentId) {
+  uint32_t id = kInvalidValue;
+  if (!_lastError) {
+    ASMJIT_ASSERT(_code != nullptr);
+    Error err = _code->newNamedLabelId(id, name, nameLength, type, parentId);
+    if (ASMJIT_UNLIKELY(err)) setLastError(err);
   }
   return Label(id);
 }
@@ -135,7 +145,7 @@ Error Assembler::bind(const Label& label) {
     return setLastError(DebugUtils::errored(kErrorInvalidLabel));
 
   // Label can be bound only once.
-  if (le->offset != -1)
+  if (le->isBound())
     return setLastError(DebugUtils::errored(kErrorLabelAlreadyBound));
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
@@ -155,7 +165,7 @@ Error Assembler::bind(const Label& label) {
   Error error = kErrorOk;
   size_t pos = getOffset();
 
-  CodeHolder::LabelLink* link = le->links;
+  CodeHolder::LabelLink* link = le->_links;
   CodeHolder::LabelLink* prev = nullptr;
 
   while (link) {
@@ -192,7 +202,7 @@ Error Assembler::bind(const Label& label) {
   }
 
   // Chain unused links.
-  link = le->links;
+  link = le->_links;
   if (link) {
     if (!prev) prev = link;
 
@@ -201,8 +211,8 @@ Error Assembler::bind(const Label& label) {
   }
 
   // Set as bound (offset is zero or greater and no links).
-  le->offset = pos;
-  le->links = nullptr;
+  le->_offset = pos;
+  le->_links = nullptr;
 
   if (error != kErrorOk)
     return setLastError(error);
@@ -255,21 +265,17 @@ Error Assembler::embedLabel(const Label& label) {
   re.from = static_cast<uint64_t>(getOffset());
   re.data = 0;
 
-  if (le->offset != -1) {
-    // Bound label.
-    re.data = static_cast<uint64_t>(static_cast<int64_t>(le->offset));
+  if (le->isBound()) {
+    re.data = static_cast<uint64_t>(static_cast<int64_t>(le->getOffset()));
   }
   else {
-    // Non-bound label. Need to chain.
-
     CodeHolder::LabelLink* link = _code->newLabelLink();
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
-    link->prev = (CodeHolder::LabelLink*)le->links;
+    link->prev = (CodeHolder::LabelLink*)le->_links;
     link->offset = getOffset();
     link->displacement = 0;
-
-    le->links = link;
+    le->_links = link;
   }
 
   if (_code->_relocations.append(re) != kErrorOk)

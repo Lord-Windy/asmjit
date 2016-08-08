@@ -179,8 +179,18 @@ public:
   //! Emit instruction.
   virtual Error _emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) = 0;
 
-  //! Create new `Label`.
+  //! Create a new label.
   virtual Label newLabel() = 0;
+  //! Create a new named label.
+  virtual Label newNamedLabel(const char* name, size_t nameLength = kInvalidIndex, uint32_t type = Label::kTypeGlobal, uint32_t parentId = kInvalidValue) = 0;
+
+  //! Get a label by name.
+  //!
+  //! Returns invalid Label in case that the name is invalid or label was not found.
+  //!
+  //! NOTE: This function doesn't trigger ErrorHandler in case the Label is
+  //! invalid or was not found. You must check the validity of the Label returned.
+  ASMJIT_API Label getLabelByName(const char* name, size_t nameLength = kInvalidIndex, uint32_t parentId = kInvalidValue) noexcept;
 
   //! Bind the `label` to the current position of the current section.
   //!

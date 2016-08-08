@@ -339,8 +339,30 @@ Label CodeBuilder::newLabel() {
     }
     else {
       Error err = registerLabelNode(node);
-      if (ASMJIT_UNLIKELY(err)) setLastError(err);
-      id = node->getId();
+      if (ASMJIT_UNLIKELY(err))
+        setLastError(err);
+      else
+        id = node->getId();
+    }
+  }
+
+  return Label(id);
+}
+
+Label CodeBuilder::newNamedLabel(const char* name, size_t nameLength, uint32_t type, uint32_t parentId) {
+  uint32_t id = kInvalidValue;
+
+  if (!_lastError) {
+    CBLabel* node = newNodeT<CBLabel>(id);
+    if (ASMJIT_UNLIKELY(!node)) {
+      setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    }
+    else {
+      Error err = _code->newNamedLabelId(id, name, nameLength, type, parentId);
+      if (ASMJIT_UNLIKELY(err))
+        setLastError(err);
+      else
+        id = node->getId();
     }
   }
 

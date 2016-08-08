@@ -161,6 +161,7 @@ struct X86EmitterBaseT {
 
   // These typedefs are used to describe implicit operands passed explicitly.
   typedef X86Gp AL;
+  typedef X86Gp AH;
   typedef X86Gp CL;
   typedef X86Gp AX;
   typedef X86Gp DX;
@@ -416,12 +417,12 @@ struct X86EmitterBaseT {
   INST_2i(bts, Bts, X86Mem, Imm)                                          // ANY
   INST_3x(bzhi, Bzhi, X86Gp, X86Gp, X86Gp)                                // BMI2
   INST_3x(bzhi, Bzhi, X86Gp, X86Mem, X86Gp)                               // BMI2
-  INST_1x(cbw, Cbw, AX)                                                   // ANY: AX      <- Sign Extend AL  [EXPLICIT]
-  INST_2x(cdq, Cdq, EDX, EAX)                                             // ANY: EDX:EAX <- Sign Extend EAX [EXPLICIT]
-  INST_1x(cdqe, Cdqe, EAX)                                                // X64: RAX     <- Sign Extend EAX [EXPLICIT]
-  INST_2x(cqo, Cqo, RDX, RAX)                                             // X64: RDX:RAX <- Sign Extend RAX [EXPLICIT]
-  INST_2x(cwd, Cwd, DX, AX)                                               // ANY: DX:AX   <- Sign Extend AX  [EXPLICIT]
-  INST_1x(cwde, Cwde, EAX)                                                // ANY: EAX     <- Sign Extend AX  [EXPLICIT]
+  INST_1x(cbw, Cbw, AX)                                                   // ANY       [EXPLICIT] AX      <- Sign Extend AL
+  INST_2x(cdq, Cdq, EDX, EAX)                                             // ANY       [EXPLICIT] EDX:EAX <- Sign Extend EAX
+  INST_1x(cdqe, Cdqe, EAX)                                                // X64       [EXPLICIT] RAX     <- Sign Extend EAX
+  INST_2x(cqo, Cqo, RDX, RAX)                                             // X64       [EXPLICIT] RDX:RAX <- Sign Extend RAX
+  INST_2x(cwd, Cwd, DX, AX)                                               // ANY       [EXPLICIT] DX:AX   <- Sign Extend AX
+  INST_1x(cwde, Cwde, EAX)                                                // ANY       [EXPLICIT] EAX     <- Sign Extend AX
   INST_1x(call, Call, X86Gp)                                              // ANY
   INST_1x(call, Call, X86Mem)                                             // ANY
   INST_1x(call, Call, Label)                                              // ANY
@@ -440,42 +441,52 @@ struct X86EmitterBaseT {
   INST_2i(cmp, Cmp, X86Gp, Imm)                                           // ANY
   INST_2x(cmp, Cmp, X86Mem, X86Gp)                                        // ANY
   INST_2i(cmp, Cmp, X86Mem, Imm)                                          // ANY
-  INST_3x(cmpxchg, Cmpxchg, X86Gp, X86Gp, ZAX)                            // I486       [EXPLICIT]
-  INST_3x(cmpxchg, Cmpxchg, X86Mem, X86Gp, ZAX)                           // I486       [EXPLICIT]
-  INST_5x(cmpxchg8b, Cmpxchg8b, X86Mem, EDX, EAX, ECX, EBX);              // CMPXCHG8B  [EXPLICIT]
-  INST_5x(cmpxchg16b, Cmpxchg16b, X86Mem, RDX, RAX, RCX, RBX);            // CMPXCHG16B [EXPLICIT]
-  INST_4x(cpuid, Cpuid, EAX, EBX, ECX, EDX)                               // I486       [EXPLICIT]
+  INST_3x(cmpxchg, Cmpxchg, X86Gp, X86Gp, ZAX)                            // I486      [EXPLICIT]
+  INST_3x(cmpxchg, Cmpxchg, X86Mem, X86Gp, ZAX)                           // I486      [EXPLICIT]
+  INST_5x(cmpxchg16b, Cmpxchg16b, X86Mem, RDX, RAX, RCX, RBX);            // CMPXCHG16B[EXPLICIT] m == EDX:EAX ? m <- ECX:EBX
+  INST_5x(cmpxchg8b, Cmpxchg8b, X86Mem, EDX, EAX, ECX, EBX);              // CMPXCHG8B [EXPLICIT] m == RDX:RAX ? m <- RCX:RBX
+  INST_4x(cpuid, Cpuid, EAX, EBX, ECX, EDX)                               // I486      [EXPLICIT] EAX:EBX:ECX:EDX  <- CPUID[EAX:ECX]
   INST_2x(crc32, Crc32, X86Gp, X86Gp)                                     // SSE4_2
   INST_2x(crc32, Crc32, X86Gp, X86Mem)                                    // SSE4_2
-  INST_1x(daa, Daa, X86Gp)                                                // X86 [EXPLICIT]
-  INST_1x(das, Das, X86Gp)                                                // X86 [EXPLICIT]
+  INST_1x(daa, Daa, X86Gp)                                                // X86       [EXPLICIT]
+  INST_1x(das, Das, X86Gp)                                                // X86       [EXPLICIT]
   INST_1x(dec, Dec, X86Gp)                                                // ANY
   INST_1x(dec, Dec, X86Mem)                                               // ANY
-  INST_2x(div, Div, X86Gp, X86Gp)                                         // ANY:  AH[Rem]: AL[Quot] <- AX / r8     [EXPLICIT]
-  INST_2x(div, Div, X86Gp, X86Mem)                                        // ANY:  AH[Rem]: AL[Quot] <- AX / m8     [EXPLICIT]
-  INST_3x(div, Div, X86Gp, X86Gp, X86Gp)                                  // ANY: xDX[Rem]:xAX[Quot] <- xDX:xAX / r [EXPLICIT]
-  INST_3x(div, Div, X86Gp, X86Gp, X86Mem)                                 // ANY: xDX[Rem]:xAX[Quot] <- xDX:xAX / m [EXPLICIT]
+  INST_2x(div, Div, X86Gp, X86Gp)                                         // ANY       [EXPLICIT]  AH[Rem]: AL[Quot] <- AX / r8
+  INST_2x(div, Div, X86Gp, X86Mem)                                        // ANY       [EXPLICIT]  AH[Rem]: AL[Quot] <- AX / m8
+  INST_3x(div, Div, X86Gp, X86Gp, X86Gp)                                  // ANY       [EXPLICIT] xDX[Rem]:xAX[Quot] <- xDX:xAX / r16|r32|r64
+  INST_3x(div, Div, X86Gp, X86Gp, X86Mem)                                 // ANY       [EXPLICIT] xDX[Rem]:xAX[Quot] <- xDX:xAX / m16|m32|m64
   INST_0x(emms, Emms)                                                     // MMX
   INST_2x(enter, Enter, Imm, Imm)                                         // ANY
   INST_1x(fxrstor, Fxrstor, X86Mem)                                       // FXSR
   INST_1x(fxrstor64, Fxrstor64, X86Mem)                                   // FXSR
   INST_1x(fxsave, Fxsave, X86Mem)                                         // FXSR
   INST_1x(fxsave64, Fxsave64, X86Mem)                                     // FXSR
-  INST_2x(idiv, Idiv, X86Gp, X86Gp)                                       // ANY:  AH[Rem]: AL[Quot] <- AX / r8     [EXPLICIT]
-  INST_2x(idiv, Idiv, X86Gp, X86Mem)                                      // ANY:  AH[Rem]: AL[Quot] <- AX / m8     [EXPLICIT]
-  INST_3x(idiv, Idiv, X86Gp, X86Gp, X86Gp)                                // ANY: ?DX[Rem]:?AX[Quot] <- ?DX:?AX / r [EXPLICIT]
-  INST_3x(idiv, Idiv, X86Gp, X86Gp, X86Mem)                               // ANY: ?DX[Rem]:?AX[Quot] <- ?DX:?AX / m [EXPLICIT]
+  INST_2x(idiv, Idiv, X86Gp, X86Gp)                                       // ANY       [EXPLICIT]  AH[Rem]: AL[Quot] <- AX / r8
+  INST_2x(idiv, Idiv, X86Gp, X86Mem)                                      // ANY       [EXPLICIT]  AH[Rem]: AL[Quot] <- AX / m8
+  INST_3x(idiv, Idiv, X86Gp, X86Gp, X86Gp)                                // ANY       [EXPLICIT] xDX[Rem]:xAX[Quot] <- xDX:xAX / r16|r32|r64
+  INST_3x(idiv, Idiv, X86Gp, X86Gp, X86Mem)                               // ANY       [EXPLICIT] xDX[Rem]:xAX[Quot] <- xDX:xAX / m16|m32|m64
+  INST_2x(imul, Imul, X86Gp, X86Gp)                                       // ANY       [EXPLICIT] AX <- AL * r8
+                                                                          // ANY                  ra <- ra * rb
+  INST_2x(imul, Imul, X86Gp, X86Mem)                                      // ANY       [EXPLICIT] AX <- AL * m8
+                                                                          // ANY                  ra <- ra * m16|m32|m64
+  INST_2i(imul, Imul, X86Gp, Imm)                                         // ANY
+  INST_3i(imul, Imul, X86Gp, X86Gp, Imm)                                  // ANY
+  INST_3i(imul, Imul, X86Gp, X86Mem, Imm)                                 // ANY
+  INST_3x(imul, Imul, X86Gp, X86Gp, X86Gp)                                // ANY       [EXPLICIT] xDX:xAX <- xAX * r16|r32|r64
+  INST_3x(imul, Imul, X86Gp, X86Gp, X86Mem)                               // ANY       [EXPLICIT] xDX:xAX <- xAX * m16|m32|m64
   INST_1x(inc, Inc, X86Gp)                                                // ANY
   INST_1x(inc, Inc, X86Mem)                                               // ANY
   INST_1i(int_, Int, Imm)                                                 // ANY
   INST_0x(int3, Int3)                                                     // ANY
   INST_0x(into, Into)                                                     // ANY
   INST_1c(j, J, X86Inst::condToJcc, Label)                                // ANY
+  INST_2x(jecxz, Jecxz, X86Gp, Label)                                     // ANY       [EXPLICIT] Short jump if CX/ECX/RCX is zero.
   INST_1x(jmp, Jmp, X86Gp)                                                // ANY
   INST_1x(jmp, Jmp, X86Mem)                                               // ANY
   INST_1x(jmp, Jmp, Label)                                                // ANY
   INST_1i(jmp, Jmp, Imm)                                                  // ANY
-  INST_1x(lahf, Lahf, X86Gp)                                              // LAHF_SAHF: AH <- EFL [EXPLICIT]
+  INST_1x(lahf, Lahf, AH)                                                 // LAHF_SAHF [EXPLICIT] AH <- EFL
   INST_1x(ldmxcsr, Ldmxcsr, X86Mem)                                       // SSE
   INST_2x(lea, Lea, X86Gp, X86Mem)                                        // ANY
   INST_0x(leave, Leave)                                                   // ANY
@@ -505,12 +516,12 @@ struct X86EmitterBaseT {
   INST_2x(movsxd, Movsxd, X86Gp, X86Mem)                                  // X64
   INST_2x(movzx, Movzx, X86Gp, X86Gp)                                     // ANY
   INST_2x(movzx, Movzx, X86Gp, X86Mem)                                    // ANY
-  INST_2x(mul, Mul, AX, X86Gp)                                            // ANY: AX      <-  AL * r8 [EXPLICIT]
-  INST_2x(mul, Mul, AX, X86Mem)                                           // ANY: AX      <-  AL * m8 [EXPLICIT]
-  INST_3x(mul, Mul, ZDX, ZAX, X86Gp)                                      // ANY: ?DX:?AX <- ?AX * r  [EXPLICIT]
-  INST_3x(mul, Mul, ZDX, ZAX, X86Mem)                                     // ANY: ?DX:?AX <- ?AX * m  [EXPLICIT]
-  INST_4x(mulx, Mulx, X86Gp, X86Gp, X86Gp, ZDX)                           // BMI2 [EXPLICIT]
-  INST_4x(mulx, Mulx, X86Gp, X86Gp, X86Mem, ZDX)                          // BMI2 [EXPLICIT]
+  INST_2x(mul, Mul, AX, X86Gp)                                            // ANY       [EXPLICIT] AX      <-  AL * r8
+  INST_2x(mul, Mul, AX, X86Mem)                                           // ANY       [EXPLICIT] AX      <-  AL * m8
+  INST_3x(mul, Mul, ZDX, ZAX, X86Gp)                                      // ANY       [EXPLICIT] xDX:xAX <- xAX * r16|r32|r64
+  INST_3x(mul, Mul, ZDX, ZAX, X86Mem)                                     // ANY       [EXPLICIT] xDX:xAX <- xAX * m16|m32|m64
+  INST_4x(mulx, Mulx, X86Gp, X86Gp, X86Gp, ZDX)                           // BMI2      [EXPLICIT]
+  INST_4x(mulx, Mulx, X86Gp, X86Gp, X86Mem, ZDX)                          // BMI2      [EXPLICIT]
   INST_1x(neg, Neg, X86Gp)                                                // ANY
   INST_1x(neg, Neg, X86Mem)                                               // ANY
   INST_0x(nop, Nop)                                                       // ANY
@@ -555,8 +566,8 @@ struct X86EmitterBaseT {
   INST_1x(rdgsbase, Rdgsbase, X86Gp)                                      // FSGSBASE
   INST_1x(rdrand, Rdrand, X86Gp)                                          // RDRAND
   INST_1x(rdseed, Rdseed, X86Gp)                                          // RDSEED
-  INST_2x(rdtsc, Rdtsc, EDX, EAX)                                         // RDTSC : EDX:EAX     <- Counter [EXPLICIT]
-  INST_3x(rdtscp, Rdtscp, EDX, EAX, ECX)                                  // RDTSCP: EDX:EAX:EXC <- Counter [EXPLICIT]
+  INST_2x(rdtsc, Rdtsc, EDX, EAX)                                         // RDTSC     [EXPLICIT] EDX:EAX     <- Counter
+  INST_3x(rdtscp, Rdtscp, EDX, EAX, ECX)                                  // RDTSCP    [EXPLICIT] EDX:EAX:EXC <- Counter
   INST_2x(rol, Rol, X86Gp, CL)                                            // ANY
   INST_2x(rol, Rol, X86Mem, CL)                                           // ANY
   INST_2i(rol, Rol, X86Gp, Imm)                                           // ANY
@@ -572,7 +583,7 @@ struct X86EmitterBaseT {
   INST_2i(sbb, Sbb, X86Gp, Imm)                                           // ANY
   INST_2x(sbb, Sbb, X86Mem, X86Gp)                                        // ANY
   INST_2i(sbb, Sbb, X86Mem, Imm)                                          // ANY
-  INST_1x(sahf, Sahf, X86Gp)                                              // LAHF_SAHF: EFL <- AH [EXPLICIT]
+  INST_1x(sahf, Sahf, AH)                                                 // LAHF_SAHF [EXPLICIT] EFL <- AH
   INST_2x(sal, Sal, X86Gp, CL)                                            // ANY
   INST_2x(sal, Sal, X86Mem, CL)                                           // ANY
   INST_2i(sal, Sal, X86Gp, Imm)                                           // ANY
@@ -634,13 +645,13 @@ struct X86EmitterBaseT {
   INST_2x(xchg, Xchg, X86Gp, X86Gp)                                       // ANY
   INST_2x(xchg, Xchg, X86Mem, X86Gp)                                      // ANY
   INST_2x(xchg, Xchg, X86Gp, X86Mem)                                      // ANY
-  INST_3x(xgetbv, Xgetbv, EDX, EAX, ECX)                                  // XSAVE: EDX:EAX <- XCR[ECX] [EXPLICIT]
+  INST_3x(xgetbv, Xgetbv, EDX, EAX, ECX)                                  // XSAVE     [EXPLICIT] EDX:EAX <- XCR[ECX]
   INST_2x(xor_, Xor, X86Gp, X86Gp)                                        // ANY
   INST_2x(xor_, Xor, X86Gp, X86Mem)                                       // ANY
   INST_2i(xor_, Xor, X86Gp, Imm)                                          // ANY
   INST_2x(xor_, Xor, X86Mem, X86Gp)                                       // ANY
   INST_2i(xor_, Xor, X86Mem, Imm)                                         // ANY
-  INST_3x(xsetbv, Xsetbv, EDX, EAX, ECX)                                  // XSAVE: XCR[ECX] <- EDX:EAX [EXPLICIT]
+  INST_3x(xsetbv, Xsetbv, EDX, EAX, ECX)                                  // XSAVE     [EXPLICIT] XCR[ECX] <- EDX:EAX
 
   // --------------------------------------------------------------------------
   // [FPU Instructions]
@@ -791,10 +802,10 @@ struct X86EmitterBaseT {
   INST_3i(blendpd, Blendpd, X86Xmm, X86Mem, Imm)                          // SSE4_1
   INST_3i(blendps, Blendps, X86Xmm, X86Xmm, Imm)                          // SSE4_1
   INST_3i(blendps, Blendps, X86Xmm, X86Mem, Imm)                          // SSE4_1
-  INST_3x(blendvpd, Blendvpd, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT].
-  INST_3x(blendvpd, Blendvpd, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT].
-  INST_3x(blendvps, Blendvps, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT].
-  INST_3x(blendvps, Blendvps, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT].
+  INST_3x(blendvpd, Blendvpd, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT]
+  INST_3x(blendvpd, Blendvpd, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT]
+  INST_3x(blendvps, Blendvps, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT]
+  INST_3x(blendvps, Blendvps, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT]
   INST_3i(cmppd, Cmppd, X86Xmm, X86Xmm, Imm)                              // SSE2
   INST_3i(cmppd, Cmppd, X86Xmm, X86Mem, Imm)                              // SSE2
   INST_3i(cmpps, Cmpps, X86Xmm, X86Xmm, Imm)                              // SSE
@@ -1059,16 +1070,16 @@ struct X86EmitterBaseT {
   INST_2x(pavgw, Pavgw, X86Mm, X86Mem)                                    // SSE
   INST_2x(pavgw, Pavgw, X86Xmm, X86Xmm)                                   // SSE2
   INST_2x(pavgw, Pavgw, X86Xmm, X86Mem)                                   // SSE2
-  INST_3x(pblendvb, Pblendvb, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT].
-  INST_3x(pblendvb, Pblendvb, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT].
+  INST_3x(pblendvb, Pblendvb, X86Xmm, X86Xmm, XMM0)                       // SSE4_1 [EXPLICIT]
+  INST_3x(pblendvb, Pblendvb, X86Xmm, X86Mem, XMM0)                       // SSE4_1 [EXPLICIT]
   INST_3i(pblendw, Pblendw, X86Xmm, X86Xmm, Imm)                          // SSE4_1
   INST_3i(pblendw, Pblendw, X86Xmm, X86Mem, Imm)                          // SSE4_1
   INST_3i(pclmulqdq, Pclmulqdq, X86Xmm, X86Xmm, Imm)                      // PCLMULQDQ.
   INST_3i(pclmulqdq, Pclmulqdq, X86Xmm, X86Mem, Imm)                      // PCLMULQDQ.
-  INST_6x(pcmpestri, Pcmpestri, X86Xmm, X86Xmm, Imm, ECX, EAX, EDX)       // SSE4_2 [EXPLICIT].
-  INST_6x(pcmpestri, Pcmpestri, X86Xmm, X86Mem, Imm, ECX, EAX, EDX)       // SSE4_2 [EXPLICIT].
-  INST_6x(pcmpestrm, Pcmpestrm, X86Xmm, X86Xmm, Imm, XMM0, EAX, EDX)      // SSE4_2 [EXPLICIT].
-  INST_6x(pcmpestrm, Pcmpestrm, X86Xmm, X86Mem, Imm, XMM0, EAX, EDX)      // SSE4_2 [EXPLICIT].
+  INST_6x(pcmpestri, Pcmpestri, X86Xmm, X86Xmm, Imm, ECX, EAX, EDX)       // SSE4_2 [EXPLICIT]
+  INST_6x(pcmpestri, Pcmpestri, X86Xmm, X86Mem, Imm, ECX, EAX, EDX)       // SSE4_2 [EXPLICIT]
+  INST_6x(pcmpestrm, Pcmpestrm, X86Xmm, X86Xmm, Imm, XMM0, EAX, EDX)      // SSE4_2 [EXPLICIT]
+  INST_6x(pcmpestrm, Pcmpestrm, X86Xmm, X86Mem, Imm, XMM0, EAX, EDX)      // SSE4_2 [EXPLICIT]
   INST_2x(pcmpeqb, Pcmpeqb, X86Mm, X86Mm)                                 // MMX
   INST_2x(pcmpeqb, Pcmpeqb, X86Mm, X86Mem)                                // MMX
   INST_2x(pcmpeqb, Pcmpeqb, X86Xmm, X86Xmm)                               // SSE2
@@ -1097,10 +1108,10 @@ struct X86EmitterBaseT {
   INST_2x(pcmpgtw, Pcmpgtw, X86Mm, X86Mem)                                // MMX
   INST_2x(pcmpgtw, Pcmpgtw, X86Xmm, X86Xmm)                               // SSE2
   INST_2x(pcmpgtw, Pcmpgtw, X86Xmm, X86Mem)                               // SSE2
-  INST_4x(pcmpistri, Pcmpistri, X86Xmm, X86Xmm, Imm, ECX)                 // SSE4_2 [EXPLICIT].
-  INST_4x(pcmpistri, Pcmpistri, X86Xmm, X86Mem, Imm, ECX)                 // SSE4_2 [EXPLICIT].
-  INST_4x(pcmpistrm, Pcmpistrm, X86Xmm, X86Xmm, Imm, XMM0)                // SSE4_2 [EXPLICIT].
-  INST_4x(pcmpistrm, Pcmpistrm, X86Xmm, X86Mem, Imm, XMM0)                // SSE4_2 [EXPLICIT].
+  INST_4x(pcmpistri, Pcmpistri, X86Xmm, X86Xmm, Imm, ECX)                 // SSE4_2 [EXPLICIT]
+  INST_4x(pcmpistri, Pcmpistri, X86Xmm, X86Mem, Imm, ECX)                 // SSE4_2 [EXPLICIT]
+  INST_4x(pcmpistrm, Pcmpistrm, X86Xmm, X86Xmm, Imm, XMM0)                // SSE4_2 [EXPLICIT]
+  INST_4x(pcmpistrm, Pcmpistrm, X86Xmm, X86Mem, Imm, XMM0)                // SSE4_2 [EXPLICIT]
   INST_3i(pextrb, Pextrb, X86Gp, X86Xmm, Imm)                             // SSE4_1
   INST_3i(pextrb, Pextrb, X86Mem, X86Xmm, Imm)                            // SSE4_1
   INST_3i(pextrd, Pextrd, X86Gp, X86Xmm, Imm)                             // SSE4_1
@@ -1529,8 +1540,8 @@ struct X86EmitterBaseT {
   INST_2x(sha256msg1, Sha256msg1, X86Xmm, X86Mem)                         // SHA
   INST_2x(sha256msg2, Sha256msg2, X86Xmm, X86Xmm)                         // SHA
   INST_2x(sha256msg2, Sha256msg2, X86Xmm, X86Mem)                         // SHA
-  INST_3x(sha256rnds2, Sha256rnds2, X86Xmm, X86Xmm, XMM0)                 // SHA [EXPLICIT].
-  INST_3x(sha256rnds2, Sha256rnds2, X86Xmm, X86Mem, XMM0)                 // SHA [EXPLICIT].
+  INST_3x(sha256rnds2, Sha256rnds2, X86Xmm, X86Xmm, XMM0)                 // SHA [EXPLICIT]
+  INST_3x(sha256rnds2, Sha256rnds2, X86Xmm, X86Mem, XMM0)                 // SHA [EXPLICIT]
 
   // --------------------------------------------------------------------------
   // [AVX...AVX512]
@@ -4692,6 +4703,8 @@ struct X86EmitterImplicitT : public X86EmitterBaseT<This> {
   using X86EmitterBaseT<This>::cpuid;
   using X86EmitterBaseT<This>::div;
   using X86EmitterBaseT<This>::idiv;
+  using X86EmitterBaseT<This>::imul;
+  using X86EmitterBaseT<This>::jecxz;
   using X86EmitterBaseT<This>::lahf;
   using X86EmitterBaseT<This>::mulx;
   using X86EmitterBaseT<This>::movsd;
@@ -4702,122 +4715,63 @@ struct X86EmitterImplicitT : public X86EmitterBaseT<This> {
   using X86EmitterBaseT<This>::xgetbv;
   using X86EmitterBaseT<This>::xsetbv;
 
-  INST_0x(cbw, Cbw)                                                       // ANY: AX      <- Sign Extend AL  [IMPLICIT]
-  INST_0x(cdq, Cdq)                                                       // ANY: EDX:EAX <- Sign Extend EAX [IMPLICIT]
-  INST_0x(cdqe, Cdqe)                                                     // X64: RAX     <- Sign Extend EAX [IMPLICIT]
-  INST_0x(clzero, Clzero)                                                 // CLZERO                          [IMPLICIT]
-  INST_0x(cqo, Cqo)                                                       // X64: RDX:RAX <- Sign Extend RAX [IMPLICIT]
-  INST_0x(cwd, Cwd)                                                       // ANY: DX:AX   <- Sign Extend AX  [IMPLICIT]
-  INST_0x(cwde, Cwde)                                                     // ANY: EAX     <- Sign Extend AX  [IMPLICIT]
-  INST_0x(lahf, Lahf)                                                     // LAHF_SAHF: AH          <- EFL   [IMPLICIT]
-  INST_3x(mulx, Mulx, X86Gp, X86Gp, X86Gp)                                // BMI2                            [IMPLICIT]
-  INST_3x(mulx, Mulx, X86Gp, X86Gp, X86Mem)                               // BMI2                            [IMPLICIT]
-  INST_0x(rdtsc, Rdtsc)                                                   // RDTSC    : EDX:EAX     <- CNT   [IMPLICIT]
-  INST_0x(rdtscp, Rdtscp)                                                 // RDTSCP   : EDX:EAX:EXC <- CNT   [IMPLICIT]
-  INST_0x(sahf, Sahf)                                                     // LAHF_SAHF: EFL         <- AH    [IMPLICIT]
+  INST_0x(cbw, Cbw)                                                       // ANY       [IMPLICIT] AX      <- Sign Extend AL
+  INST_0x(cdq, Cdq)                                                       // ANY       [IMPLICIT] EDX:EAX <- Sign Extend EAX
+  INST_0x(cdqe, Cdqe)                                                     // X64       [IMPLICIT] RAX     <- Sign Extend EAX
+  INST_0x(clzero, Clzero)                                                 // CLZERO    [IMPLICIT]
+  INST_2x(cmpxchg, Cmpxchg, X86Gp, X86Gp)                                 // I486      [IMPLICIT]
+  INST_2x(cmpxchg, Cmpxchg, X86Mem, X86Gp)                                // I486      [IMPLICIT]
+  INST_1x(cmpxchg16b, Cmpxchg16b, X86Mem)                                 // CMPXCHG8B [IMPLICIT] m == RDX:RAX ? m <- RCX:RBX
+  INST_1x(cmpxchg8b, Cmpxchg8b, X86Mem)                                   // CMPXCHG16B[IMPLICIT] m == EDX:EAX ? m <- ECX:EBX
+  INST_0x(cpuid, Cpuid)                                                   // I486      [IMPLICIT] EAX:EBX:ECX:EDX  <- CPUID[EAX:ECX]
+  INST_0x(cqo, Cqo)                                                       // X64       [IMPLICIT] RDX:RAX <- Sign Extend RAX
+  INST_0x(cwd, Cwd)                                                       // ANY       [IMPLICIT] DX:AX   <- Sign Extend AX
+  INST_0x(cwde, Cwde)                                                     // ANY       [IMPLICIT] EAX     <- Sign Extend AX
+  INST_1x(div, Div, X86Gp)                                                // ANY       [IMPLICIT]  AH[Rem]: AL[Quot] <- AX    / r8
+                                                                          // ANY       [IMPLICIT] xDX[Rem]:xAX[Quot] <- DX:AX / r16|r32|r64
+  INST_1x(div, Div, X86Mem)                                               // ANY       [IMPLICIT]  AH[Rem]: AL[Quot] <- AX    / m8
+                                                                          // ANY       [IMPLICIT] xDX[Rem]:xAX[Quot] <- DX:AX / m16|m32|m64
+  INST_1x(idiv, Idiv, X86Gp)                                              // ANY       [IMPLICIT]  AH[Rem]: AL[Quot] <- AX    / r8
+                                                                          // ANY       [IMPLICIT] xDX[Rem]:xAX[Quot] <- DX:AX / r16|r32|r64
+  INST_1x(idiv, Idiv, X86Mem)                                             // ANY       [IMPLICIT]  AH[Rem]: AL[Quot] <- AX    / m8
+                                                                          // ANY       [IMPLICIT] xDX[Rem]:xAX[Quot] <- DX:AX / m16|m32|m64
+  INST_1x(imul, Imul, X86Gp)                                              // ANY       [IMPLICIT] AX      <- AL  * r8
+                                                                          // ANY       [IMPLICIT] xAX:xDX <- xAX * r16|r32|r64
+  INST_1x(imul, Imul, X86Mem)                                             // ANY       [IMPLICIT] AX      <- AL  * m8
+                                                                          // ANY       [IMPLICIT] xAX:xDX <- xAX * m16|m32|m64
+  INST_1x(jecxz, Jecxz, Label)                                            // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
+  INST_0x(lahf, Lahf)                                                     // LAHF_SAHF [IMPLICIT] AH      <- EFL
+  INST_1x(mul, Mul, X86Gp)                                                // ANY       [IMPLICIT] AX      <-  AL * r8
+                                                                          // ANY       [IMPLICIT] xDX:xAX <- xAX * r16|r32|r64
+  INST_1x(mul, Mul, X86Mem)                                               // ANY       [IMPLICIT] AX      <-  AL * m8
+                                                                          // ANY       [IMPLICIT] xDX:xAX <- xAX * m16|m32|m64
+  INST_3x(mulx, Mulx, X86Gp, X86Gp, X86Gp)                                // BMI2      [IMPLICIT]
+  INST_3x(mulx, Mulx, X86Gp, X86Gp, X86Mem)                               // BMI2      [IMPLICIT]
+  INST_0x(rdtsc, Rdtsc)                                                   // RDTSC     [IMPLICIT] EDX:EAX <- CNT
+  INST_0x(rdtscp, Rdtscp)                                                 // RDTSCP    [IMPLICIT] EDX:EAX:EXC <- CNT
+  INST_0x(sahf, Sahf)                                                     // LAHF_SAHF [IMPLICIT] EFL     <- AH
+  INST_0x(xgetbv, Xgetbv)                                                 // XSAVE     [IMPLICIT] EDX:EAX <- XCR[ECX]
+  INST_1x(xrstor, Xrstor, X86Mem)                                         // XSAVE     [IMPLICIT]
+  INST_1x(xrstor64, Xrstor64, X86Mem)                                     // XSAVE+X64 [IMPLICIT]
+  INST_1x(xrstors, Xrstors, X86Mem)                                       // XSAVE     [IMPLICIT]
+  INST_1x(xrstors64, Xrstors64, X86Mem)                                   // XSAVE+X64 [IMPLICIT]
+  INST_1x(xsave, Xsave, X86Mem)                                           // XSAVE     [IMPLICIT]
+  INST_1x(xsave64, Xsave64, X86Mem)                                       // XSAVE+X64 [IMPLICIT]
+  INST_1x(xsavec, Xsavec, X86Mem)                                         // XSAVE     [IMPLICIT]
+  INST_1x(xsavec64, Xsavec64, X86Mem)                                     // XSAVE+X64 [IMPLICIT]
+  INST_1x(xsaveopt, Xsaveopt, X86Mem)                                     // XSAVE     [IMPLICIT]
+  INST_1x(xsaveopt64, Xsaveopt64, X86Mem)                                 // XSAVE+X64 [IMPLICIT]
+  INST_1x(xsaves, Xsaves, X86Mem)                                         // XSAVE     [IMPLICIT]
+  INST_1x(xsaves64, Xsaves64, X86Mem)                                     // XSAVE+X64 [IMPLICIT]
+  INST_0x(xsetbv, Xsetbv)                                                 // XSAVE     [IMPLICIT] XCR[ECX] <- EDX:EAX
 
-  INST_0x(xgetbv, Xgetbv)                                                 // XSAVE    : EDX:EAX <- XCR[ECX]  [IMPLICIT]
-  INST_0x(xsetbv, Xsetbv)                                                 // XSAVE    : XCR[ECX] <- EDX:EAX  [IMPLICIT]
-
-  //! Restore Processor Extended States specified by `EDX:EAX` [IMPLICIT] (XSAVE).
-  INST_1x(xrstor, Xrstor, X86Mem)
-  //! Restore Processor Extended States specified by `EDX:EAX` [IMPLICIT] (XSAVE & X64).
-  INST_1x(xrstor64, Xrstor64, X86Mem)
-
-  //! Restore Processor Extended States (SUPERVISOR) specified by `EDX:EAX` [IMPLICIT] (XSAVE).
-  INST_1x(xrstors, Xrstors, X86Mem)
-  //! Restore Processor Extended States (SUPERVISOR) specified by `EDX:EAX` [IMPLICIT] (XSAVE & X64).
-  INST_1x(xrstors64, Xrstors64, X86Mem)
-
-  //! Save Processor Extended States specified by `EDX:EAX` [IMPLICIT] (XSAVE).
-  INST_1x(xsave, Xsave, X86Mem)
-  //! Save Processor Extended States specified by `EDX:EAX` [IMPLICIT] (XSAVE & X64).
-  INST_1x(xsave64, Xsave64, X86Mem)
-
-  //! Save Processor Extended States specified by `EDX:EAX` with compaction [IMPLICIT] (XSAVE).
-  INST_1x(xsavec, Xsavec, X86Mem)
-  //! Save Processor Extended States specified by `EDX:EAX` with compaction [IMPLICIT] (XSAVE & X64).
-  INST_1x(xsavec64, Xsavec64, X86Mem)
-
-  //! Save Processor Extended States specified by `EDX:EAX` (Optimized) [IMPLICIT] (XSAVEOPT).
-  INST_1x(xsaveopt, Xsaveopt, X86Mem)
-  //! Save Processor Extended States specified by `EDX:EAX` (Optimized) [IMPLICIT] (XSAVEOPT & X64).
-  INST_1x(xsaveopt64, Xsaveopt64, X86Mem)
-
-  //! Save Processor Extended States (SUPERVISOR) specified by `EDX:EAX` with compaction [IMPLICIT] (XSAVE).
-  INST_1x(xsaves, Xsaves, X86Mem)
-  //! Save Processor Extended States (SUPERVISOR) specified by `EDX:EAX` with compaction [IMPLICIT] (XSAVE & X64).
-  INST_1x(xsaves64, Xsaves64, X86Mem)
-
-  //! Short jump if CX/ECX/RCX is zero.
-  INST_2x(jecxz, Jecxz, X86Gp, Label)
-
-  //! Return.
   INST_0x(ret, Ret)
-  //! \overload
   INST_1i(ret, Ret, Imm)
-
-  //! CMPXCHG [IMPLICIT] (I486).
-  INST_2x(cmpxchg, Cmpxchg, X86Gp, X86Gp)
-  //! \overload
-  INST_2x(cmpxchg, Cmpxchg, X86Mem, X86Gp)
-
-  //! CMPXCHG 128-bit value in RDX:RAX with `o0` [IMPLICIT] (CMPXCHG16B).
-  INST_1x(cmpxchg16b, Cmpxchg16b, X86Mem)
-  //! CMPXCHG 64-bit value in EDX:EAX with `o0` [IMPLICIT] (CMPXCHG8B).
-  INST_1x(cmpxchg8b, Cmpxchg8b, X86Mem)
-
-  //! CPU identification (I486).
-  INST_0x(cpuid, Cpuid)
 
   //! Decimal adjust AL after addition (X86).
   INST_0x(daa, Daa)
   //! Decimal adjust AL after subtraction (X86).
   INST_0x(das, Das)
-
-  //! Unsigned divide [IMPLICIT]:
-  //!   - AH (Rem):AL (Quot) <- AX      / r|m8
-  //!   - DX (Rem):AX (Quot) <- DX :AX  / r16|m16
-  //!   - EDX(Rem):EAX(Quot) <- EDX:EAX / r32|m32
-  //!   - RDX(Rem):RAX(Quot) <- RDX:RAX / r64|m64
-  INST_1x(div, Div, X86Gp)
-  //! \overload
-  INST_1x(div, Div, X86Mem)
-
-  //! Signed multiply (xDX:xAX <- xAX * o0).
-  INST_1x(imul, Imul, X86Gp)
-  //! \overload
-  INST_1x(imul, Imul, X86Mem)
-
-  //! Signed divide [IMPLICIT]:
-  //!   - AH (Rem):AL (Quot) <- AX      / r|m8
-  //!   - DX (Rem):AX (Quot) <- DX :AX  / r16|m16
-  //!   - EDX(Rem):EAX(Quot) <- EDX:EAX / r32|m32
-  //!   - RDX(Rem):RAX(Quot) <- RDX:RAX / r64|m64
-  INST_1x(idiv, Idiv, X86Gp)
-  //! \overload
-  INST_1x(idiv, Idiv, X86Mem)
-
-  //! Signed multiply.
-  INST_2x(imul, Imul, X86Gp, X86Gp)
-  //! \overload
-  INST_2x(imul, Imul, X86Gp, X86Mem)
-  //! \overload
-  INST_2i(imul, Imul, X86Gp, Imm)
-
-  //! Signed multiply.
-  INST_3i(imul, Imul, X86Gp, X86Gp, Imm)
-  //! \overload
-  INST_3i(imul, Imul, X86Gp, X86Mem, Imm)
-
-  //! Unsigned multiply [IMPLICIT]:
-  //!   - AX      <- AL  * r8|m8
-  //!   - DX |AX  <- AX  * r16|m16
-  //!   - EDX|EAX <- EAX * r32|m32
-  //!   - RDX|RAX <- RAX * r64|m64
-  INST_1x(mul, Mul, X86Gp)
-  //! \overload
-  INST_1x(mul, Mul, X86Mem)
 
   //! Compare BYTE in ES:[EDI/RDI] and DS:[ESI/RSI] [IMPLICIT].
   INST_0x(cmpsb, CmpsB)
@@ -4995,7 +4949,6 @@ struct X86EmitterImplicitT : public X86EmitterBaseT<This> {
   INST_3i(vpcmpistri, Vpcmpistri, X86Xmm, X86Mem, Imm)                    // AVX1 [IMPLICIT]
   INST_3i(vpcmpistrm, Vpcmpistrm, X86Xmm, X86Xmm, Imm)                    // AVX1 [IMPLICIT]
   INST_3i(vpcmpistrm, Vpcmpistrm, X86Xmm, X86Mem, Imm)                    // AVX1 [IMPLICIT]
-
 };
 
 // ============================================================================
@@ -5006,15 +4959,10 @@ template<typename This>
 struct X86EmitterExplicitT : public X86EmitterBaseT<This> {
   using X86EmitterBaseT<This>::cmpsd;
   using X86EmitterBaseT<This>::movsd;
-  // TODO
-  // using X86EmitterBaseT<This>::imul;
 
   // --------------------------------------------------------------------------
   // [General Purpose and Non-SIMD Instructions]
   // --------------------------------------------------------------------------
-
-  //! Short jump if CX/ECX/RCX is zero.
-  INST_2x(jecxz, Jecxz, X86Gp, Label)
 
   //! Compare BYTE in ES:`o0` and DS:`o1`.
   INST_2x(cmpsb, CmpsB, X86Gp, X86Gp)
@@ -5123,29 +5071,6 @@ struct X86EmitterExplicitT : public X86EmitterBaseT<This> {
   INST_3x(repne_scasq, RepneScasQ, X86Gp, X86Gp, X86Gp)
   //! Repeated find AX WORDs, starting at ES:[EDI/RDI].
   INST_3x(repne_scasw, RepneScasW, X86Gp, X86Gp, X86Gp)
-
-  // --------------------------------------------------------------------------
-  // [X86]
-  // --------------------------------------------------------------------------
-
-  //! Signed multiply (o0:o1 <- o1 * o2).
-  //!
-  //! Hi value is stored in `o0`, lo value is stored in `o1`.
-  INST_3x(imul, Imul, X86Gp, X86Gp, X86Gp)
-  //! \overload
-  INST_3x(imul, Imul, X86Gp, X86Gp, X86Mem)
-
-  //! Signed multiply.
-  INST_2x(imul, Imul, X86Gp, X86Gp)
-  //! \overload
-  INST_2x(imul, Imul, X86Gp, X86Mem)
-  //! \overload
-  INST_2i(imul, Imul, X86Gp, Imm)
-
-  //! Signed multiply.
-  INST_3i(imul, Imul, X86Gp, X86Gp, Imm)
-  //! \overload
-  INST_3i(imul, Imul, X86Gp, X86Mem, Imm)
 };
 
 #undef THIS

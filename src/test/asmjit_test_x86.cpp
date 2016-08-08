@@ -3290,7 +3290,9 @@ int X86TestSuite::run() {
   for (i = 0; i < count; i++) {
     JitRuntime runtime;
 
-    CodeHolder code(runtime.getCodeInfo());
+    CodeHolder code;
+
+    code.init(runtime.getCodeInfo());
     code.setErrorHandler(&errorHandler);
 
     if (alwaysPrintLog) {

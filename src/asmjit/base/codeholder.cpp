@@ -55,6 +55,7 @@ static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
   self->_trampolinesSize = 0;
 
   self->_baseAllocator.reset(releaseMemory);
+  self->_nameAllocator.reset(releaseMemory);
 
   // Skip '.text' section if `releaseMemory` is false and it's not external.
   size_t i = (releaseMemory || self->_defaultSection.buffer.isExternal) ? 0 : 1;
@@ -72,6 +73,7 @@ static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
 
   self->_sections.reset(releaseMemory);
   self->_labels.reset(releaseMemory);
+  self->_labelsHash.reset(releaseMemory);
   self->_unusedLinks = nullptr;
   self->_relocations.reset(releaseMemory);
 }
@@ -109,29 +111,8 @@ CodeHolder::CodeHolder() noexcept
     _logger(nullptr),
     _errorHandler(nullptr),
     _trampolinesSize(0),
-    _baseAllocator(8192  - Zone::kZoneOverhead),
-    _unusedLinks(nullptr),
-    _labels(),
-    _sections(),
-    _relocations() {
-
-  _defaultSection.buffer.data = nullptr;
-  _defaultSection.buffer.length = 0;
-  _defaultSection.buffer.capacity = 0;
-  CodeHolder_initDefaultSection(this);
-}
-
-CodeHolder::CodeHolder(const CodeInfo& codeInfo) noexcept
-  : _codeInfo(codeInfo),
-    _isLocked(false),
-    _globalHints(0),
-    _globalOptions(0),
-    _emitters(nullptr),
-    _cgAsm(nullptr),
-    _logger(nullptr),
-    _errorHandler(nullptr),
-    _trampolinesSize(0),
-    _baseAllocator(8192  - Zone::kZoneOverhead),
+    _baseAllocator(8192 - Zone::kZoneOverhead),
+    _nameAllocator(8192 - Zone::kZoneOverhead),
     _unusedLinks(nullptr),
     _labels(),
     _sections(),
@@ -382,6 +363,52 @@ Error CodeHolder::reserveBuffer(CodeBuffer* cb, size_t n) noexcept {
 // [asmjit::CodeHolder - Labels & Symbols]
 // ============================================================================
 
+namespace {
+
+//! \internal
+//!
+//! Only used to lookup a label from `_labelsHash`.
+class LabelByName {
+public:
+  ASMJIT_INLINE LabelByName(const char* name, size_t nameLength, uint32_t hVal) noexcept
+    : name(name),
+      nameLength(static_cast<uint32_t>(nameLength)) {}
+
+  ASMJIT_INLINE bool matches(const CodeHolder::LabelEntry* entry) const noexcept {
+    return static_cast<uint32_t>(entry->getNameLength()) == nameLength &&
+           ::memcmp(entry->getName(), name, nameLength) == 0;
+  }
+
+  const char* name;
+  uint32_t nameLength;
+  uint32_t hVal;
+};
+
+// Returns a hash of `name` and fixes `nameLength` if it's `kInvalidIndex`.
+static uint32_t CodeHolder_hashNameAndFixLen(const char* name, size_t& nameLength) noexcept {
+  uint32_t hVal = 0;
+  if (nameLength == kInvalidIndex) {
+    size_t i = 0;
+    for (;;) {
+      uint8_t c = static_cast<uint8_t>(name[i]);
+      if (!c) break;
+      hVal = Utils::hashRound(hVal, c);
+      i++;
+    }
+    nameLength = i;
+  }
+  else {
+    for (size_t i = 0; i < nameLength; i++) {
+      uint8_t c = static_cast<uint8_t>(name[i]);
+      if (ASMJIT_UNLIKELY(!c)) return DebugUtils::errored(kErrorInvalidLabelName);
+      hVal = Utils::hashRound(hVal, c);
+    }
+  }
+  return hVal;
+}
+
+} // anonymous namespace
+
 CodeHolder::LabelLink* CodeHolder::newLabelLink() noexcept {
   LabelLink* link = _unusedLinks;
 
@@ -401,33 +428,111 @@ CodeHolder::LabelLink* CodeHolder::newLabelLink() noexcept {
   return link;
 }
 
-Error CodeHolder::newLabelId(uint32_t& out) noexcept {
-  Error err = kErrorOk;
-  uint32_t id = kInvalidValue;
+Error CodeHolder::newLabelId(uint32_t& idOut) noexcept {
+  idOut = kInvalidValue;
 
   size_t index = _labels.getLength();
-  if (index <= Label::kPackedIdCount) {
-    err = _labels.willGrow(1);
-    if (err == kErrorOk) {
-      LabelEntry* entry = _baseAllocator.allocT<LabelEntry>();
-      if (!entry) {
-        err = DebugUtils::errored(kErrorNoHeapMemory);
-      }
-      else {
-        entry->offset = -1;
-        entry->links = nullptr;
+  if (ASMJIT_LIKELY(index > Label::kPackedIdCount))
+    return DebugUtils::errored(kErrorLabelIndexOverflow);
 
-        _labels.appendUnsafe(entry);
-        id = Operand::packId(static_cast<uint32_t>(index));
-      }
-    }
+  ASMJIT_PROPAGATE(_labels.willGrow(1));
+  LabelEntry* le = _baseAllocator.allocZeroedT<LabelEntry>();
+
+  if (ASMJIT_UNLIKELY(!le))
+    return DebugUtils::errored(kErrorNoHeapMemory);;
+
+  uint32_t id = Operand::packId(static_cast<uint32_t>(index));
+  le->_setId(id);
+  le->_parentId = kInvalidValue;
+  le->_offset = -1;
+
+  _labels.appendUnsafe(le);
+  idOut = id;
+  return kErrorOk;
+}
+
+Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t nameLength, uint32_t type, uint32_t parentId) noexcept {
+  idOut = kInvalidValue;
+  uint32_t hVal = CodeHolder_hashNameAndFixLen(name, nameLength);
+
+  if (ASMJIT_UNLIKELY(nameLength == 0))
+    return DebugUtils::errored(kErrorInvalidLabelName);
+
+  if (ASMJIT_UNLIKELY(nameLength > Label::kMaxNameLength))
+    return DebugUtils::errored(kErrorLabelNameTooLong);
+
+  switch (type) {
+    case Label::kTypeLocal:
+      if (ASMJIT_UNLIKELY(Operand::unpackId(parentId) >= _labels.getLength()))
+        return DebugUtils::errored(kErrorInvalidParentLabel);
+
+      hVal ^= parentId;
+      break;
+
+    case Label::kTypeGlobal:
+      if (ASMJIT_UNLIKELY(parentId != kInvalidValue))
+        return DebugUtils::errored(kErrorNonLocalLabelCantHaveParent);
+
+      break;
+
+    default:
+      return DebugUtils::errored(kErrorInvalidArgument);
+  }
+
+  // Don't allow to insert duplicates. Local labels allow duplicates that have
+  // different id, this is already accomplished by having a different hashes
+  // between the same label names having different parent labels.
+  LabelEntry* le = _labelsHash.get(LabelByName(name, nameLength, hVal));
+  if (ASMJIT_UNLIKELY(le))
+    return DebugUtils::errored(kErrorLabelAlreadyDefined);
+
+  Error err = kErrorOk;
+  size_t index = _labels.getLength();
+
+  if (ASMJIT_UNLIKELY(index > Label::kPackedIdCount))
+    return DebugUtils::errored(kErrorLabelIndexOverflow);
+
+  ASMJIT_PROPAGATE(_labels.willGrow(1));
+  le = _baseAllocator.allocZeroedT<LabelEntry>();
+
+  if (ASMJIT_UNLIKELY(!le))
+    return  DebugUtils::errored(kErrorNoHeapMemory);
+
+  uint32_t id = Operand::packId(static_cast<uint32_t>(index));
+  le->_hVal = hVal;
+  le->_setId(id);
+  le->_type = static_cast<uint8_t>(type);
+  le->_nameLength = static_cast<uint16_t>(nameLength);
+  le->_parentId = kInvalidValue;
+  le->_offset = -1;
+
+  if (nameLength >= LabelEntry::kEmbeddedSize) {
+    char* nameExternal = static_cast<char*>(_nameAllocator.alloc(nameLength + 1));
+    if (ASMJIT_UNLIKELY(!nameExternal))
+      return DebugUtils::errored(kErrorNoHeapMemory);
+
+    ::memcpy(nameExternal, name, nameLength);
+    nameExternal[nameLength] = '\0';
+    le->_nameExternal = nameExternal;
   }
   else {
-    err = DebugUtils::errored(kErrorLabelIndexOverflow);
+    ::memcpy(le->_nameEmbedded, name, nameLength);
+    le->_nameEmbedded[nameLength] = '\0';
   }
 
-  out = id;
+  _labels.appendUnsafe(le);
+  _labelsHash.put(le);
+
+  idOut = id;
   return err;
+}
+
+uint32_t CodeHolder::getLabelIdByName(const char* name, size_t nameLength, uint32_t parentId) noexcept {
+  uint32_t hVal = CodeHolder_hashNameAndFixLen(name, nameLength);
+  if (ASMJIT_UNLIKELY(!nameLength)) return kInvalidValue;
+
+  LabelEntry* le = _labelsHash.get(LabelByName(name, nameLength, hVal));
+  return le ? le->getId() : static_cast<uint32_t>(kInvalidValue);
 }
 
 // ============================================================================

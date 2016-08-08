@@ -131,6 +131,124 @@ Error PodVectorBase::_resize(size_t n, size_t sizeOfT) noexcept {
   return kErrorOk;
 }
 
+// ============================================================================
+// [asmjit::PodHashBase - Utilities]
+// ============================================================================
+
+static uint32_t PodHashGetClosestPrime(uint32_t x) noexcept {
+  static const uint32_t primeTable[] = {
+    53, 193, 389, 769, 1543, 3079, 6151, 12289, 24593
+  };
+
+  size_t i = 0;
+  uint32_t p;
+
+  do {
+    if ((p = primeTable[i]) > x)
+      break;
+  } while (++i < ASMJIT_ARRAY_SIZE(primeTable));
+
+  return p;
+}
+
+// ============================================================================
+// [asmjit::PodHashBase - Reset]
+// ============================================================================
+
+void PodHashBase::reset(bool releaseMemory) noexcept {
+  _size = 0;
+
+  if (releaseMemory) {
+    if (_data != _embedded)
+      ASMJIT_FREE(_data);
+
+    _bucketsCount = 1;
+    _bucketsGrow = 1;
+    _data = _embedded;
+    _embedded[0] = nullptr;
+  }
+  else {
+    ::memset(_data, 0, _bucketsCount * sizeof(void*));
+  }
+}
+
+// ============================================================================
+// [asmjit::PodHashBase - Rehash]
+// ============================================================================
+
+void PodHashBase::_rehash(uint32_t newCount) noexcept {
+  PodHashNode** oldData = _data;
+  PodHashNode** newData = reinterpret_cast<PodHashNode**>(
+    ASMJIT_ALLOC(static_cast<size_t>(newCount) * sizeof(PodHashNode*)));
+
+  // We can still store nodes into the table, but it will degrade.
+  if (ASMJIT_UNLIKELY(newData == nullptr))
+    return;
+
+  uint32_t i;
+  uint32_t oldCount = _bucketsCount;
+
+  for (i = 0; i < oldCount; i++) {
+    PodHashNode* node = oldData[i];
+    while (node) {
+      PodHashNode* next = node->_hashNext;
+      uint32_t hMod = node->_hVal % newCount;
+
+      node->_hashNext = newData[hMod];
+      newData[hMod] = node;
+
+      node = next;
+    }
+  }
+
+  // 90% is the maximum occupancy, can't overflow since the maximum capacity
+  // is limited to the last prime number stored in the prime table.
+  _bucketsCount = newCount;
+  _bucketsGrow = newCount * 9 / 10;
+
+  _data = newData;
+  if (oldData != _embedded) ASMJIT_FREE(oldData);
+}
+
+// ============================================================================
+// [asmjit::PodHashBase - Ops]
+// ============================================================================
+
+PodHashNode* PodHashBase::_put(PodHashNode* node) noexcept {
+  uint32_t hMod = node->_hVal % _bucketsCount;
+  PodHashNode* next = _data[hMod];
+
+  node->_hashNext = next;
+  _data[hMod] = node;
+
+  if (++_size >= _bucketsGrow && next) {
+    uint32_t newCapacity = PodHashGetClosestPrime(_bucketsCount);
+    if (newCapacity != _bucketsCount)
+      _rehash(newCapacity);
+  }
+
+  return node;
+}
+
+PodHashNode* PodHashBase::_del(PodHashNode* node) noexcept {
+  uint32_t hMod = node->_hVal % _bucketsCount;
+
+  PodHashNode** pPrev = &_data[hMod];
+  PodHashNode* p = *pPrev;
+
+  while (p) {
+    if (p == node) {
+      *pPrev = p->_hashNext;
+      return node;
+    }
+
+    pPrev = &p->_hashNext;
+    p = *pPrev;
+  }
+
+  return nullptr;
+}
+
 } // asmjit namespace
 
 // [Api-End]

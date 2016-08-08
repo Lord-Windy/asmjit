@@ -363,6 +363,107 @@ public:
   StaticData _staticData;
 };
 
+// ============================================================================
+// [asmjit::PodHashNode]
+// ============================================================================
+
+//! Node used by \ref PodHash<> template.
+//!
+//! You must provide function `bool eq(const Key& key)` in order to make
+//! `PodHash::get()` working.
+class PodHashNode {
+public:
+  ASMJIT_INLINE PodHashNode(uint32_t hVal = 0) noexcept
+    : _hashNext(nullptr),
+      _hVal(hVal) {}
+
+  //! Next node in the chain, null if it terminates the chain.
+  PodHashNode* _hashNext;
+  //! Key hash.
+  uint32_t _hVal;
+  //! Should be used by Node that inherits PodHashNode, it aligns PodHashNode.
+  uint32_t _customData;
+};
+
+// ============================================================================
+// [asmjit::PodHashBase]
+// ============================================================================
+
+class PodHashBase {
+public:
+  ASMJIT_NONCOPYABLE(PodHashBase)
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE PodHashBase() noexcept {
+    _size = 0;
+    _bucketsCount = 1;
+    _bucketsGrow = 1;
+    _data = _embedded;
+    _embedded[0] = nullptr;
+  }
+  ASMJIT_INLINE ~PodHashBase() noexcept { reset(true); }
+
+  // --------------------------------------------------------------------------
+  // [Reset]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API void reset(bool releaseMemory) noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Ops]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE size_t getSize() const noexcept { return _size; }
+
+  ASMJIT_API void _rehash(uint32_t newCount) noexcept;
+  ASMJIT_API PodHashNode* _put(PodHashNode* node) noexcept;
+  ASMJIT_API PodHashNode* _del(PodHashNode* node) noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  size_t _size;
+  uint32_t _bucketsCount;
+  uint32_t _bucketsGrow;
+
+  PodHashNode** _data;
+  PodHashNode* _embedded[1];
+};
+
+// ============================================================================
+// [asmjit::PodHash<Key, Node>]
+// ============================================================================
+
+//! Low-level hash table specialized for storing string keys and POD values.
+//!
+//! This hash table allows duplicates to be inserted (the API is so low
+//! level that it's up to you if you allow it or not, as you should first
+//! `get()` the node and then modify it or insert a new node by using `put()`,
+//! depending on the intention).
+template<typename Node>
+class PodHash : public PodHashBase {
+public:
+  ASMJIT_INLINE PodHash() noexcept : PodHashBase() {}
+  ASMJIT_INLINE ~PodHash() noexcept {}
+
+  template<typename Key>
+  ASMJIT_INLINE Node* get(const Key& key) const noexcept {
+    uint32_t hMod = key.hVal % _bucketsCount;
+    Node* node = static_cast<Node*>(_data[hMod]);
+
+    while (node && !key.matches(node))
+      node = static_cast<Node*>(node->_hashNext);
+    return node;
+  }
+
+  ASMJIT_INLINE Node* put(Node* node) noexcept { return static_cast<Node*>(_put(node)); }
+  ASMJIT_INLINE Node* del(Node* node) noexcept { return static_cast<Node*>(_del(node)); }
+};
+
 //! \}
 
 } // asmjit namespace

@@ -45,7 +45,7 @@ public:
     //! Zone allocator overhead.
     kZoneOverhead =
       kMemAllocOverhead +
-        static_cast<int>(sizeof(Zone::Block) - sizeof(void*))
+        static_cast<int>(sizeof(Block) - sizeof(void*))
   };
 
   // --------------------------------------------------------------------------
@@ -127,7 +127,7 @@ public:
   //! // Create your objects using zone object allocating, for example:
   //! Object* obj = static_cast<Object*>( zone.alloc(sizeof(Object)) );
   //
-  //! if (obj == nullptr) {
+  //! if (!obj) {
   //!   // Handle out of memory error.
   //! }
   //!

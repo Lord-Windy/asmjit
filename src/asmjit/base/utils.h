@@ -148,6 +148,23 @@ struct Utils {
   static ASMJIT_INLINE T iMax(const T& a, const T& b) noexcept { return a > b ? a : b; }
 
   // --------------------------------------------------------------------------
+  // [Hash]
+  // --------------------------------------------------------------------------
+
+  // \internal
+  static ASMJIT_INLINE uint32_t hashRound(uint32_t hash, uint32_t c) noexcept { return hash * 65599 + c; }
+
+  // Get a hash of the given string `str` of `len` length. Length must be valid
+  // as this function doesn't check for a null terminator and allows it in the
+  // middle of the string.
+  static ASMJIT_INLINE uint32_t hashString(const char* str, size_t len) noexcept {
+    uint32_t hVal = 0;
+    for (uint32_t i = 0; i < len; i++)
+      hVal = hashRound(hVal, str[i]);
+    return hVal;
+  }
+
+  // --------------------------------------------------------------------------
   // [Swap]
   // --------------------------------------------------------------------------
 

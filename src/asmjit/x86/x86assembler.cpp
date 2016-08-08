@@ -1114,10 +1114,10 @@ CaseX86M_Bx_MulDiv:
         label = _code->getLabelEntry(static_cast<const Label&>(o0));
         if (!label) goto InvalidLabel;
 
-        if (label->offset != -1) {
+        if (label->isBound()) {
           // Bound label.
           static const intptr_t kRel32Size = 5;
-          intptr_t offs = label->offset - (intptr_t)(cursor - _bufferData);
+          intptr_t offs = label->getOffset() - (intptr_t)(cursor - _bufferData);
 
           ASMJIT_ASSERT(offs <= 0);
           EMIT_BYTE(opCode);
@@ -1359,12 +1359,12 @@ CaseX86M_Bx_MulDiv:
             EMIT_BYTE(0x2E);
         }
 
-        if (label->offset != -1) {
+        if (label->isBound()) {
           // Bound label.
           static const intptr_t kRel8Size = 2;
           static const intptr_t kRel32Size = 6;
 
-          intptr_t offs = label->offset - (intptr_t)(cursor - _bufferData);
+          intptr_t offs = label->getOffset() - (intptr_t)(cursor - _bufferData);
           ASMJIT_ASSERT(offs <= 0);
 
           if ((options & X86Inst::kOptionLongForm) == 0 && Utils::isInt8(offs - kRel8Size)) {
@@ -1405,35 +1405,42 @@ CaseX86M_Bx_MulDiv:
       break;
 
     case X86Inst::kEncodingX86Jecxz:
-      if (isign3 == ENC_OPS2(Reg, Label)) {
+      if (isign3 == ENC_OPS1(Label)) {
+        label = _code->getLabelEntry(static_cast<const Label&>(o0));
+      }
+      else if (isign3 == ENC_OPS2(Reg, Label)) {
         if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdCx))
           goto IllegalInstruction;
-
         label = _code->getLabelEntry(static_cast<const Label&>(o1));
-        if (!label) goto InvalidLabel;
+      }
+      else {
+        goto IllegalInstruction;
+      }
 
-        if ((getArchType() == Arch::kTypeX86 && o0.getSize() == 2) ||
-            (getArchType() != Arch::kTypeX86 && o0.getSize() == 4)) {
-          EMIT_BYTE(0x67);
-        }
-        EMIT_BYTE(0xE3);
+      if (ASMJIT_UNLIKELY(!label))
+        goto InvalidLabel;
 
-        if (label->offset != -1) {
-          // Bound label.
-          intptr_t offs = label->offset - (intptr_t)(cursor - _bufferData) - 1;
-          if (ASMJIT_UNLIKELY(!Utils::isInt8(offs)))
-            goto IllegalInstruction;
+      if ((getArchType() == Arch::kTypeX86 && o0.getSize() == 2) ||
+          (getArchType() != Arch::kTypeX86 && o0.getSize() == 4)) {
+        EMIT_BYTE(0x67);
+      }
+      EMIT_BYTE(0xE3);
 
-          EMIT_BYTE(offs);
-          goto EmitDone;
-        }
-        else {
-          // Non-bound label.
-          dispOffset = -1;
-          dispSize = 1;
-          relocId = -1;
-          goto EmitDisplacement;
-        }
+      if (label->isBound()) {
+        // Bound label.
+        intptr_t offs = label->getOffset() - (intptr_t)(cursor - _bufferData) - 1;
+        if (ASMJIT_UNLIKELY(!Utils::isInt8(offs)))
+          goto IllegalInstruction;
+
+        EMIT_BYTE(offs);
+        goto EmitDone;
+      }
+      else {
+        // Non-bound label.
+        dispOffset = -1;
+        dispSize = 1;
+        relocId = -1;
+        goto EmitDisplacement;
       }
       break;
 
@@ -1460,12 +1467,12 @@ CaseX86M_Bx_MulDiv:
         label = _code->getLabelEntry(static_cast<const Label&>(o0));
         if (!label) goto InvalidLabel;
 
-        if (label->offset != -1) {
+        if (label->isBound()) {
           // Bound label.
           const intptr_t kRel8Size = 2;
           const intptr_t kRel32Size = 5;
 
-          intptr_t offs = label->offset - (intptr_t)(cursor - _bufferData);
+          intptr_t offs = label->getOffset() - (intptr_t)(cursor - _bufferData);
 
           if (Utils::isInt8(offs - kRel8Size) && !(options & X86Inst::kOptionLongForm)) {
             options |= X86Inst::kOptionShortForm;
@@ -3692,9 +3699,9 @@ EmitModSib_LabelRip_X86:
           if (_code->_relocations.append(re) != kErrorOk)
             return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
 
-          if (label->offset != -1) {
+          if (label->isBound()) {
             // Bound label.
-            _code->_relocations[relocId].data += static_cast<int64_t>(label->offset);
+            _code->_relocations[relocId].data += static_cast<int64_t>(label->getOffset());
             EMIT_DWORD(0);
           }
           else {
@@ -3728,9 +3735,9 @@ EmitModSib_LabelRip_X86:
           if (!label) goto InvalidLabel;
 
           dispOffset -= (4 + imLen);
-          if (label->offset != -1) {
+          if (label->isBound()) {
             // Bound label.
-            dispOffset += label->offset - static_cast<int32_t>((intptr_t)(cursor - _bufferData));
+            dispOffset += label->getOffset() - static_cast<int32_t>((intptr_t)(cursor - _bufferData));
             EMIT_DWORD(static_cast<int32_t>(dispOffset));
           }
           else {
@@ -4114,17 +4121,17 @@ EmitJmpOrCallAbs:
 
 EmitDisplacement:
   {
-    ASMJIT_ASSERT(label->offset == -1);
+    ASMJIT_ASSERT(!label->isBound());
     ASMJIT_ASSERT(dispSize == 1 || dispSize == 4);
 
     // Chain with label.
     CodeHolder::LabelLink* link = _code->newLabelLink();
     // TODO: nullcheck.
-    link->prev = label->links;
+    link->prev = label->_links;
     link->offset = (intptr_t)(cursor - _bufferData);
     link->displacement = dispOffset;
     link->relocId = relocId;
-    label->links = link;
+    label->_links = link;
 
     // Emit label size as dummy data.
     if (dispSize == 1)

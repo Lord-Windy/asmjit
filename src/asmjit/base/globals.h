@@ -561,6 +561,21 @@ ASMJIT_ENUM(ErrorCode) {
   //! Label is already bound.
   kErrorLabelAlreadyBound,
 
+  //! Label is already defined (named labels).
+  kErrorLabelAlreadyDefined,
+
+  //! Label name too long.
+  kErrorLabelNameTooLong,
+
+  //! Label must always be local if it's anonymous (without a name).
+  kErrorInvalidLabelName,
+
+  //! Parent id passed to `CodeHolder::newNamedLabelId()` was invalid.
+  kErrorInvalidParentLabel,
+
+  //! Parent id specified for a non-local (global) label.
+  kErrorNonLocalLabelCantHaveParent,
+
   //! Unknown instruction (an instruction ID is out of bounds or instruction
   //! name is invalid).
   kErrorUnknownInstruction,

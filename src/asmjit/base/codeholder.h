@@ -279,11 +279,19 @@ class ASMJIT_VIRTAPI CodeHolder {
 public:
   ASMJIT_NONCOPYABLE(CodeHolder)
 
+  // --------------------------------------------------------------------------
+  // [SectionEntry]
+  // --------------------------------------------------------------------------
+
   //! Code or data section entry.
   struct SectionEntry {
     CodeSection info;                    //!< Section information (name, flags, alignment).
     CodeBuffer buffer;                   //!< Machine code & data of this section.
   };
+
+  // --------------------------------------------------------------------------
+  // [LabelLink]
+  // --------------------------------------------------------------------------
 
   //! Data structure used to link labels.
   struct LabelLink {
@@ -293,11 +301,100 @@ public:
     intptr_t relocId;                    //!< Relocation id (in case it's needed).
   };
 
-  //! Label data.
-  struct LabelEntry {
-    intptr_t offset;                     //!< Label offset.
-    LabelLink* links;                    //!< Label links.
+  // --------------------------------------------------------------------------
+  // [LabelEntry]
+  // --------------------------------------------------------------------------
+
+  //! Label entry contains the following properties:
+  //!
+  //!   * Label id - This is the only thing that is set to the `Label` operand.
+  //!   * Label name - Optional, used mostly to create executables and libraries.
+  //!   * Label type - Type of the label, default `Label::kTypeAnonymous`.
+  //!   * Label parent id - Derived from many assemblers that allow to define a
+  //!       local label that falls under a global label. This allows to define
+  //!       many labels of the same name that have different parent (global) label.
+  //!
+  //!   * Offset - offset of the label bound by `Assembler`.
+  //!   * Links - single-linked list that contains locations of code that has
+  //!       to be patched when the label gets bound. Every use of unbound label
+  //!       adds one link to `_links` list.
+  //!
+  //!   * HVal - Hash value of label's name and optionally parentId.
+  //!   * HashNext - Hash-table implementation detail.
+  class LabelEntry : public PodHashNode {
+  public:
+    // NOTE: Label id is stored in `_customData`, which is provided by PodHashNode
+    // to fill a padding that a C++ compiler targeting 64-bit CPU will add to align
+    // the structure to 64-bits.
+
+    enum { kEmbeddedSize = 8 };
+
+    //! Get label id.
+    ASMJIT_INLINE uint32_t getId() const noexcept { return _customData; }
+    //! Set label id (internal, used only by \ref CodeHolder).
+    ASMJIT_INLINE void _setId(uint32_t id) noexcept { _customData = id; }
+
+    //! Get label type, see \ref Label::Type.
+    ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
+    //! Get label flags, returns 0 at the moment.
+    ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
+
+    //! Get label's parent id.
+    ASMJIT_INLINE uint32_t getParentId() const noexcept { return _parentId; }
+
+    //! Get if the label has name.
+    ASMJIT_INLINE bool hasName() const noexcept { return _nameLength > 0; }
+
+    //! Get if the label's name is embedded in `_nameEmbedded` field.
+    ASMJIT_INLINE bool _isNameEmbedded() const noexcept { return _nameLength < kEmbeddedSize; }
+
+    //! Get the label's name.
+    //!
+    //! NOTE: Local labels will return their local name without their parent
+    //! part, for example ".L1".
+    ASMJIT_INLINE const char* getName() const noexcept {
+      return _isNameEmbedded() ? const_cast<char*>(_nameEmbedded) : _nameExternal;
+    }
+
+    //! Get length of label's name.
+    //!
+    //! NOTE: Label name is always null terminated, so you can use `strlen()` to
+    //! get it, however, it's also cached in `LabelEntry`, so if you want to know
+    //! the length the easiest way is to use `LabelEntry::getNameLength()`.
+    ASMJIT_INLINE size_t getNameLength() const noexcept { return _nameLength; }
+
+    //! Get if the label is bound.
+    ASMJIT_INLINE bool isBound() const noexcept { return _offset != -1; }
+    //! Get the label offset (only useful if the label is bound).
+    ASMJIT_INLINE intptr_t getOffset() const noexcept { return _offset; }
+
+    //! Get the hash-value of label's name and its parent label (if any).
+    //!
+    //! Label hash is calculated as `HASH(Name) ^ ParentId`. The hash function
+    //! is implemented in `Utils::hashString()` and `Utils::hashRound()`.
+    ASMJIT_INLINE uint32_t getHVal() const noexcept { return _hVal; }
+
+    // ------------------------------------------------------------------------
+    // [Members]
+    // ------------------------------------------------------------------------
+
+    uint8_t _type;                       //!< Label type, see Label::Type.
+    uint8_t _flags;                      //!< Must be zero.
+    uint16_t _nameLength;                //!< Label's name length.
+    uint32_t _parentId;                  //!< Label parent id or `kInvalidValue`.
+
+    union {
+      char _nameEmbedded[kEmbeddedSize]; //!< Name (embedded 7+1 chars if it's enough).
+      char* _nameExternal;               //!< External pointer to the name if it doesn't fit.
+    };
+
+    intptr_t _offset;                    //!< Label offset.
+    LabelLink* _links;                   //!< Label links.
   };
+
+  // --------------------------------------------------------------------------
+  // [RelocEntry]
+  // --------------------------------------------------------------------------
 
   //! Code relocation data.
   //!
@@ -319,8 +416,6 @@ public:
 
   //! Create an uninitialized CodeHolder (you must init() it before it can be used).
   ASMJIT_API CodeHolder() noexcept;
-  //! Create a CodeHolder initialized to hold code described by `codeInfo`.
-  explicit ASMJIT_API CodeHolder(const CodeInfo& codeInfo) noexcept;
   //! Destroy the CodeHolder.
   ASMJIT_API ~CodeHolder() noexcept;
 
@@ -420,7 +515,7 @@ public:
   //! Set the error handler, will affect all attached `CodeEmitter`s.
   ASMJIT_API Error setErrorHandler(ErrorHandler* handler) noexcept;
   //! Reset the error handler (does nothing if not attached).
-  ASMJIT_INLINE Error resetErrorHandler() noexcept { return setErrorHandler(nullptr); }
+  ASMJIT_INLINE void resetErrorHandler() noexcept { setErrorHandler(nullptr); }
 
   // --------------------------------------------------------------------------
   // [Sections]
@@ -429,6 +524,7 @@ public:
   //! Get array of `SectionEntry*` records.
   ASMJIT_INLINE const PodVector<SectionEntry*>& getSections() const noexcept { return _sections; }
 
+  // TODO: Maybe getSectionEntry() would be a better name, like getLabelEntry()?
   //! Get a specific section based on its id.
   ASMJIT_INLINE SectionEntry* getSection(size_t index) const noexcept { return _sections[index]; }
 
@@ -439,10 +535,18 @@ public:
   // [Labels & Symbols]
   // --------------------------------------------------------------------------
 
-  //! Create a new label id which can be associated with \ref Label.
+  //! Create a new anonymous label and return its id in `idOut`.
   //!
-  //! Returns `Error`, does not trigger \ref ErrorHandler on error.
-  ASMJIT_API Error newLabelId(uint32_t& out) noexcept;
+  //! Returns `Error`, does not report error to \ref ErrorHandler.
+  ASMJIT_API Error newLabelId(uint32_t& idOut) noexcept;
+
+  //! Create a new named label label-type `type`.
+  //!
+  //! Returns `Error`, does not report error to \ref ErrorHandler.
+  ASMJIT_API Error newNamedLabelId(uint32_t& idOut, const char* name, size_t nameLength, uint32_t type, uint32_t parentId) noexcept;
+
+  //! Get a label id by name.
+  ASMJIT_API uint32_t getLabelIdByName(const char* name, size_t nameLength = kInvalidIndex, uint32_t parentId = kInvalidValue) noexcept;
 
   //! Create a new label-link used to store information about yet unbound labels.
   //!
@@ -474,7 +578,7 @@ public:
   //! \overload
   ASMJIT_INLINE bool isLabelBound(uint32_t id) const noexcept {
     size_t index = Operand::unpackId(id);
-    return index < _labels.getLength() && _labels[index]->offset != -1;
+    return index < _labels.getLength() && _labels[index]->isBound();
   }
 
   //! Get a `label` offset or -1 if the label is not yet bound.
@@ -484,7 +588,7 @@ public:
   //! \overload
   ASMJIT_INLINE intptr_t getLabelOffset(uint32_t id) const noexcept {
     ASMJIT_ASSERT(isLabelValid(id));
-    return _labels[Operand::unpackId(id)]->offset;
+    return _labels[Operand::unpackId(id)]->getOffset();
   }
 
   //! Get information about the given `label`.
@@ -540,8 +644,11 @@ public:
   uint32_t _trampolinesSize;             //!< Size of all possible trampolines.
 
   Zone _baseAllocator;                   //!< Base allocator (sections, labels, and relocations).
+  Zone _nameAllocator;                   //!< Allocates label names.
+
   PodVectorTmp<SectionEntry*, 1> _sections; //!< Section entries.
-  PodVector<LabelEntry*> _labels;        //!< Label entries.
+  PodVector<LabelEntry*> _labels;        //!< Label entries (each label is stored here).
+  PodHash<LabelEntry> _labelsHash;       //!< Label name -> LabelEntry (only named labels).
   LabelLink* _unusedLinks;               //!< Pool of unused `LabelLink`s.
   PodVector<RelocEntry> _relocations;    //!< Relocation entries.
 

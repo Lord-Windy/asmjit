@@ -139,6 +139,7 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_API virtual Label newLabel() override;
+  ASMJIT_API virtual Label newNamedLabel(const char* name, size_t nameLength = kInvalidIndex, uint32_t type = Label::kTypeGlobal, uint32_t parentId = kInvalidValue) override;
   ASMJIT_API virtual Error bind(const Label& label) override;
   ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
   ASMJIT_API virtual Error embed(const void* data, uint32_t size) override;

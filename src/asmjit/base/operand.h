@@ -420,6 +420,18 @@ public:
 class Label : public Operand {
 public:
   enum {
+    kMaxNameLength = 2048                //!< Maximum length of a label / symbol.
+  };
+
+  enum Type {
+    kTypeAnonymous = 0,                  //!< Anonymous (unnamed) label.
+    kTypeLocal     = 1,                  //!< Local label (always has parentId).
+    kTypeGlobal    = 2,                  //!< Global label.
+    kTypeCount     = 3                   //!< Number of label types.
+  };
+
+  // TODO: Find a better place, find a better name.
+  enum {
     //! Label tag is used as a sub-type, forming a unique signature across all
     //! operand types as 0x1 is never associated with any register (reg-type).
     //! This means that a memory operand's BASE register can be constructed

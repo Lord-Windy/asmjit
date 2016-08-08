@@ -171,32 +171,32 @@ X86Gp getDstRegByValue() { return x86::ecx; }
 
 void usingOperandsExample(X86Assembler& a) {
   // Create some operands.
-  X86Gp  dst = getDstRegByValue();  // Get `ecx` register returned by a function.
-  X86Gp  src = x86::rax;            // Get `rax` register directly from the provided `x86` namespace.
-  X86Gp  idx = x86::gpq(10);        // Construct `r10` dynamically.
-  X86Mem m = x86::ptr(src, idx);    // Construct [src + idx] memory address - referencing [rax + r10].
+  X86Gp  dst = getDstRegByValue();   // Get `ecx` register returned by a function.
+  X86Gp  src = x86::rax;             // Get `rax` register directly from the provided `x86` namespace.
+  X86Gp  idx = x86::gpq(10);         // Construct `r10` dynamically.
+  X86Mem m = x86::ptr(src, idx);     // Construct [src + idx] memory address - referencing [rax + r10].
 
   // Examine `m`:
-  m.getIndexType();                 // Returns `X86Reg::kRegGpq`.
-  m.getIndexId();                   // Returns 10 (`r10`).
+  m.getIndexType();                  // Returns `X86Reg::kRegGpq`.
+  m.getIndexId();                    // Returns 10 (`r10`).
 
   // Reconstruct `idx` stored in mem:
   X86Gp idx_2 = X86Gp::fromTypeAndId(m.getIndexType(), m.getIndexId());
-  idx == idx_2;                     // True, `idx` and idx_2` are identical.
+  idx == idx_2;                      // True, `idx` and idx_2` are identical.
 
-  Operand op = m;                   // Possible.
-  op.isMem();                       // True (can be casted to Mem and X86Mem).
+  Operand op = m;                    // Possible.
+  op.isMem();                        // True (can be casted to Mem and X86Mem).
 
-  m == op;                          // True, `op` is just a copy of `m`.
+  m == op;                           // True, `op` is just a copy of `m`.
   static_cast<X86Mem&>(op).addOffset(1);
-  m == op;                          // False, `op` now points to [rax + r10 + 1], which is not [rax + r10].
+  m == op;                           // False, `op` now points to [rax + r10 + 1], which is not [rax + r10].
 
   // Emitting 'mov'
-  a.mov(dst, m);                    // Type-safe way.
-  a.mov(dst, op);                   // Not possible, `mov` doesn't provide `X86Reg, Operand` overload.
+  a.mov(dst, m);                     // Type-safe way.
+  a.mov(dst, op);                    // Not possible, `mov` doesn't provide `X86Reg, Operand` overload.
 
-  a.emit(X86Inst::kIdMov, dst, m);  // Unsafe, but possible.
-  a.emit(X86Inst::kIdMov, dst, op); // Also possible, `emit()` is typeless and can be used dynamically.
+  a.emit(X86Inst::kIdMov, dst, m);   // Unsafe, but possible.
+  a.emit(X86Inst::kIdMov, dst, op);  // Also possible, `emit()` is typeless and can be used dynamically.
 }
 ```
 
@@ -212,59 +212,59 @@ using namespace asmjit;
 using namespace asmjit::x86;
 
 // BASE + OFFSET.
-X86Mem a = ptr(rax);                 // a = [rax]
-X86Mem b = ptr(rax, 15)              // b = [rax + 15]
+X86Mem a = ptr(rax);                  // a = [rax]
+X86Mem b = ptr(rax, 15)               // b = [rax + 15]
 
 // BASE + INDEX + SCALE - Scale is in BITS as used by X86!
-X86Mem c = ptr(rax, rbx)             // c = [rax + rbx]
-X86Mem d = ptr(rax, rbx, 2)          // d = [rax + rbx << 2]
-X86Mem e = ptr(rax, rbx, 2, 15)      // e = [rax + rbx << 2 + 15]
+X86Mem c = ptr(rax, rbx)              // c = [rax + rbx]
+X86Mem d = ptr(rax, rbx, 2)           // d = [rax + rbx << 2]
+X86Mem e = ptr(rax, rbx, 2, 15)       // e = [rax + rbx << 2 + 15]
 
 // BASE + VM (Vector Index) (encoded as MOD+VSIB).
-X86Mem f = ptr(rax, xmm1)            // f = [rax + xmm1]
-X86Mem g = ptr(rax, xmm1, 2)         // g = [rax + xmm1 << 2]
-X86Mem h = ptr(rax, xmm1, 2, 15)     // h = [rax + xmm1 << 2 + 15]
+X86Mem f = ptr(rax, xmm1)             // f = [rax + xmm1]
+X86Mem g = ptr(rax, xmm1, 2)          // g = [rax + xmm1 << 2]
+X86Mem h = ptr(rax, xmm1, 2, 15)      // h = [rax + xmm1 << 2 + 15]
 
 // WITHOUT BASE:
 uint64_t ADDR = (uint64_t)0x1234;
-X86Mem i = ptr(ADDR);                // i = [0x1234]
-X86Mem j = ptr(ADDR, rbx);           // j = [0x1234 + rbx]
-X86Mem k = ptr(ADDR, rbx, 2);        // k = [0x1234 + rbx << 2]
+X86Mem i = ptr(ADDR);                 // i = [0x1234]
+X86Mem j = ptr(ADDR, rbx);            // j = [0x1234 + rbx]
+X86Mem k = ptr(ADDR, rbx, 2);         // k = [0x1234 + rbx << 2]
 
 // LABEL - Will be emitted to use RIP (64-bit) or absolute address (32-bit).
 Label L = ...;
-X86Mem m = ptr(L);                   // m = [L]
-X86Mem n = ptr(L, rbx);              // n = [L + rbx]
-X86Mem o = ptr(L, rbx, 2);           // o = [L + rbx << 2]
-X86Mem p = ptr(L, rbx, 2, 15);       // p = [L + rbx << 2 + 15]
+X86Mem m = ptr(L);                    // m = [L]
+X86Mem n = ptr(L, rbx);               // n = [L + rbx]
+X86Mem o = ptr(L, rbx, 2);            // o = [L + rbx << 2]
+X86Mem p = ptr(L, rbx, 2, 15);        // p = [L + rbx << 2 + 15]
 
 // RIP - 64-bit only (RIP can't use INDEX).
-X86Mem q = ptr(rip, 24);             // q = [rip + 24]
+X86Mem q = ptr(rip, 24);              // q = [rip + 24]
 ```
 
 Memory operands can optionally contain memory size. This is required by instructions where the memory size cannot be deduced from other operands, like `inc` and `dec`:
 
 ```c++
-X86Mem a = dword_ptr(rax, rbx);      // dword ptr [rax + rbx].
-X86Mem b = qword_ptr(rdx, rsi, 0, 1);// qword ptr [rdx + rsi << 0 + 1].
+X86Mem a = dword_ptr(rax, rbx);       // dword ptr [rax + rbx].
+X86Mem b = qword_ptr(rdx, rsi, 0, 1); // qword ptr [rdx + rsi << 0 + 1].
 ```
 
 Memory operands provide API that can be used to work with them:
 
 ```c++
-X86Mem mem = dword_ptr(rax, 12);     // dword ptr [rax + 12].
+X86Mem mem = dword_ptr(rax, 12);      // dword ptr [rax + 12].
 
-mem.hasBase();                       // true.
-mem.hasIndex();                      // false.
-mem.getSize();                       // 4.
-mem.getOffset();                     // 12.
+mem.hasBase();                        // true.
+mem.hasIndex();                       // false.
+mem.getSize();                        // 4.
+mem.getOffset();                      // 12.
 
-mem.setSize(0);                      // Sets the size to 0 (makes it sizeless).
-mem.addOffset(-1);                   // Adds -1 to the offset and makes it 11.
-mem.setOffset(0);                    // Sets the offset to 0.
-mem.setBase(rcx);                    // Changes BASE to RCX.
-mem.setIndex(rax);                   // Changes INDEX to RAX.
-mem.hasIndex();                      // true.
+mem.setSize(0);                       // Sets the size to 0 (makes it sizeless).
+mem.addOffset(-1);                    // Adds -1 to the offset and makes it 11.
+mem.setOffset(0);                     // Sets the offset to 0.
+mem.setBase(rcx);                     // Changes BASE to RCX.
+mem.setIndex(rax);                    // Changes INDEX to RAX.
+mem.hasIndex();                       // true.
 
 // ...
 ```
@@ -275,25 +275,25 @@ Making changes to memory operand is very comfortable when emitting loads and sto
 using namespace asmjit;
 using namespace asmjit::x86;
 
-X86Assembler a(...);                 // Your initialized X86Assembler.
-X86Mem m = ptr(eax);                 // Construct [eax] memory operand.
+X86Assembler a(...);                  // Your initialized X86Assembler.
+X86Mem m = ptr(eax);                  // Construct [eax] memory operand.
 
 // One way of emitting bunch of loads is to use `mem.adjusted()`. It returns
 // a new memory operand and keeps the source operand unchanged.
-a.movaps(xmm0, m);                   // No adjustment needed to load [eax].
-a.movaps(xmm1, m.adjusted(16));      // Loads [eax + 16].
-a.movaps(xmm2, m.adjusted(32));      // Loads [eax + 32].
-a.movaps(xmm3, m.adjusted(48));      // Loads [eax + 48].
+a.movaps(xmm0, m);                    // No adjustment needed to load [eax].
+a.movaps(xmm1, m.adjusted(16));       // Loads [eax + 16].
+a.movaps(xmm2, m.adjusted(32));       // Loads [eax + 32].
+a.movaps(xmm3, m.adjusted(48));       // Loads [eax + 48].
 
 // ... do something with xmm0-3 ...
 
 // Another way of adjusting memory is to change the operand in-place. If you
 // want to keep the original operand you can simply clone it.
 X86Mem mx = m.clone();
-a.movaps(mx, xmm0); mx.addOffset(16);// Stores [eax]      (and adds 16 to mx).
-a.movaps(mx, xmm1); mx.addOffset(16);// Stores [eax + 16] (and adds 16 to mx).
-a.movaps(mx, xmm2); mx.addOffset(16);// Stores [eax + 32] (and adds 16 to mx).
-a.movaps(mx, xmm3);                  // Stores [eax + 48].
+a.movaps(mx, xmm0); mx.addOffset(16); // Stores [eax]      (and adds 16 to mx).
+a.movaps(mx, xmm1); mx.addOffset(16); // Stores [eax + 16] (and adds 16 to mx).
+a.movaps(mx, xmm2); mx.addOffset(16); // Stores [eax + 32] (and adds 16 to mx).
+a.movaps(mx, xmm3);                   // Stores [eax + 48].
 ```
 
 You can explore the possibilities by taking a look at [base/operand.h](./src/asmjit/base/operand.h) and [x86/x86operand.h](./src/asmjit/x86/x86operand.h). Always use `X86Mem` when targeting X86 and X64 as it extends the base `Mem` operand with additional features provided by X86.
@@ -309,23 +309,24 @@ using namespace asmjit;
 typedef int (*Func)(void);
 
 int main(int argc, char* argv[]) {
-  JitRuntime rt;                     // Create a runtime specialized for JIT.
+  JitRuntime rt;                      // Create a Runtime specialized for JIT.
 
-  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(rt.getCodeInfo());        // Initialize it to be compatible with `rt`.
 
-  a.mov(x86::eax, 0);                // Move zero to 'eax' register.
-  a.ret();                           // Return from function.
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
+  a.mov(x86::eax, 0);                 // Move zero to 'eax' register.
+  a.ret();                            // Return from function.
   // ----> X86Assembler is no longer needed from here <----
 
   Func fn;
-  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
+  Error err = rt.add(&fn, &code);     // Add the code generated to the runtime.
 
-  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  if (err) return 1;                  // Handle a possible error returned by AsmJit.
   // ----> CodeHolder is no longer needed from here <----
 
-  int result = fn();                 // Execute the generated code.
-  printf("%d\n", result);            // Print the resulting "1".
+  int result = fn();                  // Execute the generated code.
+  printf("%d\n", result);             // Print the resulting "1".
 
   // All classes use RAII, all resources will be released before `main()` returns,
   // the generated function can be, however, released explicitly if you intend to
@@ -350,51 +351,53 @@ int main(int argc, char* argv[]) {
   assert(sizeof(void*) == 8 &&
     "This example requires 64-bit environment.");
 
-  using namespace asmjit::x86;       // To make the access to X86 registers easier.
-  JitRuntime rt;                     // Create a runtime specialized for JIT.
+  using namespace asmjit::x86;        // To make the access to X86 registers easier.
+  JitRuntime rt;                      // Create a runtime specialized for JIT.
 
-  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(rt.getCodeInfo());        // Initialize it to be compatible with `rt`.
+
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
 
   // Decide between Windows vs Unix calling convention:
   //   WIN64  - passes first 4 arguments in RCX, RDX, R8, and R9.
   //   UNIX64 - passes first 6 arguments in RDI, RSI, RCX, RDX, R8, and R9.
   bool w64 = static_cast<bool>(ASMJIT_OS_WINDOWS);
 
-  X86Gp arr = w64 ? rcx : rdi;       // First argument (array ptr).
-  X86Gp cnt = w64 ? rdx : rsi;       // Second argument (number of elements)
-  X86Gp sum = eax;                   // Use RAX as 'sum' as it's a return register.
+  X86Gp arr = w64 ? rcx : rdi;        // First argument (array ptr).
+  X86Gp cnt = w64 ? rdx : rsi;        // Second argument (number of elements)
+  X86Gp sum = eax;                    // Use RAX as 'sum' as it's a return register.
 
   // To construct the loop, we need some labels.
   Label Loop = a.newLabel();
   Label Exit = a.newLabel();
 
-  a.xor_(sum, sum);                  // Clear 'sum' register (shorter than 'mov').
-  a.test(cnt, cnt);                  // Border case:
-  a.jz(Exit);                        //   If 'cnt' is zero jump to 'Exit'.
+  a.xor_(sum, sum);                   // Clear 'sum' register (shorter than 'mov').
+  a.test(cnt, cnt);                   // Border case:
+  a.jz(Exit);                         //   If 'cnt' is zero jump to 'Exit'.
 
-  a.bind(Loop);                      // Start of a loop iteration.
-  a.add(sum, dword_ptr(arr));        // Add int at [arr] to 'sum'.
-  a.add(arr, 4);                     // Increment 'arr' pointer.
-  a.dec(cnt);                        // Decrease 'cnt'.
-  a.jnz(Loop);                       // If not zero jump to 'Loop'.
+  a.bind(Loop);                       // Start of a loop iteration.
+  a.add(sum, dword_ptr(arr));         // Add int at [arr] to 'sum'.
+  a.add(arr, 4);                      // Increment 'arr' pointer.
+  a.dec(cnt);                         // Decrease 'cnt'.
+  a.jnz(Loop);                        // If not zero jump to 'Loop'.
 
-  a.bind(Exit);                      // Exit to handle the border case.
-  a.ret();                           // Return from function ('sum' == 'eax').
+  a.bind(Exit);                       // Exit to handle the border case.
+  a.ret();                            // Return from function ('sum' == 'eax').
   // ----> X86Assembler is no longer needed from here <----
 
   SumFunc fn;
-  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
+  Error err = rt.add(&fn, &code);     // Add the code generated to the runtime.
 
-  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  if (err) return 1;                  // Handle a possible error returned by AsmJit.
   // ----> CodeHolder is no longer needed from here <----
 
   static const int array[6] = { 4, 8, 15, 16, 23, 42 };
 
-  int result = fn(array, 6);         // Execute the generated code.
-  printf("%d\n", result);            // Print sum of array (108).
+  int result = fn(array, 6);          // Execute the generated code.
+  printf("%d\n", result);             // Print sum of array (108).
 
-  rt.release(fn);                    // It's a good practice to release the function.
+  rt.release(fn);                     // It's a good practice to release the function.
 
   return 0;
 }
@@ -410,23 +413,23 @@ So far we have created two functions and executed them. These were typical use-c
 using namespace asmjit;
 
 int main(int argc, char* argv[]) {
-  using namespace asmjit::x86;       // To make the access to X86 registers easier.
+  using namespace asmjit::x86;        // To make the access to X86 registers easier.
 
-  CodeInfo ci(Arch::kTypeX86);       // CodeInfo that describes 32-bit X86 target.
-  CodeHolder code(ci);               // Create CodeHolder based on our own CodeInfo.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(CodeInfo(Arch::kTypeX86));// Initialize it for a 32-bit X86 target.
 
   // Generate a 32-bit function that sums 4 floats and looks like:
   //   void func(float* dst, const float* a, const float* b)
-  a.mov(eax, dword_ptr(esp, 4));     // Load the destination pointer.
-  a.mov(ecx, dword_ptr(esp, 8));     // Load the first source pointer.
-  a.mov(edx, dword_ptr(esp, 12));    // Load the second source pointer.
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
+  a.mov(eax, dword_ptr(esp, 4));      // Load the destination pointer.
+  a.mov(ecx, dword_ptr(esp, 8));      // Load the first source pointer.
+  a.mov(edx, dword_ptr(esp, 12));     // Load the second source pointer.
 
-  a.movups(xmm0, ptr(ecx));          // Load 4 floats from [ecx] to XMM0.
-  a.movups(xmm1, ptr(edx));          // Load 4 floats from [edx] to XMM1.
-  a.addps(xmm0, xmm1);               // Add 4 floats in XMM1 to XMM0.
-  a.movups(ptr(eax), xmm0);          // Store the result to [eax].
-  a.ret();                           // Return from function.
+  a.movups(xmm0, ptr(ecx));           // Load 4 floats from [ecx] to XMM0.
+  a.movups(xmm1, ptr(edx));           // Load 4 floats from [edx] to XMM1.
+  a.addps(xmm0, xmm1);                // Add 4 floats in XMM1 to XMM0.
+  a.movups(ptr(eax), xmm0);           // Store the result to [eax].
+  a.ret();                            // Return from function.
 
   // Now we have two options if we want to do something with the code hold
   // by CodeHolder. In order to use it we must first sync X86Assembler with
@@ -440,7 +443,7 @@ int main(int argc, char* argv[]) {
   // buffers and knows that there is an Assembler attached, so you have to sync
   // explicitly only if you bypass CodeHolder and intend to do something on your
   // own.
-  code.sync();                       // So let's sync, it's easy.
+  code.sync();                        // So let's sync, it's easy.
 
   // We have no Runtime this time, it's on us what we do with the code.
   // CodeHolder stores code in CodeHolder::SectionEntry, which embeds CodeSection
@@ -470,11 +473,12 @@ using namespace asmjit;
 typedef void (*SumFloatsFunc)(float* dst, const float* a, const float* b);
 
 int main(int argc, char* argv[]) {
-  using namespace asmjit::x86;       // To make the access to X86 registers easier.
+  using namespace asmjit::x86;        // To make the access to X86 registers easier.
 
-  CodeInfo ci(Arch::kTypeHost);      // Configure CodeInfo for a host architecture
-  CodeHolder code(ci);               // Create CodeHolder based on our own CodeInfo.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(CodeInfo(Arch::kTypeHost));// Initialize it for the host architecture.
+
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
 
   // Generate a function runnable in both 32-bit and 64-bit architectures:
   bool isX86 = static_cast<bool>(ASMJIT_ARCH_X86);
@@ -491,21 +495,21 @@ int main(int argc, char* argv[]) {
     dst   = eax;
     src_a = ecx;
     src_b = edx;
-    a.mov(dst, dword_ptr(esp, 4));   // Load the destination pointer.
-    a.mov(src_a, dword_ptr(esp, 8)); // Load the first source pointer.
-    a.mov(src_b, dword_ptr(esp, 12));// Load the second source pointer.
+    a.mov(dst, dword_ptr(esp, 4));    // Load the destination pointer.
+    a.mov(src_a, dword_ptr(esp, 8));  // Load the first source pointer.
+    a.mov(src_b, dword_ptr(esp, 12)); // Load the second source pointer.
   }
   else {
-    dst   = isWin ? rcx : rdi;       // First argument  (destination pointer).
-    src_a = isWin ? rdx : rsi;       // Second argument (source 'a' pointer).
-    src_b = isWin ? r8  : rdx;       // Third argument  (source 'b' pointer).
+    dst   = isWin ? rcx : rdi;        // First argument  (destination pointer).
+    src_a = isWin ? rdx : rsi;        // Second argument (source 'a' pointer).
+    src_b = isWin ? r8  : rdx;        // Third argument  (source 'b' pointer).
   }
 
-  a.movups(xmm0, ptr(src_a));        // Load 4 floats from [src_a] to XMM0.
-  a.movups(xmm1, ptr(src_b));        // Load 4 floats from [src_b] to XMM1.
-  a.addps(xmm0, xmm1);               // Add 4 floats in XMM1 to XMM0.
-  a.movups(ptr(dst), xmm0);          // Store the result to [dst].
-  a.ret();                           // Return from function.
+  a.movups(xmm0, ptr(src_a));         // Load 4 floats from [src_a] to XMM0.
+  a.movups(xmm1, ptr(src_b));         // Load 4 floats from [src_b] to XMM1.
+  a.addps(xmm0, xmm1);                // Add 4 floats in XMM1 to XMM0.
+  a.movups(ptr(dst), xmm0);           // Store the result to [dst].
+  a.ret();                            // Return from function.
 
   // After the code was generated it can be relocated manually to any memory
   // location, however, we need to know it's size before we perform memory
@@ -519,10 +523,10 @@ int main(int argc, char* argv[]) {
   // AsmJit uses. It's decoupled so you don't need to use Runtime for that.
   VMemMgr vm;
 
-  void* p = vm.alloc(size);          // Allocate a virtual memory (executable).
-  if (!p) return 0;                  // Handle a possible out-of-memory case.
+  void* p = vm.alloc(size);           // Allocate a virtual memory (executable).
+  if (!p) return 0;                   // Handle a possible out-of-memory case.
 
-  size_t realSize = code.relocate(p);// Relocate & store the machine code in 'p'.
+  size_t realSize = code.relocate(p); // Relocate & store the machine code in 'p'.
   // NOTE: After this you don't need CodeHolder anymore.
 
   // The code can be executed:
@@ -550,12 +554,13 @@ int main(int argc, char* argv[]) {
 Configure the CodeInfo by calling `CodeInfo::setBaseAddress()` to initialize it to a user-provided base-address before passing it to `CodeHolder`:
 
 ```c++
-// Configure the CodeInfo first.
+// Configure CodeInfo.
 CodeInfo ci(...);
 ci.setBaseAddress(uint64_t(0x1234));
 
-// Then pass to CodeHolder.
-CodeHolder code(ci);
+// Then initialize CodeHolder with it.
+CodeHolder code;
+code.init(ci);
 
 // ... after you emit the machine code it will be relocated to the base address
 //     provided and stored in the pointer passed to `CodeHolder::relocate()`.
@@ -573,10 +578,12 @@ using namespace asmjit;
 typedef int (*Func)(void);
 
 int main(int argc, char* argv[]) {
-  JitRuntime rt;                     // Create a runtime specialized for JIT.
+  JitRuntime rt;                      // Create a runtime specialized for JIT.
 
-  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(rt.getCodeInfo());        // Initialize it to be compatible with `rt`.
+
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
 
   // Let's get these registers from X86Assembler.
   X86Gp zbp = a.zbp();
@@ -599,13 +606,13 @@ int main(int argc, char* argv[]) {
 
   // To make the example complete let's call it.
   Func fn;
-  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
-  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  Error err = rt.add(&fn, &code);     // Add the code generated to the runtime.
+  if (err) return 1;                  // Handle a possible error returned by AsmJit.
 
-  int result = fn();                 // Execute the generated code.
-  printf("%d\n", result);            // Print the resulting "0".
+  int result = fn();                  // Execute the generated code.
+  printf("%d\n", result);             // Print the resulting "0".
 
-  rt.release(fn);                    // Good practice, you know....
+  rt.release(fn);                     // Good practice, you know....
   return 0;
 }
 ```
@@ -633,10 +640,12 @@ using namespace asmjit;
 typedef int (*Func)(void);
 
 int main(int argc, char* argv[]) {
-  JitRuntime rt;                     // Create a runtime specialized for JIT.
+  JitRuntime rt;                      // Create a runtime specialized for JIT.
 
-  CodeHolder code(rt.getCodeInfo()); // Create CodeHolder based on runtime's info.
-  X86Assembler a(&code);             // Create and attach X86Assembler to `code`.
+  CodeHolder code;                    // Create a CodeHolder.
+  code.init(rt.getCodeInfo());        // Initialize it to be compatible with `rt`.
+
+  X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
 
   // Let's get these registers from X86Assembler.
   X86Gp zbp = a.zbp();
@@ -663,19 +672,19 @@ int main(int argc, char* argv[]) {
   // Now we know how much stack size we want to reserve. I have chosen 128
   // bytes on purpose as it's encodable only in long form that we have used.
 
-  int stackSize = 128;               // Number of bytes to reserve on the stack.
-  a.setOffset(patchOffset);          // Move the current cursor to `patchOffset`.
-  a.long_().sub(zsp, stackSize);     // Patch the code; don't forget to use LONG form.
+  int stackSize = 128;                // Number of bytes to reserve on the stack.
+  a.setOffset(patchOffset);           // Move the current cursor to `patchOffset`.
+  a.long_().sub(zsp, stackSize);      // Patch the code; don't forget to use LONG form.
 
   // Now the code is ready to be called
   Func fn;
-  Error err = rt.add(&fn, &code);    // Add the code generated to the runtime.
-  if (err) return 1;                 // Handle a possible error returned by AsmJit.
+  Error err = rt.add(&fn, &code);     // Add the code generated to the runtime.
+  if (err) return 1;                  // Handle a possible error returned by AsmJit.
 
-  int result = fn();                 // Execute the generated code.
-  printf("%d\n", result);            // Print the resulting "0".
+  int result = fn();                  // Execute the generated code.
+  printf("%d\n", result);             // Print the resulting "0".
 
-  rt.release(fn);                    // Good practice, you know....
+  rt.release(fn);                     // Good practice, you know....
   return 0;
 }
 ```
