@@ -67,8 +67,8 @@ const X86TypeData _x86TypeData = {
     { INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #9
   //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #10
   //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #11
-    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF32     , 4 , 0                 , "fp"      }, // #10
-    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF64     , 8 , 0                 , "fp"      }, // #11
+    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF32     , 4 , 0         | F(F32), "fp"      }, // #10
+    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF64     , 8 , 0         | F(F64), "fp"      }, // #11
     { SIGNATURE_OF(X86Reg::kRegK)    , VirtType::kIdX86K    , 8 , 0                 , "k"       }, // #12
     { SIGNATURE_OF(X86Reg::kRegMm)   , VirtType::kIdX86Mm   , 8 , F(Vector)         , "mm"      }, // #13
     { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86Xmm  , 16, F(Vector)         , "xmm"     }, // #14
