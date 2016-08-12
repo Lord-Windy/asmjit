@@ -9,7 +9,7 @@
 #define _ASMJIT_BASE_CONTAINERS_H
 
 // [Dependencies]
-#include "../base/globals.h"
+#include "../base/utils.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -20,14 +20,20 @@ namespace asmjit {
 //! \{
 
 // ============================================================================
-// [asmjit::PodList<T>]
+// [Forward Declarations]
+// ============================================================================
+
+class ZoneAllocator;
+
+// ============================================================================
+// [asmjit::ZoneList<T>]
 // ============================================================================
 
 //! \internal
 template <typename T>
-class PodList {
+class ZoneList {
 public:
-  ASMJIT_NONCOPYABLE(PodList<T>)
+  ASMJIT_NONCOPYABLE(ZoneList<T>)
 
   // --------------------------------------------------------------------------
   // [Link]
@@ -49,8 +55,8 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE PodList() noexcept : _first(nullptr), _last(nullptr) {}
-  ASMJIT_INLINE ~PodList() noexcept {}
+  ASMJIT_INLINE ZoneList() noexcept : _first(nullptr), _last(nullptr) {}
+  ASMJIT_INLINE ~ZoneList() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Data]
@@ -93,180 +99,171 @@ public:
 };
 
 // ============================================================================
-// [asmjit::PodVectorBase]
+// [asmjit::ZoneVectorBase]
 // ============================================================================
 
 //! \internal
-class PodVectorBase {
+class ZoneVectorBase {
 public:
-  //! \internal
-  struct Data {
-    //! Get data.
-    ASMJIT_INLINE void* getData() const noexcept {
-      return static_cast<void*>(const_cast<Data*>(this + 1));
-    }
+  ASMJIT_NONCOPYABLE(ZoneVectorBase)
 
-    //! Capacity of the vector.
-    size_t capacity;
-    //! Length of the vector.
-    size_t length;
-  };
-
-  static ASMJIT_API const Data _nullData;
-
+protected:
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new instance of `PodVectorBase`.
-  ASMJIT_INLINE PodVectorBase() noexcept : _d(const_cast<Data*>(&_nullData)) {}
-  //! Destroy the `PodVectorBase` and its data.
-  ASMJIT_INLINE ~PodVectorBase() noexcept { reset(true); }
+  //! Create a new instance of `ZoneVectorBase`.
+  explicit ASMJIT_INLINE ZoneVectorBase(ZoneAllocator* allocator) noexcept
+    : _allocator(allocator),
+      _length(0),
+      _capacity(0),
+      _data(nullptr) {}
 
-protected:
-  explicit ASMJIT_INLINE PodVectorBase(Data* d) noexcept : _d(d) {}
+  //! Destroy the `ZoneVectorBase` and its data.
+  ASMJIT_INLINE ~ZoneVectorBase() noexcept {}
 
   // --------------------------------------------------------------------------
   // [Reset]
   // --------------------------------------------------------------------------
 
-public:
   //! Reset the vector data and set its `length` to zero.
   //!
   //! If `releaseMemory` is true the vector buffer will be released to the
   //! system.
-  ASMJIT_API void reset(bool releaseMemory = false) noexcept;
+  ASMJIT_API void _reset(size_t sizeOfT, ZoneAllocator* allocator) noexcept;
 
   // --------------------------------------------------------------------------
   // [Grow / Reserve]
   // --------------------------------------------------------------------------
 
-protected:
-  ASMJIT_API Error _grow(size_t n, size_t sizeOfT) noexcept;
-  ASMJIT_API Error _reserve(size_t n, size_t sizeOfT) noexcept;
-  ASMJIT_API Error _resize(size_t n, size_t sizeOfT) noexcept;
+  ASMJIT_API Error _grow(size_t sizeOfT, size_t n) noexcept;
+  ASMJIT_API Error _resize(size_t sizeOfT, size_t n) noexcept;
+  ASMJIT_API Error _reserve(size_t sizeOfT, size_t n) noexcept;
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-public:
-  Data* _d;
+  ZoneAllocator* _allocator;             //!< Zone allocator used to allocate data.
+  size_t _length;                        //!< Length of the vector.
+  size_t _capacity;                      //!< Capacity of the vector.
+  void* _data;                           //!< Vector data.
 };
 
 // ============================================================================
-// [asmjit::PodVector<T>]
+// [asmjit::ZoneVector<T>]
 // ============================================================================
 
-//! Template used to store and manage array of POD data.
+//! Template used to store and manage array of Zone allocated data.
 //!
-//! This template has these adventages over other vector<> templates:
-//! - Non-copyable (designed to be non-copyable, we want it)
-//! - No copy-on-write (some implementations of stl can use it)
-//! - Optimized for working only with POD types
-//! - Uses ASMJIT_... memory management macros
+//! This template has these advantages over other std::vector<>:
+//! - Always non-copyable (designed to be non-copyable, we want it).
+//! - No copy-on-write (some implementations of STL can use it).
+//! - Optimized for working only with POD types.
+//! - Uses ZoneAllocator, thus small vectors are basically for free.
 template <typename T>
-class PodVector : public PodVectorBase {
+class ZoneVector : public ZoneVectorBase {
 public:
-  ASMJIT_NONCOPYABLE(PodVector<T>)
+  ASMJIT_NONCOPYABLE(ZoneVector<T>)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new instance of `PodVector<T>`.
-  ASMJIT_INLINE PodVector() noexcept {}
-  //! Destroy the `PodVector<T>` and its data.
-  ASMJIT_INLINE ~PodVector() noexcept {}
+  //! Create a new instance of `ZoneVector<T>`.
+  explicit ASMJIT_INLINE ZoneVector(ZoneAllocator* allocator = nullptr) noexcept
+    : ZoneVectorBase(allocator) {}
 
-protected:
-  explicit ASMJIT_INLINE PodVector(Data* d) noexcept : PodVectorBase(d) {}
+  //! Destroy the `ZoneVector<T>` and its data.
+  ASMJIT_INLINE ~ZoneVector() noexcept { _reset(sizeof(T), nullptr); }
 
   // --------------------------------------------------------------------------
-  // [Data]
+  // [Init / Reset]
   // --------------------------------------------------------------------------
 
-public:
+  //! Get if this `ZoneVectorBase` has been initialized.
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _allocator != nullptr; }
+  //! Reset this vector and initialize to use the given allocator (can be null).
+  ASMJIT_INLINE void reset(ZoneAllocator* allocator) noexcept { _reset(sizeof(T), allocator); }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
   //! Get whether the vector is empty.
-  ASMJIT_INLINE bool isEmpty() const noexcept { return _d->length == 0; }
+  ASMJIT_INLINE bool isEmpty() const noexcept { return _length == 0; }
+
   //! Get length.
-  ASMJIT_INLINE size_t getLength() const noexcept { return _d->length; }
+  ASMJIT_INLINE size_t getLength() const noexcept { return _length; }
   //! Get capacity.
-  ASMJIT_INLINE size_t getCapacity() const noexcept { return _d->capacity; }
+  ASMJIT_INLINE size_t getCapacity() const noexcept { return _capacity; }
+
   //! Get data.
-  ASMJIT_INLINE T* getData() noexcept { return static_cast<T*>(_d->getData()); }
+  ASMJIT_INLINE T* getData() noexcept { return static_cast<T*>(_data); }
   //! \overload
-  ASMJIT_INLINE const T* getData() const noexcept { return static_cast<const T*>(_d->getData()); }
+  ASMJIT_INLINE const T* getData() const noexcept { return static_cast<const T*>(_data); }
 
   // --------------------------------------------------------------------------
   // [Grow / Reserve]
   // --------------------------------------------------------------------------
 
   //! Called to grow the buffer to fit at least `n` elements more.
-  ASMJIT_INLINE Error _grow(size_t n) noexcept { return PodVectorBase::_grow(n, sizeof(T)); }
-  //! Realloc internal array to fit at least `n` items.
-  ASMJIT_INLINE Error _reserve(size_t n) noexcept { return PodVectorBase::_reserve(n, sizeof(T)); }
-
-  ASMJIT_INLINE Error willGrow(size_t n) noexcept {
-    return _d->capacity - _d->length < n ? _grow(n) : static_cast<Error>(kErrorOk);
-  }
-
+  ASMJIT_INLINE Error grow(size_t n) noexcept { return ZoneVectorBase::_grow(sizeof(T), n); }
   //! Resize the vector to hold `n` elements.
   //!
   //! If `n` is greater than the current length then the additional elements'
   //! content will be initialized to zero. If `n` is less than the current
   //! length then the vector will be truncated to exactly `n` elements.
-  ASMJIT_INLINE Error resize(size_t n) noexcept { return PodVectorBase::_resize(n, sizeof(T)); }
+  ASMJIT_INLINE Error resize(size_t n) noexcept { return ZoneVectorBase::_resize(sizeof(T), n); }
+  //! Realloc internal array to fit at least `n` items.
+  ASMJIT_INLINE Error reserve(size_t n) noexcept { return ZoneVectorBase::_reserve(sizeof(T), n); }
+
+  ASMJIT_INLINE Error willGrow(size_t n) noexcept {
+    return _capacity - _length < n ? grow(n) : static_cast<Error>(kErrorOk);
+  }
 
   // --------------------------------------------------------------------------
   // [Ops]
   // --------------------------------------------------------------------------
 
+  //! Clears the vector without reseting the \ref ZoneAllocator.
+  ASMJIT_INLINE void clear() noexcept { _length = 0; }
+
   //! Prepend `item` to the vector.
   Error prepend(const T& item) noexcept {
-    Data* d = _d;
+    if (ASMJIT_UNLIKELY(_length == _capacity))
+      ASMJIT_PROPAGATE(grow(1));
 
-    if (d->length == d->capacity) {
-      ASMJIT_PROPAGATE(_grow(1));
-      _d = d;
-    }
+    ::memmove(static_cast<T*>(_data) + 1, _data, _length * sizeof(T));
+    ::memcpy(_data, &item, sizeof(T));
 
-    ::memmove(static_cast<T*>(d->getData()) + 1, d->getData(), d->length * sizeof(T));
-    ::memcpy(d->getData(), &item, sizeof(T));
-
-    d->length++;
+    _length++;
     return kErrorOk;
   }
 
   //! Insert an `item` at the specified `index`.
   Error insert(size_t index, const T& item) noexcept {
-    Data* d = _d;
-    ASMJIT_ASSERT(index <= d->length);
+    ASMJIT_ASSERT(index <= _length);
 
-    if (d->length == d->capacity) {
-      ASMJIT_PROPAGATE(_grow(1));
-      d = _d;
-    }
+    if (ASMJIT_UNLIKELY(_length == _capacity))
+      ASMJIT_PROPAGATE(grow(1));
 
-    T* dst = static_cast<T*>(d->getData()) + index;
-    ::memmove(dst + 1, dst, d->length - index);
+    T* dst = static_cast<T*>(_data) + index;
+    ::memmove(dst + 1, dst, _length - index);
     ::memcpy(dst, &item, sizeof(T));
 
-    d->length++;
+    _length++;
     return kErrorOk;
   }
 
   //! Append `item` to the vector.
   Error append(const T& item) noexcept {
-    Data* d = _d;
+    if (ASMJIT_UNLIKELY(_length == _capacity))
+      ASMJIT_PROPAGATE(grow(1));
 
-    if (d->length == d->capacity) {
-      ASMJIT_PROPAGATE(_grow(1));
-      d = _d;
-    }
+    ::memcpy(static_cast<T*>(_data) + _length, &item, sizeof(T));
 
-    ::memcpy(static_cast<T*>(d->getData()) + d->length, &item, sizeof(T));
-    d->length++;
+    _length++;
     return kErrorOk;
   }
 
@@ -276,21 +273,18 @@ public:
   //! `kErrorOk` then N elements can be added to the vector without checking
   //! if there is a place for them. Used mostly internally.
   ASMJIT_INLINE void appendUnsafe(const T& item) noexcept {
-    Data* d = _d;
-    ASMJIT_ASSERT(d->length < d->capacity);
+    ASMJIT_ASSERT(_length < _capacity);
 
-    ::memcpy(static_cast<T*>(d->getData()) + d->length, &item, sizeof(T));
-    d->length++;
+    ::memcpy(static_cast<T*>(_data) + _length, &item, sizeof(T));
+    _length++;
   }
 
   //! Get index of `val` or `kInvalidIndex` if not found.
   ASMJIT_INLINE size_t indexOf(const T& val) const noexcept {
-    Data* d = _d;
+    const T* data = static_cast<const T*>(_data);
+    size_t length = _length;
 
-    const T* data = static_cast<const T*>(d->getData());
-    size_t len = d->length;
-
-    for (size_t i = 0; i < len; i++)
+    for (size_t i = 0; i < length; i++)
       if (data[i] == val)
         return i;
 
@@ -299,118 +293,85 @@ public:
 
   //! Remove item at index `i`.
   ASMJIT_INLINE void removeAt(size_t i) noexcept {
-    Data* d = _d;
-    ASMJIT_ASSERT(i < d->length);
+    ASMJIT_ASSERT(i < _length);
 
-    T* data = static_cast<T*>(d->getData()) + i;
-    d->length--;
-    ::memmove(data, data + 1, d->length - i);
+    T* data = static_cast<T*>(_data) + i;
+    _length--;
+    ::memmove(data, data + 1, _length - i);
   }
 
   //! Swap this pod-vector with `other`.
-  ASMJIT_INLINE void swap(PodVector<T>& other) noexcept {
-    T* otherData = other._d;
-    other._d = _d;
-    _d = otherData;
+  ASMJIT_INLINE void swap(ZoneVector<T>& other) noexcept {
+    ASMJIT_ASSERT(_allocator == other._allocator);
+
+    Utils::swap(_length, other._length);
+    Utils::swap(_capacity, other._capacity);
+    Utils::swap(_data, other._data);
   }
 
   //! Get item at index `i`.
   ASMJIT_INLINE T& operator[](size_t i) noexcept {
-    ASMJIT_ASSERT(i < getLength());
+    ASMJIT_ASSERT(i < _length);
     return getData()[i];
   }
 
   //! Get item at index `i`.
   ASMJIT_INLINE const T& operator[](size_t i) const noexcept {
-    ASMJIT_ASSERT(i < getLength());
+    ASMJIT_ASSERT(i < _length);
     return getData()[i];
   }
 };
 
 // ============================================================================
-// [asmjit::PodVectorTmp<T>]
+// [asmjit::ZoneHashNode]
 // ============================================================================
 
-template<typename T, size_t N>
-class PodVectorTmp : public PodVector<T> {
-public:
-  ASMJIT_NONCOPYABLE(PodVectorTmp<T, N>)
-
-  // --------------------------------------------------------------------------
-  // [StaticData]
-  // --------------------------------------------------------------------------
-
-  struct StaticData : public PodVectorBase::Data {
-    char data[sizeof(T) * N];
-  };
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a new instance of `PodVectorTmp<T>`.
-  ASMJIT_INLINE PodVectorTmp() noexcept : PodVector<T>(&_staticData) {
-    _staticData.capacity = N;
-    _staticData.length = 0;
-  }
-  //! Destroy the `PodVectorTmp<T>` and its data.
-  ASMJIT_INLINE ~PodVectorTmp() noexcept {}
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  StaticData _staticData;
-};
-
-// ============================================================================
-// [asmjit::PodHashNode]
-// ============================================================================
-
-//! Node used by \ref PodHash<> template.
+//! Node used by \ref ZoneHash<> template.
 //!
 //! You must provide function `bool eq(const Key& key)` in order to make
-//! `PodHash::get()` working.
-class PodHashNode {
+//! `ZoneHash::get()` working.
+class ZoneHashNode {
 public:
-  ASMJIT_INLINE PodHashNode(uint32_t hVal = 0) noexcept
+  ASMJIT_INLINE ZoneHashNode(uint32_t hVal = 0) noexcept
     : _hashNext(nullptr),
       _hVal(hVal) {}
 
   //! Next node in the chain, null if it terminates the chain.
-  PodHashNode* _hashNext;
+  ZoneHashNode* _hashNext;
   //! Key hash.
   uint32_t _hVal;
-  //! Should be used by Node that inherits PodHashNode, it aligns PodHashNode.
+  //! Should be used by Node that inherits ZoneHashNode, it aligns ZoneHashNode.
   uint32_t _customData;
 };
 
 // ============================================================================
-// [asmjit::PodHashBase]
+// [asmjit::ZoneHashBase]
 // ============================================================================
 
-class PodHashBase {
+class ZoneHashBase {
 public:
-  ASMJIT_NONCOPYABLE(PodHashBase)
+  ASMJIT_NONCOPYABLE(ZoneHashBase)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE PodHashBase() noexcept {
+  ASMJIT_INLINE ZoneHashBase(ZoneAllocator* allocator) noexcept {
+    _allocator = allocator;
     _size = 0;
     _bucketsCount = 1;
     _bucketsGrow = 1;
     _data = _embedded;
     _embedded[0] = nullptr;
   }
-  ASMJIT_INLINE ~PodHashBase() noexcept { reset(true); }
+  ASMJIT_INLINE ~ZoneHashBase() noexcept { reset(nullptr); }
 
   // --------------------------------------------------------------------------
   // [Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API void reset(bool releaseMemory) noexcept;
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _allocator != nullptr; }
+  ASMJIT_API void reset(ZoneAllocator* allocator) noexcept;
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -419,23 +380,24 @@ public:
   ASMJIT_INLINE size_t getSize() const noexcept { return _size; }
 
   ASMJIT_API void _rehash(uint32_t newCount) noexcept;
-  ASMJIT_API PodHashNode* _put(PodHashNode* node) noexcept;
-  ASMJIT_API PodHashNode* _del(PodHashNode* node) noexcept;
+  ASMJIT_API ZoneHashNode* _put(ZoneHashNode* node) noexcept;
+  ASMJIT_API ZoneHashNode* _del(ZoneHashNode* node) noexcept;
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  size_t _size;
-  uint32_t _bucketsCount;
-  uint32_t _bucketsGrow;
+  ZoneAllocator* _allocator;             //!< Zone allocator used to allocate data.
+  size_t _size;                          //!< Count of records inserted into the hash table.
+  uint32_t _bucketsCount;                //!< Count of hash buckets.
+  uint32_t _bucketsGrow;                 //!< When buckets array should grow.
 
-  PodHashNode** _data;
-  PodHashNode* _embedded[1];
+  ZoneHashNode** _data;                  //!< Buckets data.
+  ZoneHashNode* _embedded[1];            //!< Embedded data, used by empty hash tables.
 };
 
 // ============================================================================
-// [asmjit::PodHash<Key, Node>]
+// [asmjit::ZoneHash<Key, Node>]
 // ============================================================================
 
 //! Low-level hash table specialized for storing string keys and POD values.
@@ -445,10 +407,11 @@ public:
 //! `get()` the node and then modify it or insert a new node by using `put()`,
 //! depending on the intention).
 template<typename Node>
-class PodHash : public PodHashBase {
+class ZoneHash : public ZoneHashBase {
 public:
-  ASMJIT_INLINE PodHash() noexcept : PodHashBase() {}
-  ASMJIT_INLINE ~PodHash() noexcept {}
+  explicit ASMJIT_INLINE ZoneHash(ZoneAllocator* allocator = nullptr) noexcept
+    : ZoneHashBase(allocator) {}
+  ASMJIT_INLINE ~ZoneHash() noexcept {}
 
   template<typename Key>
   ASMJIT_INLINE Node* get(const Key& key) const noexcept {

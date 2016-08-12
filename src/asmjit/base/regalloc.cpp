@@ -36,6 +36,7 @@ RAPass::~RAPass() noexcept {}
 Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
   _cc = static_cast<CodeCompiler*>(cb);
   _zone = zone;
+  _allocator.reset(zone);
   _emitComments = (cb->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
 
   Error err = kErrorOk;
@@ -55,13 +56,11 @@ Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
     do {
       node = node->getNext();
     } while (node && node->getType() != CBNode::kNodeFunc);
-
-    if (err != kErrorOk)
-      break;
   } while (node);
 
-  _cc = nullptr;
+  _allocator.reset(nullptr);
   _zone = nullptr;
+  _cc = nullptr;
 
   return err;
 }
@@ -109,7 +108,7 @@ Error RAPass::prepare(CCFunc* func) noexcept {
   _unreachableList.reset();
   _returningList.reset();
   _jccList.reset();
-  _contextVd.reset(false);
+  _contextVd.reset(&_allocator);
 
   _memVarCells = nullptr;
   _memStackCells = nullptr;
@@ -142,7 +141,7 @@ void RAPass::cleanup() noexcept {
     vreg->resetPhysId();
   }
 
-  _contextVd.reset(false);
+  _contextVd.reset(nullptr);
   _extraBlock = nullptr;
 }
 
@@ -336,7 +335,7 @@ Error RAPass::resolveCellOffsets() {
 // ============================================================================
 
 Error RAPass::removeUnreachableCode() {
-  PodList<CBNode*>::Link* link = _unreachableList.getFirst();
+  ZoneList<CBNode*>::Link* link = _unreachableList.getFirst();
   CBNode* stop = getStop();
 
   while (link) {
@@ -411,7 +410,7 @@ Error RAPass::livenessAnalysis() {
   LivenessTarget* ltCur = nullptr;
   LivenessTarget* ltUnused = nullptr;
 
-  PodList<CBNode*>::Link* retPtr = _returningList.getFirst();
+  ZoneList<CBNode*>::Link* retPtr = _returningList.getFirst();
   ASMJIT_ASSERT(retPtr != nullptr);
 
   CBNode* node = retPtr->getValue();

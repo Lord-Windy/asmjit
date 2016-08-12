@@ -73,19 +73,19 @@ public:
 
   //! \internal
   template<typename T>
-  ASMJIT_INLINE T* newNodeT() noexcept { return new(_nodeAllocator.alloc(sizeof(T))) T(this); }
+  ASMJIT_INLINE T* newNodeT() noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this); }
 
   //! \internal
   template<typename T, typename P0>
-  ASMJIT_INLINE T* newNodeT(P0 p0) noexcept { return new(_nodeAllocator.alloc(sizeof(T))) T(this, p0); }
+  ASMJIT_INLINE T* newNodeT(P0 p0) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0); }
 
   //! \internal
   template<typename T, typename P0, typename P1>
-  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1) noexcept { return new(_nodeAllocator.alloc(sizeof(T))) T(this, p0, p1); }
+  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0, p1); }
 
   //! \internal
   template<typename T, typename P0, typename P1, typename P2>
-  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1, P2 p2) noexcept { return new(_nodeAllocator.alloc(sizeof(T))) T(this, p0, p1, p2); }
+  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1, P2 p2) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0, p1, p2); }
 
   ASMJIT_API Error registerLabelNode(CBLabel* node) noexcept;
   //! Get `CBLabel` by `id`.
@@ -157,11 +157,12 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  Zone _nodeAllocator;                   //!< Node allocator.
-  Zone _dataAllocator;                   //!< Data and string allocator (includes comments).
-  Zone _pipeAllocator;                   //!< Allocator used to pass to `CBPass`s.
+  Zone _cbBaseZone;                      //!< Base zone used to allocate nodes.
+  Zone _cbDataZone;                      //!< Data zone used to allocate data and names.
+  Zone _cbPassZone;                      //!< Zone passed to `CBPass::process()`.
 
-  PodVector<CBLabel*> _labelArray;       //!< Maps label indexes to `CBLabel` nodes.
+  ZoneAllocator _cbBaseAllocator;        //!< Allocator using `_cbBaseZone`.
+  ZoneVector<CBLabel*> _labelArray;      //!< Maps label indexes to CBLabel nodes.
 
   CBNode* _firstNode;                    //!< First node of the current section.
   CBNode* _lastNode;                     //!< Last node of the current section.
@@ -385,7 +386,7 @@ public:
   uint32_t _flowId;                      //!< Flow index.
 
   const char* _inlineComment;            //!< Inline comment or null if not used.
-  void* _passData;                       //!< Data used by the current `CBPass`.
+  void* _passData;                       //!< Data used exclusively by the current `CBPass`.
 };
 
 // ============================================================================
@@ -451,11 +452,11 @@ public:
   ASMJIT_INLINE void delOptions(uint32_t options) noexcept { _options &= ~options; }
 
   //! Get op-mask operand (used to represent AVX-512 op-mask selector).
-  ASMJIT_INLINE Operand& getOpMask() noexcept { return _opMask; }
+  ASMJIT_INLINE Operand& getOpExtra() noexcept { return _opExtra; }
   //! \overload
-  ASMJIT_INLINE const Operand& getOpMask() const noexcept { return _opMask; }
+  ASMJIT_INLINE const Operand& getOpExtra() const noexcept { return _opExtra; }
   //1 Set op-mask operand.
-  ASMJIT_INLINE void setOpMask(const Operand& opMask) noexcept { _opMask = opMask; }
+  ASMJIT_INLINE void setOpExtra(const Operand& opExtra) noexcept { _opExtra = opExtra; }
 
   //! Get operands count.
   ASMJIT_INLINE uint32_t getOpCount() const noexcept { return _opCount; }
@@ -512,7 +513,7 @@ Update:
   uint8_t _memOpIndex;                   //!< \internal
   uint8_t _reserved;                     //!< \internal
   uint32_t _options;                     //!< Instruction options.
-  Operand _opMask;                       //!< Instruction op-mask (selector).
+  Operand _opExtra;                      //!< Extra operand (op-mask {k} on AVX-512).
   Operand* _opArray;                     //!< Instruction operands.
 };
 
@@ -757,7 +758,7 @@ public:
   //! Create a new `CBConstPool` instance.
   ASMJIT_INLINE CBConstPool(CodeBuilder* cb, uint32_t id = kInvalidValue) noexcept
     : CBLabel(cb, id),
-      _constPool(&cb->_dataAllocator) { _type = kNodeConstPool; }
+      _constPool(&cb->_cbBaseZone) { _type = kNodeConstPool; }
 
   //! Destroy the `CBConstPool` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBConstPool() noexcept {}
@@ -821,6 +822,7 @@ public:
 
   //! Create a new `CBSentinel` instance.
   ASMJIT_INLINE CBSentinel(CodeBuilder* cb) noexcept : CBNode(cb, kNodeSentinel) {
+    // TODO: This shouldn't be here.
     orFlags(kFlagIsRet);
   }
 

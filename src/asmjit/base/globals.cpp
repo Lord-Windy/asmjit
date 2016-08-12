@@ -20,18 +20,18 @@ namespace asmjit {
 // ============================================================================
 
 static const uint32_t archSignatureTable[] = {
-  //               +-----------------+----------------+-------+
-  //               |Type             | Mode           | GPInfo|
-  //               +-----------------+----------------+-------+
-  ASMJIT_PACK32_4x8(Arch::kTypeNone  , Arch::kModeNone, 0,  0),
-  ASMJIT_PACK32_4x8(Arch::kTypeX86   , Arch::kModeNone, 4,  8),
-  ASMJIT_PACK32_4x8(Arch::kTypeX64   , Arch::kModeNone, 8, 16),
-  ASMJIT_PACK32_4x8(Arch::kTypeX32   , Arch::kModeNone, 8, 16),
-  ASMJIT_PACK32_4x8(Arch::kTypeArm32 , Arch::kModeNone, 4, 16),
-  ASMJIT_PACK32_4x8(Arch::kTypeArm64 , Arch::kModeNone, 8, 32)
+  //               +-----------------+-------------------+-------+
+  //               |Type             | SubType           | GPInfo|
+  //               +-----------------+-------------------+-------+
+  ASMJIT_PACK32_4x8(Arch::kTypeNone  , Arch::kSubTypeNone, 0,  0),
+  ASMJIT_PACK32_4x8(Arch::kTypeX86   , Arch::kSubTypeNone, 4,  8),
+  ASMJIT_PACK32_4x8(Arch::kTypeX64   , Arch::kSubTypeNone, 8, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeX32   , Arch::kSubTypeNone, 8, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeArm32 , Arch::kSubTypeNone, 4, 16),
+  ASMJIT_PACK32_4x8(Arch::kTypeArm64 , Arch::kSubTypeNone, 8, 32)
 };
 
-void Arch::init(uint32_t type, uint32_t mode) noexcept {
+void Arch::init(uint32_t type, uint32_t subType) noexcept {
   uint32_t index = type < ASMJIT_ARRAY_SIZE(archSignatureTable) ? type : uint32_t(0);
 
   // Make sure the `archSignatureTable` array is correctly indexed.
@@ -41,7 +41,7 @@ void Arch::init(uint32_t type, uint32_t mode) noexcept {
   // Even if the architecture is not knows we setup its type and mode, however,
   // the information `Arch` has would be basically useless.
   _type = type;
-  _mode = mode;
+  _subType = subType;
 }
 
 // ============================================================================
@@ -57,6 +57,7 @@ static const char errorMessages[] =
   "Invalid state\0"
   "Invalid architecture\0"
   "Not initialized\0"
+  "Already initialized\0"
   "Slot occupied\0"
   "No code generated\0"
   "Code too large\0"
@@ -68,13 +69,15 @@ static const char errorMessages[] =
   "Invalid label name\0"
   "Invalid parent label\0"
   "Non-local label can't have parent\0"
-  "Unknown instruction\0"
+  "Invalid instruction\0"
   "Illegal instruction\0"
   "Illegal register type\0"
   "Invalid register's physical id\0"
   "Invalid register's virtual id\0"
+  "Invalid type-info\0"
   "Illegal use of a low 8-bit GPB register\0"
   "Illegal use of a 64-bit GPQ register in 32-bit mode\0"
+  "Illegal use of an 80-bit float\0"
   "Illegal addressing\0"
   "Illegal displacement\0"
   "Overlapped arguments\0"

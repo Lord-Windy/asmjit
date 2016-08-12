@@ -198,16 +198,8 @@ Error Assembler::bind(const Label& label) {
     }
 
     prev = link->prev;
+    _code->_baseAllocator.release(link, sizeof(CodeHolder::LabelLink));
     link = prev;
-  }
-
-  // Chain unused links.
-  link = le->_links;
-  if (link) {
-    if (!prev) prev = link;
-
-    prev->prev = _code->_unusedLinks;
-    _code->_unusedLinks = link;
   }
 
   // Set as bound (offset is zero or greater and no links).

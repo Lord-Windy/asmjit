@@ -17,7 +17,7 @@
 
 namespace asmjit {
 
-static ASMJIT_INLINE void hostFlushInstructionCache(void* p, size_t size) noexcept {
+static ASMJIT_INLINE void hostFlushInstructionCache(const void* p, size_t size) noexcept {
   // Only useful on non-x86 architectures.
 #if !ASMJIT_ARCH_X86 && !ASMJIT_ARCH_X64
 # if ASMJIT_OS_WINDOWS
@@ -82,9 +82,9 @@ HostRuntime::HostRuntime() noexcept {
   // Setup the CodeInfo of this Runtime.
   _codeInfo._arch = CpuInfo::getHost().getArch();
   _codeInfo._stackAlignment = static_cast<uint8_t>(hostDetectNaturalStackAlignment());
-  _codeInfo._cdeclCallConv  = kCallConvHostCDecl;
-  _codeInfo._stdCallConv    = kCallConvHostStdCall;
-  _codeInfo._fastCallConv   = kCallConvHostFastCall;
+  _codeInfo._cdeclCallConv  = CallConv::kIdHostCDecl;
+  _codeInfo._stdCallConv    = CallConv::kIdHostStdCall;
+  _codeInfo._fastCallConv   = CallConv::kIdHostFastCall;
 }
 HostRuntime::~HostRuntime() noexcept {}
 
@@ -92,7 +92,7 @@ HostRuntime::~HostRuntime() noexcept {}
 // [asmjit::HostRuntime - Interface]
 // ============================================================================
 
-void HostRuntime::flush(void* p, size_t size) noexcept {
+void HostRuntime::flush(const void* p, size_t size) noexcept {
   hostFlushInstructionCache(p, size);
 }
 

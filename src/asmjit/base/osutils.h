@@ -28,8 +28,8 @@ struct VMemInfo {
 #if ASMJIT_OS_WINDOWS
   HANDLE hCurrentProcess;                //!< Handle of the current process (Windows).
 #endif // ASMJIT_OS_WINDOWS
-  size_t pageSize;                       //!< Virtual memory page-size.
-  size_t pageGranularity;                //!< Virtual memory page-granularity.
+  size_t pageSize;                       //!< Virtual memory page size.
+  size_t pageGranularity;                //!< Virtual memory page granularity.
 };
 
 // ============================================================================

@@ -234,7 +234,7 @@ struct XGetBVResult {
 //! \internal
 //!
 //! HACK: VS2008 or less, 64-bit mode - `__cpuidex` doesn't exist! However,
-//! 64-bit calling convention specifies the first parameter to be passed in
+//! 64-bit calling convention specifies the first parameter to be passed by
 //! ECX, so we may be lucky if compiler doesn't move the register, otherwise
 //! the result would be wrong.
 static void ASMJIT_NOINLINE void x86CallCpuIdWorkaround(uint32_t inEcx, uint32_t inEax, CpuIdResult* result) noexcept {

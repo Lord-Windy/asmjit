@@ -33,198 +33,13 @@ static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uin
 // [asmjit::X86RAPass - Utils]
 // ============================================================================
 
-// Getting `VarClass` is the only safe operation when dealing with denormalized
-// `varType`. Any other property would require to map typeId to regType.
-static ASMJIT_INLINE uint32_t x86TypeIdToClass(uint32_t typeId) noexcept {
-  ASMJIT_ASSERT(typeId < VirtType::kIdCount);
-  return _x86TypeData.typeInfo[typeId].getRegClass();
+static ASMJIT_INLINE uint32_t x86RegTypeToKind(uint32_t regType) noexcept {
+  ASMJIT_ASSERT(regType < X86Reg::kRegCount);
+  return x86OpData.regInfo[regType].regKind;
 }
 
 // ============================================================================
-// [asmjit::X86RAPass - Annotate]
-// ============================================================================
-
-#if !defined(ASMJIT_DISABLE_LOGGING)
-static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOptions, const Reg& r, void* handlerData) noexcept {
-  X86RAPass* self = static_cast<X86RAPass*>(handlerData);
-  X86Compiler* cc = self->cc();
-
-  uint32_t id = r.getId();
-  if (!cc->isVirtRegValid(id))
-    return DebugUtils::errored(kErrorInvalidState);
-
-  VirtReg* vreg = cc->getVirtRegById(id);
-  ASMJIT_ASSERT(vreg != nullptr);
-
-  const char* name = vreg->getName();
-  if (name && name[0] != '\0') {
-    out.appendString(name);
-  }
-  else {
-    out.appendChar('v');
-    out.appendUInt(Operand::unpackId(id));
-  }
-
-  return kErrorOk;
-}
-#endif // !ASMJIT_DISABLE_LOGGING
-
-#if defined(ASMJIT_TRACE)
-static void ASMJIT_CDECL X86RAPass_traceNode(X86RAPass* self, CBNode* node_, const char* prefix) {
-  StringBuilderTmp<256> sb;
-
-  switch (node_->getType()) {
-    case CBNode::kNodeAlign: {
-      CBAlign* node = static_cast<CBAlign*>(node_);
-      sb.appendFormat(".align %u (%s)",
-        node->getAlignment(),
-        node->getMode() == kAlignCode ? "code" : "data");
-      break;
-    }
-
-    case CBNode::kNodeData: {
-      CBData* node = static_cast<CBData*>(node_);
-      sb.appendFormat(".embed (%u bytes)", node->getSize());
-      break;
-    }
-
-    case CBNode::kNodeComment: {
-      CBComment* node = static_cast<CBComment*>(node_);
-      sb.appendFormat("; %s", node->getInlineComment());
-      break;
-    }
-
-    case CBNode::kNodeHint: {
-      CCHint* node = static_cast<CCHint*>(node_);
-      static const char* hint[16] = {
-        "alloc",
-        "spill",
-        "save",
-        "save-unuse",
-        "unuse"
-      };
-      sb.appendFormat("[%s] %s",
-        hint[node->getHint()], node->getVReg()->getName());
-      break;
-    }
-
-    case CBNode::kNodeLabel: {
-      CBLabel* node = static_cast<CBLabel*>(node_);
-      sb.appendFormat("L%u: (NumRefs=%u)", Operand::unpackId(node->getId()), node->getNumRefs());
-      break;
-    }
-
-    case CBNode::kNodeInst: {
-      CBInst* node = static_cast<CBInst*>(node_);
-      self->_formatter.formatInstruction(sb, 0,
-        node->getInstId(),
-        node->getOptions(),
-        node->getOpMask(),
-        node->getOpArray(), node->getOpCount());
-      break;
-    }
-
-    case CBNode::kNodeSentinel: {
-      CBSentinel* node = static_cast<CBSentinel*>(node_);
-      sb.appendFormat("[end]");
-      break;
-    }
-
-    case CBNode::kNodeFunc: {
-      CCFunc* node = static_cast<CCFunc*>(node_);
-      sb.appendFormat("[func]");
-      break;
-    }
-
-    case CBNode::kNodeFuncExit: {
-      CCFuncRet* node = static_cast<CCFuncRet*>(node_);
-      sb.appendFormat("[ret]");
-      break;
-    }
-
-    case CBNode::kNodeCall: {
-      CCCall* node = static_cast<CCCall*>(node_);
-      sb.appendFormat("[call]");
-      break;
-    }
-
-    case CBNode::kNodePushArg: {
-      CCPushArg* node = static_cast<CCPushArg*>(node_);
-      sb.appendFormat("[sarg]");
-      break;
-    }
-
-    default: {
-      sb.appendFormat("[unknown]");
-      break;
-    }
-  }
-
-  ASMJIT_TLOG("%s[%05u] %s\n", prefix, node_->getFlowId(), sb.getData());
-}
-#endif // ASMJIT_TRACE
-
-// ============================================================================
-// [asmjit::X86RAPass - Construction / Destruction]
-// ============================================================================
-
-X86RAPass::X86RAPass() noexcept : RAPass() {
-#if defined(ASMJIT_TRACE)
-  _traceNode = (TraceNodeFunc)X86RAPass_traceNode;
-#endif // ASMJIT_TRACE
-
-#if !defined(ASMJIT_DISABLE_LOGGING)
-  _formatter.setVirtRegHandler(X86VirtRegHandler, this);
-#endif // !ASMJIT_DISABLE_LOGGING
-
-  _state = &_x86State;
-  _varMapToVaListOffset = ASMJIT_OFFSET_OF(X86RAData, tiedArray);
-}
-X86RAPass::~X86RAPass() noexcept {}
-
-// ============================================================================
-// [asmjit::X86RAPass - Interface]
-// ============================================================================
-
-Error X86RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
-  return Base::process(cb, zone);
-}
-
-Error X86RAPass::prepare(CCFunc* func) noexcept {
-  ASMJIT_PROPAGATE(Base::prepare(func));
-
-  uint32_t archType = _cc->getArchType();
-  _regCount._gp  = archType == Arch::kTypeX86 ? 8 : 16;
-  _regCount._mm  = 8;
-  _regCount._k   = 8;
-  _regCount._xyz = archType == Arch::kTypeX86 ? 8 : 16;
-  _zsp = cc()->zsp();
-  _zbp = cc()->zbp();
-
-  _gaRegs[X86Reg::kClassGp ] = Utils::bits(_regCount.getGp()) & ~Utils::mask(X86Gp::kIdSp);
-  _gaRegs[X86Reg::kClassMm ] = Utils::bits(_regCount.getMm());
-  _gaRegs[X86Reg::kClassK  ] = Utils::bits(_regCount.getK());
-  _gaRegs[X86Reg::kClassXyz] = Utils::bits(_regCount.getXyz());
-
-  _x86State.reset(0);
-  _clobberedRegs.reset();
-
-  _stackFrameCell = nullptr;
-
-  _argBaseReg = kInvalidReg; // Used by patcher.
-  _varBaseReg = kInvalidReg; // Used by patcher.
-
-  _argBaseOffset = 0;        // Used by patcher.
-  _varBaseOffset = 0;        // Used by patcher.
-
-  _argActualDisp = 0;        // Used by translator.
-  _varActualDisp = 0;        // Used by translator.
-
-  return kErrorOk;
-}
-
-// ============================================================================
-// [asmjit::X86SpecialInst]
+// [asmjit::X86RAPass - SpecialInst]
 // ============================================================================
 
 struct X86SpecialInst {
@@ -397,522 +212,481 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
 }
 
 // ============================================================================
-// [asmjit::X86RAPass - EmitLoad]
+// [asmjit::X86RAPass - Annotate]
 // ============================================================================
 
-void X86RAPass::emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) {
-  ASMJIT_ASSERT(physId != kInvalidReg);
-  X86Mem m = getVarMem(vreg);
-
-  switch (vreg->getTypeId()) {
-    case VirtType::kIdI8      :
-    case VirtType::kIdU8      : cc()->emit(X86Inst::kIdMov   , x86::gpb_lo(physId), m); break;
-    case VirtType::kIdI16     :
-    case VirtType::kIdU16     : cc()->emit(X86Inst::kIdMov   , x86::gpw(physId), m); break;
-    case VirtType::kIdI32     :
-    case VirtType::kIdU32     : cc()->emit(X86Inst::kIdMov   , x86::gpd(physId), m); break;
-    case VirtType::kIdI64     :
-    case VirtType::kIdU64     : cc()->emit(X86Inst::kIdMov   , x86::gpq(physId), m); break;
-    case VirtType::kIdX86Mm   : cc()->emit(X86Inst::kIdMovq  , x86::mm(physId), m); break;
-    case VirtType::kIdX86XmmSs: cc()->emit(X86Inst::kIdMovss , x86::xmm(physId), m); break;
-    case VirtType::kIdX86XmmSd: cc()->emit(X86Inst::kIdMovsd , x86::xmm(physId), m); break;
-    case VirtType::kIdX86Xmm  :
-    case VirtType::kIdX86XmmPs:
-    case VirtType::kIdX86XmmPd: cc()->emit(X86Inst::kIdMovaps, x86::xmm(physId), m); break;
-
-    // Compiler doesn't manage FPU stack.
-    case VirtType::kIdF32     :
-    case VirtType::kIdF64     :
-    default                   : ASMJIT_NOT_REACHED();
-  }
-
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_dataAllocator.sformat("[%s] %s", reason, vreg->getName()));
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitSave]
-// ============================================================================
-
-void X86RAPass::emitSave(VirtReg* vreg, uint32_t physId, const char* reason) {
-  ASMJIT_ASSERT(physId != kInvalidReg);
-  X86Mem m = getVarMem(vreg);
-
-  switch (vreg->getTypeId()) {
-    case VirtType::kIdI8      :
-    case VirtType::kIdU8      : cc()->emit(X86Inst::kIdMov   , m, x86::gpb_lo(physId)); break;
-    case VirtType::kIdI16     :
-    case VirtType::kIdU16     : cc()->emit(X86Inst::kIdMov   , m, x86::gpw(physId)); break;
-    case VirtType::kIdI32     :
-    case VirtType::kIdU32     : cc()->emit(X86Inst::kIdMov   , m, x86::gpd(physId)); break;
-    case VirtType::kIdI64     :
-    case VirtType::kIdU64     : cc()->emit(X86Inst::kIdMov   , m, x86::gpq(physId)); break;
-    case VirtType::kIdX86Mm   : cc()->emit(X86Inst::kIdMovq  , m, x86::mm(physId)); break;
-    case VirtType::kIdX86XmmSs: cc()->emit(X86Inst::kIdMovss , m, x86::xmm(physId)); break;
-    case VirtType::kIdX86XmmSd: cc()->emit(X86Inst::kIdMovsd , m, x86::xmm(physId)); break;
-    case VirtType::kIdX86Xmm  :
-    case VirtType::kIdX86XmmPs:
-    case VirtType::kIdX86XmmPd: cc()->emit(X86Inst::kIdMovaps, m, x86::xmm(physId)); break;
-
-    // Compiler doesn't manage FPU stack.
-    case VirtType::kIdF32     :
-    case VirtType::kIdF64     :
-    default                   : ASMJIT_NOT_REACHED();
-  }
-
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_dataAllocator.sformat("[%s] %s", reason, vreg->getName()));
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitMove]
-// ============================================================================
-
-void X86RAPass::emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) {
-  ASMJIT_ASSERT(toPhysId != kInvalidReg);
-  ASMJIT_ASSERT(fromPhysId != kInvalidReg);
-
-  switch (vreg->getTypeId()) {
-    case VirtType::kIdI8      :
-    case VirtType::kIdU8      :
-    case VirtType::kIdI16     :
-    case VirtType::kIdU16     :
-    case VirtType::kIdI32     :
-    case VirtType::kIdU32     : cc()->emit(X86Inst::kIdMov   , x86::gpd(toPhysId), x86::gpd(fromPhysId)); break;
-    case VirtType::kIdI64     :
-    case VirtType::kIdU64     : cc()->emit(X86Inst::kIdMov   , x86::gpq(toPhysId), x86::gpq(fromPhysId)); break;
-    case VirtType::kIdX86Mm   : cc()->emit(X86Inst::kIdMovq  , x86::mm(toPhysId), x86::mm(fromPhysId)); break;
-    case VirtType::kIdX86XmmSs: cc()->emit(X86Inst::kIdMovss , x86::xmm(toPhysId), x86::xmm(fromPhysId)); break;
-    case VirtType::kIdX86XmmSd: cc()->emit(X86Inst::kIdMovsd , x86::xmm(toPhysId), x86::xmm(fromPhysId)); break;
-    case VirtType::kIdX86Xmm  :
-    case VirtType::kIdX86XmmPs:
-    case VirtType::kIdX86XmmPd: cc()->emit(X86Inst::kIdMovaps, x86::xmm(toPhysId), x86::xmm(fromPhysId)); break;
-
-    // Compiler doesn't manage FPU stack.
-    case VirtType::kIdF32     :
-    case VirtType::kIdF64     :
-    default                   : ASMJIT_NOT_REACHED();
-  }
-
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_dataAllocator.sformat("[%s] %s", reason, vreg->getName()));
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitSwap]
-// ============================================================================
-
-void X86RAPass::emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aIndex, uint32_t bIndex, const char* reason) {
-  ASMJIT_ASSERT(aIndex != kInvalidReg);
-  ASMJIT_ASSERT(bIndex != kInvalidReg);
-
-  uint32_t typeId = Utils::iMax(aVReg->getTypeId(), bVReg->getTypeId());
-  if (typeId == VirtType::kIdI64 || typeId == VirtType::kIdU64)
-    cc()->emit(X86Inst::kIdXchg, x86::gpq(aIndex), x86::gpq(bIndex));
-  else
-    cc()->emit(X86Inst::kIdXchg, x86::gpd(aIndex), x86::gpd(bIndex));
-
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_dataAllocator.sformat("[%s] %s, %s", reason, aVReg->getName(), bVReg->getName()));
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitPushSequence / EmitPopSequence]
-// ============================================================================
-
-void X86RAPass::emitPushSequence(uint32_t regMask) {
-  uint32_t i = 0;
-
-  X86Gp gpr(_zsp);
-  while (regMask != 0) {
-    ASMJIT_ASSERT(i < _regCount.getGp());
-    if ((regMask & 0x1) != 0) {
-      gpr.setId(i);
-      cc()->emit(X86Inst::kIdPush, gpr);
-    }
-    i++;
-    regMask >>= 1;
-  }
-}
-
-void X86RAPass::emitPopSequence(uint32_t regMask) {
-  if (regMask == 0) return;
-
-  uint32_t i = static_cast<int32_t>(_regCount.getGp());
-  uint32_t mask = 0x1 << static_cast<uint32_t>(i - 1);
-
-  X86Gp gpr(_zsp);
-  while (i) {
-    i--;
-    if ((regMask & mask) != 0) {
-      gpr.setId(i);
-      cc()->emit(X86Inst::kIdPop, gpr);
-    }
-    mask >>= 1;
-  }
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitConvertVarToVar]
-// ============================================================================
-
-void X86RAPass::emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uint32_t srcType, uint32_t srcIndex) {
-  switch (dstType) {
-    case VirtType::kIdI8:
-    case VirtType::kIdU8:
-    case VirtType::kIdI16:
-    case VirtType::kIdU16:
-    case VirtType::kIdI32:
-    case VirtType::kIdU32:
-    case VirtType::kIdI64:
-    case VirtType::kIdU64:
-      break;
-
-    case VirtType::kIdX86XmmPs:
-      if (srcType == VirtType::kIdX86XmmPd || srcType == VirtType::kIdX86YmmPd) {
-        cc()->emit(X86Inst::kIdCvtpd2ps, x86::xmm(dstIndex), x86::xmm(srcIndex));
-        return;
-      }
-      ASMJIT_FALLTHROUGH;
-
-    case VirtType::kIdX86XmmSs:
-      if (srcType == VirtType::kIdX86XmmSd || srcType == VirtType::kIdX86XmmPd || srcType == VirtType::kIdX86YmmPd) {
-        cc()->emit(X86Inst::kIdCvtsd2ss, x86::xmm(dstIndex), x86::xmm(srcIndex));
-        return;
-      }
-
-      if (VirtType::isIntTypeId(srcType)) {
-        // TODO: [COMPILER] Variable conversion not supported.
-        ASMJIT_NOT_REACHED();
-      }
-      break;
-
-    case VirtType::kIdX86XmmPd:
-      if (srcType == VirtType::kIdX86XmmPs || srcType == VirtType::kIdX86YmmPs) {
-        cc()->emit(X86Inst::kIdCvtps2pd, x86::xmm(dstIndex), x86::xmm(srcIndex));
-        return;
-      }
-      ASMJIT_FALLTHROUGH;
-
-    case VirtType::kIdX86XmmSd:
-      if (srcType == VirtType::kIdX86XmmSs || srcType == VirtType::kIdX86XmmPs || srcType == VirtType::kIdX86YmmPs) {
-        cc()->emit(X86Inst::kIdCvtss2sd, x86::xmm(dstIndex), x86::xmm(srcIndex));
-        return;
-      }
-
-      if (VirtType::isIntTypeId(srcType)) {
-        // TODO: [COMPILER] Variable conversion not supported.
-        ASMJIT_NOT_REACHED();
-      }
-      break;
-  }
-}
-
-// ============================================================================
-// [asmjit::X86RAPass - EmitMoveVarOnStack / EmitMoveImmOnStack]
-// ============================================================================
-
-void X86RAPass::emitMoveVarOnStack(
-  uint32_t dstType, const X86Mem* dst,
-  uint32_t srcType, uint32_t srcIndex) {
-
-  ASMJIT_ASSERT(srcIndex != kInvalidReg);
-
-  X86Mem m0(*dst);
-  X86Reg r0, r1;
-
-  uint32_t gpSize = cc()->getGpSize();
-  uint32_t instId;
-
-  switch (dstType) {
-    case VirtType::kIdI8:
-    case VirtType::kIdU8:
-      // Move DWORD (GP).
-      if (VirtType::isIntTypeId(srcType)) goto _MovGpD;
-
-      // Move DWORD (MMX).
-      if (srcType == VirtType::kIdX86Mm) goto _MovMmD;
-
-      // Move DWORD (XMM).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Xmm, VirtType::kIdX86XmmPd)) goto _MovXmmD;
-      break;
-
-    case VirtType::kIdI16:
-    case VirtType::kIdU16:
-      // Extend BYTE->WORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI8, VirtType::kIdU8)) {
-        r1.setX86RegT<X86Reg::kRegGpbLo>(srcIndex);
-
-        instId = (dstType == VirtType::kIdI16 && srcType == VirtType::kIdI8) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
-        goto _ExtendMovGpD;
-      }
-
-      // Move DWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI16, VirtType::kIdU64))
-        goto _MovGpD;
-
-      // Move DWORD (MMX).
-      if (srcType == VirtType::kIdX86Mm)
-        goto _MovMmD;
-
-      // Move DWORD (XMM).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Xmm, VirtType::kIdX86XmmPd))
-        goto _MovXmmD;
-      break;
-
-    case VirtType::kIdI32:
-    case VirtType::kIdU32:
-      // Extend BYTE->DWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI8, VirtType::kIdU8)) {
-        r1.setX86RegT<X86Reg::kRegGpbLo>(srcIndex);
-
-        instId = (dstType == VirtType::kIdI32 && srcType == VirtType::kIdI8) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
-        goto _ExtendMovGpD;
-      }
-
-      // Extend WORD->DWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI16, VirtType::kIdU16)) {
-        r1.setX86RegT<X86Reg::kRegGpw>(srcIndex);
-
-        instId = (dstType == VirtType::kIdI32 && srcType == VirtType::kIdI16) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
-        goto _ExtendMovGpD;
-      }
-
-      // Move DWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI32, VirtType::kIdU64))
-        goto _MovGpD;
-
-      // Move DWORD (MMX).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Mm, VirtType::kIdX86Mm))
-        goto _MovMmD;
-
-      // Move DWORD (XMM).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Xmm, VirtType::kIdX86XmmPd))
-        goto _MovXmmD;
-      break;
-
-    case VirtType::kIdI64:
-    case VirtType::kIdU64:
-      // Extend BYTE->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI8, VirtType::kIdU8)) {
-        r1.setX86RegT<X86Reg::kRegGpbLo>(srcIndex);
-
-        instId = (dstType == VirtType::kIdI64 && srcType == VirtType::kIdI8) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
-        goto _ExtendMovGpXQ;
-      }
-
-      // Extend WORD->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI16, VirtType::kIdU16)) {
-        r1.setX86RegT<X86Reg::kRegGpw>(srcIndex);
-
-        instId = (dstType == VirtType::kIdI64 && srcType == VirtType::kIdI16) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
-        goto _ExtendMovGpXQ;
-      }
-
-      // Extend DWORD->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI32, VirtType::kIdU32)) {
-        r1.setX86RegT<X86Reg::kRegGpd>(srcIndex);
-
-        instId = X86Inst::kIdMovsxd;
-        if (dstType == VirtType::kIdI64 && srcType == VirtType::kIdI32)
-          goto _ExtendMovGpXQ;
-        else
-          goto _ZeroExtendGpDQ;
-      }
-
-      // Move QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI64, VirtType::kIdU64))
-        goto _MovGpQ;
-
-      // Move QWORD (MMX).
-      if (srcType == VirtType::kIdX86Mm)
-        goto _MovMmQ;
-
-      // Move QWORD (XMM).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Xmm, VirtType::kIdX86XmmPd))
-        goto _MovXmmQ;
-      break;
-
-    case VirtType::kIdX86Mm:
-      // Extend BYTE->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI8, VirtType::kIdU8)) {
-        r1.setX86RegT<X86Reg::kRegGpbLo>(srcIndex);
-
-        instId = X86Inst::kIdMovzx;
-        goto _ExtendMovGpXQ;
-      }
-
-      // Extend WORD->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI16, VirtType::kIdU16)) {
-        r1.setX86RegT<X86Reg::kRegGpw>(srcIndex);
-
-        instId = X86Inst::kIdMovzx;
-        goto _ExtendMovGpXQ;
-      }
-
-      // Extend DWORD->QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI32, VirtType::kIdU32))
-        goto _ExtendMovGpDQ;
-
-      // Move QWORD (GP).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdI64, VirtType::kIdU64))
-        goto _MovGpQ;
-
-      // Move QWORD (MMX).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Mm, VirtType::kIdX86Mm))
-        goto _MovMmQ;
-
-      // Move QWORD (XMM).
-      if (Utils::inInterval<uint32_t>(srcType, VirtType::kIdX86Xmm, VirtType::kIdX86XmmPd))
-        goto _MovXmmQ;
-      break;
-
-    case VirtType::kIdF32:
-    case VirtType::kIdX86XmmSs:
-      // Move FLOAT.
-      if (srcType == VirtType::kIdX86XmmSs || srcType == VirtType::kIdX86XmmPs || srcType == VirtType::kIdX86Xmm)
-        goto _MovXmmD;
-
-      ASMJIT_NOT_REACHED();
-      break;
-
-    case VirtType::kIdF64:
-    case VirtType::kIdX86XmmSd:
-      // Move DOUBLE.
-      if (srcType == VirtType::kIdX86XmmSd || srcType == VirtType::kIdX86XmmPd || srcType == VirtType::kIdX86Xmm)
-        goto _MovXmmQ;
-
-      ASMJIT_NOT_REACHED();
-      break;
-
-    case VirtType::kIdX86Xmm:
-      // TODO: [COMPILER].
-      ASMJIT_NOT_REACHED();
-      break;
-
-    case VirtType::kIdX86XmmPs:
-      // TODO: [COMPILER].
-      ASMJIT_NOT_REACHED();
-      break;
-
-    case VirtType::kIdX86XmmPd:
-      // TODO: [COMPILER].
-      ASMJIT_NOT_REACHED();
-      break;
-  }
-  return;
-
-  // Extend+Move Gp.
-_ExtendMovGpD:
-  m0.setSize(4);
-  r0.setX86RegT<X86Reg::kRegGpd>(srcIndex);
-
-  cc()->emit(instId, r0, r1);
-  cc()->emit(X86Inst::kIdMov, m0, r0);
-  return;
-
-_ExtendMovGpXQ:
-  if (gpSize == 8) {
-    m0.setSize(8);
-    r0.setX86RegT<X86Reg::kRegGpq>(srcIndex);
-
-    cc()->emit(instId, r0, r1);
-    cc()->emit(X86Inst::kIdMov, m0, r0);
+#if !defined(ASMJIT_DISABLE_LOGGING)
+static Error ASMJIT_CDECL X86VirtRegHandler(StringBuilder& out, uint32_t logOptions, const Reg& r, void* handlerData) noexcept {
+  X86RAPass* self = static_cast<X86RAPass*>(handlerData);
+  X86Compiler* cc = self->cc();
+
+  uint32_t id = r.getId();
+  if (!cc->isVirtRegValid(id))
+    return DebugUtils::errored(kErrorInvalidState);
+
+  VirtReg* vreg = cc->getVirtRegById(id);
+  ASMJIT_ASSERT(vreg != nullptr);
+
+  const char* name = vreg->getName();
+  if (name && name[0] != '\0') {
+    out.appendString(name);
   }
   else {
-    m0.setSize(4);
-    r0.setX86RegT<X86Reg::kRegGpd>(srcIndex);
-
-    cc()->emit(instId, r0, r1);
-
-_ExtendMovGpDQ:
-    cc()->emit(X86Inst::kIdMov, m0, r0);
-    m0.addOffsetLo32(4);
-    cc()->emit(X86Inst::kIdAnd, m0, 0);
+    out.appendChar('v');
+    out.appendUInt(Operand::unpackId(id));
   }
-  return;
 
-_ZeroExtendGpDQ:
-  m0.setSize(4);
-  r0.setX86RegT<X86Reg::kRegGpd>(srcIndex);
-  goto _ExtendMovGpDQ;
+  return kErrorOk;
+}
+#endif // !ASMJIT_DISABLE_LOGGING
 
-  // Move Gp.
-_MovGpD:
-  m0.setSize(4);
-  r0.setX86RegT<X86Reg::kRegGpd>(srcIndex);
-  cc()->emit(X86Inst::kIdMov, m0, r0);
-  return;
+#if defined(ASMJIT_TRACE)
+static void ASMJIT_CDECL X86RAPass_traceNode(X86RAPass* self, CBNode* node_, const char* prefix) {
+  StringBuilderTmp<256> sb;
 
-_MovGpQ:
-  m0.setSize(8);
-  r0.setX86RegT<X86Reg::kRegGpq>(srcIndex);
-  cc()->emit(X86Inst::kIdMov, m0, r0);
-  return;
+  switch (node_->getType()) {
+    case CBNode::kNodeAlign: {
+      CBAlign* node = static_cast<CBAlign*>(node_);
+      sb.appendFormat(".align %u (%s)",
+        node->getAlignment(),
+        node->getMode() == kAlignCode ? "code" : "data");
+      break;
+    }
 
-  // Move Mm.
-_MovMmD:
-  m0.setSize(4);
-  r0.setX86RegT<X86Reg::kRegMm>(srcIndex);
-  cc()->emit(X86Inst::kIdMovd, m0, r0);
-  return;
+    case CBNode::kNodeData: {
+      CBData* node = static_cast<CBData*>(node_);
+      sb.appendFormat(".embed (%u bytes)", node->getSize());
+      break;
+    }
 
-_MovMmQ:
-  m0.setSize(8);
-  r0.setX86RegT<X86Reg::kRegMm>(srcIndex);
-  cc()->emit(X86Inst::kIdMovq, m0, r0);
-  return;
+    case CBNode::kNodeComment: {
+      CBComment* node = static_cast<CBComment*>(node_);
+      sb.appendFormat("; %s", node->getInlineComment());
+      break;
+    }
 
-  // Move XMM.
-_MovXmmD:
-  m0.setSize(4);
-  r0.setX86RegT<X86Reg::kRegXmm>(srcIndex);
-  cc()->emit(X86Inst::kIdMovss, m0, r0);
-  return;
+    case CBNode::kNodeHint: {
+      CCHint* node = static_cast<CCHint*>(node_);
+      static const char* hint[16] = {
+        "alloc",
+        "spill",
+        "save",
+        "save-unuse",
+        "unuse"
+      };
+      sb.appendFormat("[%s] %s",
+        hint[node->getHint()], node->getVReg()->getName());
+      break;
+    }
 
-_MovXmmQ:
-  m0.setSize(8);
-  r0.setX86RegT<X86Reg::kRegXmm>(srcIndex);
-  cc()->emit(X86Inst::kIdMovlps, m0, r0);
+    case CBNode::kNodeLabel: {
+      CBLabel* node = static_cast<CBLabel*>(node_);
+      sb.appendFormat("L%u: (NumRefs=%u)", Operand::unpackId(node->getId()), node->getNumRefs());
+      break;
+    }
+
+    case CBNode::kNodeInst: {
+      CBInst* node = static_cast<CBInst*>(node_);
+      self->_formatter.formatInstruction(sb, 0,
+        node->getInstId(),
+        node->getOptions(),
+        node->getOpExtra(),
+        node->getOpArray(), node->getOpCount());
+      break;
+    }
+
+    case CBNode::kNodeSentinel: {
+      CBSentinel* node = static_cast<CBSentinel*>(node_);
+      sb.appendFormat("[end]");
+      break;
+    }
+
+    case CBNode::kNodeFunc: {
+      CCFunc* node = static_cast<CCFunc*>(node_);
+      sb.appendFormat("[func]");
+      break;
+    }
+
+    case CBNode::kNodeFuncExit: {
+      CCFuncRet* node = static_cast<CCFuncRet*>(node_);
+      sb.appendFormat("[ret]");
+      break;
+    }
+
+    case CBNode::kNodeCall: {
+      CCCall* node = static_cast<CCCall*>(node_);
+      sb.appendFormat("[call]");
+      break;
+    }
+
+    case CBNode::kNodePushArg: {
+      CCPushArg* node = static_cast<CCPushArg*>(node_);
+      sb.appendFormat("[sarg]");
+      break;
+    }
+
+    default: {
+      sb.appendFormat("[unknown]");
+      break;
+    }
+  }
+
+  ASMJIT_TLOG("%s[%05u] %s\n", prefix, node_->getFlowId(), sb.getData());
+}
+#endif // ASMJIT_TRACE
+
+// ============================================================================
+// [asmjit::X86RAPass - Construction / Destruction]
+// ============================================================================
+
+X86RAPass::X86RAPass() noexcept : RAPass() {
+#if defined(ASMJIT_TRACE)
+  _traceNode = (TraceNodeFunc)X86RAPass_traceNode;
+#endif // ASMJIT_TRACE
+
+#if !defined(ASMJIT_DISABLE_LOGGING)
+  _formatter.setVirtRegHandler(X86VirtRegHandler, this);
+#endif // !ASMJIT_DISABLE_LOGGING
+
+  _state = &_x86State;
+  _varMapToVaListOffset = ASMJIT_OFFSET_OF(X86RAData, tiedArray);
+}
+X86RAPass::~X86RAPass() noexcept {}
+
+// ============================================================================
+// [asmjit::X86RAPass - Interface]
+// ============================================================================
+
+Error X86RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
+  return Base::process(cb, zone);
 }
 
-void X86RAPass::emitMoveImmOnStack(uint32_t dstType, const X86Mem* dst, const Imm* src) {
+Error X86RAPass::prepare(CCFunc* func) noexcept {
+  ASMJIT_PROPAGATE(Base::prepare(func));
+
+  uint32_t archType = _cc->getArchType();
+  _regCount._gp  = archType == Arch::kTypeX86 ? 8 : 16;
+  _regCount._mm  = 8;
+  _regCount._k   = 8;
+  _regCount._xyz = archType == Arch::kTypeX86 ? 8 : 16;
+  _zsp = cc()->zsp();
+  _zbp = cc()->zbp();
+
+  _gaRegs[X86Reg::kKindGp ] = Utils::bits(_regCount.getGp()) & ~Utils::mask(X86Gp::kIdSp);
+  _gaRegs[X86Reg::kKindMm ] = Utils::bits(_regCount.getMm());
+  _gaRegs[X86Reg::kKindK  ] = Utils::bits(_regCount.getK());
+  _gaRegs[X86Reg::kKindXyz] = Utils::bits(_regCount.getXyz());
+
+  _x86State.reset(0);
+  _clobberedRegs.reset();
+
+  _stackFrameCell = nullptr;
+
+  _useAVX = false;
+  _argBaseReg = kInvalidReg; // Used by patcher.
+  _varBaseReg = kInvalidReg; // Used by patcher.
+
+  _argBaseOffset = 0;        // Used by patcher.
+  _varBaseOffset = 0;        // Used by patcher.
+
+  _argActualDisp = 0;        // Used by translator.
+  _varActualDisp = 0;        // Used by translator.
+
+  return kErrorOk;
+}
+
+// ============================================================================
+// [asmjit::X86RAPass - Emit]
+// ============================================================================
+
+Error X86RAPass::emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) noexcept {
+  ASMJIT_ASSERT(physId != kInvalidReg);
+
+  X86Reg dst = X86Reg(Init, vreg->getSignature(), physId);
+  X86Mem src = getVarMem(vreg);
+
+  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
+  if (_emitComments)
+    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
+  return kErrorOk;
+}
+
+Error X86RAPass::emitSave(VirtReg* vreg, uint32_t physId, const char* reason) noexcept {
+  ASMJIT_ASSERT(physId != kInvalidReg);
+
+  X86Mem dst = getVarMem(vreg);
+  X86Reg src = X86Reg(Init, vreg->getSignature(), physId);
+
+  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
+  if (_emitComments)
+    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
+  return kErrorOk;
+}
+
+Error X86RAPass::emitMove(VirtReg* vreg, uint32_t dstPhysId, uint32_t srcPhysId, const char* reason) noexcept {
+  ASMJIT_ASSERT(dstPhysId != kInvalidReg);
+  ASMJIT_ASSERT(srcPhysId != kInvalidReg);
+
+  X86Reg dst = X86Reg(Init, vreg->getSignature(), dstPhysId);
+  X86Reg src = X86Reg(Init, vreg->getSignature(), srcPhysId);
+
+  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
+  if (_emitComments)
+    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
+  return kErrorOk;
+}
+
+Error X86RAPass::emitRegOp(Operand_& dst, Operand_& src, uint32_t typeId) noexcept {
+  uint32_t instId = 0;
+  bool isMem = dst.isMem() || src.isMem();
+
+  switch (typeId) {
+    case TypeId::kI8:
+    case TypeId::kU8:
+    case TypeId::kI16:
+    case TypeId::kU16:
+      if (src.isMem()) {
+        // Use movzx and change the destination register to GPD (safer, no dependencies).
+        dst.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
+        instId = X86Inst::kIdMovzx;
+      }
+      else if (!dst.isMem()) {
+        // Change both destination and source registers to GPD (safer, no dependencies).
+        dst.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
+        src.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
+      }
+      ASMJIT_FALLTHROUGH;
+
+    case TypeId::kI32:
+    case TypeId::kU32:
+    case TypeId::kI64:
+    case TypeId::kU64: instId = X86Inst::kIdMov; break;
+
+    case TypeId::kMask8: instId = X86Inst::kIdKmovb; break;
+    case TypeId::kMask16: instId = X86Inst::kIdKmovw; break;
+    case TypeId::kMask32: instId = X86Inst::kIdKmovd; break;
+    case TypeId::kMask64: instId = X86Inst::kIdKmovq; break;
+
+    case TypeId::kMmx32:
+      if (isMem) {
+        instId = X86Inst::kIdMovd;
+        break;
+      }
+      ASMJIT_FALLTHROUGH;
+
+    case TypeId::kMmx64:
+      instId = X86Inst::kIdMovq;
+      break;
+
+    default: {
+      uint32_t eId = TypeId::elementOf(typeId);
+      if (TypeId::isVec32(typeId) && isMem) {
+        if (eId == TypeId::kF32)
+          instId = _useAVX ? X86Inst::kIdVmovss : X86Inst::kIdMovss;
+        else
+          instId = _useAVX ? X86Inst::kIdVmovd : X86Inst::kIdMovd;
+        break;
+      }
+
+      if (TypeId::isVec64(typeId) && isMem) {
+        if (eId == TypeId::kF32)
+          instId = _useAVX ? X86Inst::kIdVmovsd : X86Inst::kIdMovsd;
+        else
+          instId = _useAVX ? X86Inst::kIdVmovq : X86Inst::kIdMovq;
+        break;
+      }
+
+      if (eId == TypeId::kF32)
+        instId = _useAVX ? X86Inst::kIdVmovaps : X86Inst::kIdMovaps;
+      else if (eId == TypeId::kF64)
+        instId = _useAVX ? X86Inst::kIdVmovapd : X86Inst::kIdMovapd;
+      else
+        instId = _useAVX ? X86Inst::kIdVmovdqa : X86Inst::kIdMovdqa;
+      break;
+    }
+  }
+
+  if (!instId)
+    return DebugUtils::errored(kErrorInvalidState);
+
+  return cc()->emit(instId, dst, src);
+}
+
+Error X86RAPass::emitCvtOp(VirtReg* dst, uint32_t dstPhysId, VirtReg* src, uint32_t srcPhysId) noexcept {
+  uint32_t cvtOp = (dst->getTypeId() << 8) | src->getTypeId();
+  uint32_t instId = 0;
+
+  X86Reg dstReg = X86Reg::fromTypeAndId(dst->getRegType(), dstPhysId);
+  X86Reg srcReg = X86Reg::fromTypeAndId(src->getRegType(), srcPhysId);
+
+  switch (cvtOp) {
+    case ((TypeId::kI16 << 8) | TypeId::kI8 ):
+    case ((TypeId::kI32 << 8) | TypeId::kI8 ):
+    case ((TypeId::kI32 << 8) | TypeId::kI16):
+    case ((TypeId::kI64 << 8) | TypeId::kI8 ):
+    case ((TypeId::kI16 << 8) | TypeId::kI16):
+      instId = X86Inst::kIdMovsx;
+      break;
+
+    case ((TypeId::kI64 << 8) | TypeId::kI32):
+      instId = X86Inst::kIdMovsxd;
+      break;
+
+    case ((TypeId::kU16 << 8) | TypeId::kI8 ):
+    case ((TypeId::kU16 << 8) | TypeId::kU8 ):
+    case ((TypeId::kU32 << 8) | TypeId::kI8 ):
+    case ((TypeId::kU32 << 8) | TypeId::kU8 ):
+    case ((TypeId::kU32 << 8) | TypeId::kI16):
+    case ((TypeId::kU32 << 8) | TypeId::kU16):
+      instId = X86Inst::kIdMovzx;
+      break;
+
+    // Convert to a 32-bit 'movzx'.
+    case ((TypeId::kU64 << 8) | TypeId::kI8 ):
+    case ((TypeId::kU64 << 8) | TypeId::kU8 ):
+    case ((TypeId::kU64 << 8) | TypeId::kI16):
+    case ((TypeId::kU64 << 8) | TypeId::kU16):
+      dstReg.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
+      instId = X86Inst::kIdMovzx;
+      break;
+
+    // Convert to a 32-bit 'mov', which zero extends for free.
+    case ((TypeId::kU64 << 8) | TypeId::kI32):
+    case ((TypeId::kU64 << 8) | TypeId::kU32):
+      dstReg.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
+      instId = X86Inst::kIdMov;
+      break;
+
+    // Scalar double to float.
+    case ((TypeId::kF32x1 << 8) | TypeId::kF64x1):
+      instId = _useAVX ? X86Inst::kIdCvtsd2ss : X86Inst::kIdVcvtsd2ss;
+      break;
+
+    // Scalar float to double.
+    case ((TypeId::kF64x1 << 8) | TypeId::kF32x1):
+      instId = _useAVX ? X86Inst::kIdCvtss2sd : X86Inst::kIdVcvtss2sd;
+      break;
+  }
+
+  if (!instId) return kErrorOk;
+  return cc()->emit(instId, dstReg, srcReg);
+}
+
+Error X86RAPass::emitSwapGp(VirtReg* dstReg, VirtReg* srcReg, uint32_t dstPhysId, uint32_t srcPhysId, const char* reason) noexcept {
+  ASMJIT_ASSERT(dstPhysId != kInvalidReg);
+  ASMJIT_ASSERT(srcPhysId != kInvalidReg);
+
+  uint32_t is64 = Utils::iMax(dstReg->getTypeId(), srcReg->getTypeId()) >= TypeId::kI64;
+  uint32_t sign = is64 ? uint32_t(X86RegTraits<X86Reg::kRegGpd>::kSignature)
+                       : uint32_t(X86RegTraits<X86Reg::kRegGpq>::kSignature);
+
+  X86Reg a = X86Reg(Init, sign, dstPhysId);
+  X86Reg b = X86Reg(Init, sign, srcPhysId);
+
+  ASMJIT_PROPAGATE(cc()->emit(X86Inst::kIdXchg, a, b));
+  if (_emitComments)
+    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s, %s", reason, dstReg->getName(), srcReg->getName()));
+  return kErrorOk;
+}
+
+Error X86RAPass::emitImmToReg(uint32_t dstTypeId, uint32_t dstPhysId, const Imm* src) noexcept {
+  ASMJIT_ASSERT(dstPhysId != kInvalidReg);
+
+  X86Reg r0;
+  Imm imm(*src);
+
+  switch (dstTypeId) {
+    case TypeId::kI8:
+    case TypeId::kU8:
+      imm.truncateTo8Bits();
+      ASMJIT_FALLTHROUGH;
+
+    case TypeId::kI16:
+    case TypeId::kU16:
+      imm.truncateTo16Bits();
+      ASMJIT_FALLTHROUGH;
+
+    case TypeId::kI32:
+    case TypeId::kU32:
+Mov32Truncate:
+      imm.truncateTo32Bits();
+Mov32:
+      r0.setX86RegT<X86Reg::kRegGpd>(dstPhysId);
+      cc()->emit(X86Inst::kIdMov, r0, imm);
+      break;
+
+    case TypeId::kI64:
+    case TypeId::kU64:
+      // Move to GPD register will also clear the high DWORD of GPQ
+      // register in 64-bit mode.
+      if (imm.isUInt32())
+        goto Mov32Truncate;
+
+      r0.setX86RegT<X86Reg::kRegGpq>(dstPhysId);
+      cc()->emit(X86Inst::kIdMov, r0, imm);
+      break;
+
+    case TypeId::kF32:
+    case TypeId::kF64:
+      // Compiler doesn't manage FPU stack.
+      ASMJIT_NOT_REACHED();
+      break;
+
+    case TypeId::kMmx32:
+    case TypeId::kMmx64:
+      // TODO: [COMPILER] EmitMoveImmToReg.
+      break;
+
+    default:
+      // TODO: [COMPILER] EmitMoveImmToReg.
+      break;
+  }
+
+  return kErrorOk;
+}
+
+Error X86RAPass::emitImmToStack(uint32_t dstTypeId, const X86Mem* dst, const Imm* src) noexcept {
   X86Mem mem(*dst);
   Imm imm(*src);
 
+  // One stack entry has the same size as the native register size. That means
+  // that if we want to move a 32-bit integer on the stack in 64-bit mode, we
+  // need to extend it to a 64-bit integer first. In 32-bit mode, pushing a
+  // 64-bit on stack is done in two steps by pushing low and high parts
+  // separately.
   uint32_t gpSize = cc()->getGpSize();
 
-  // One stack entry is equal to the native register size. That means that if
-  // we want to move 32-bit integer on the stack, we need to extend it to 64-bit
-  // integer.
-  mem.setSize(gpSize);
-
-  switch (dstType) {
-    case VirtType::kIdI8:
-    case VirtType::kIdU8:
+  switch (dstTypeId) {
+    case TypeId::kI8:
+    case TypeId::kU8:
       imm.truncateTo8Bits();
-      goto _Move32;
+      ASMJIT_FALLTHROUGH;
 
-    case VirtType::kIdI16:
-    case VirtType::kIdU16:
+    case TypeId::kI16:
+    case TypeId::kU16:
       imm.truncateTo16Bits();
-      goto _Move32;
+      ASMJIT_FALLTHROUGH;
 
-    case VirtType::kIdI32:
-    case VirtType::kIdU32:
-_Move32:
+    case TypeId::kI32:
+    case TypeId::kU32:
+    case TypeId::kF32:
+      mem.setSize(4);
       imm.truncateTo32Bits();
       cc()->emit(X86Inst::kIdMov, mem, imm);
       break;
 
-    case VirtType::kIdI64:
-    case VirtType::kIdU64:
-_Move64:
+    case TypeId::kI64:
+    case TypeId::kU64:
+    case TypeId::kF64:
+    case TypeId::kMmx32:
+    case TypeId::kMmx64:
       if (gpSize == 4) {
         uint32_t hi = imm.getUInt32Hi();
 
         // Lo-Part.
+        mem.setSize(4);
         imm.truncateTo32Bits();
+
         cc()->emit(X86Inst::kIdMov, mem, imm);
         mem.addOffsetLo32(gpSize);
 
@@ -921,124 +695,238 @@ _Move64:
         cc()->emit(X86Inst::kIdMov, mem, imm);
       }
       else {
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-      }
-      break;
-
-    case VirtType::kIdF32:
-      goto _Move32;
-
-    case VirtType::kIdF64:
-      goto _Move64;
-
-    case VirtType::kIdX86Mm:
-      goto _Move64;
-
-    case VirtType::kIdX86Xmm:
-    case VirtType::kIdX86XmmSs:
-    case VirtType::kIdX86XmmPs:
-    case VirtType::kIdX86XmmSd:
-    case VirtType::kIdX86XmmPd:
-      if (gpSize == 4) {
-        uint32_t hi = imm.getUInt32Hi();
-
-        // Lo part.
-        imm.truncateTo32Bits();
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-        mem.addOffsetLo32(gpSize);
-
-        // Hi part.
-        imm.setUInt32(hi);
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-        mem.addOffsetLo32(gpSize);
-
-        // Zero part.
-        imm.setUInt32(0);
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-        mem.addOffsetLo32(gpSize);
-
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-      }
-      else {
-        // Lo/Hi parts.
-        cc()->emit(X86Inst::kIdMov, mem, imm);
-        mem.addOffsetLo32(gpSize);
-
-        // Zero part.
-        imm.setUInt32(0);
+        mem.setSize(8);
         cc()->emit(X86Inst::kIdMov, mem, imm);
       }
       break;
 
     default:
-      ASMJIT_NOT_REACHED();
-      break;
+      return DebugUtils::errored(kErrorInvalidState);
   }
+
+  return kErrorOk;
 }
 
-// ============================================================================
-// [asmjit::X86RAPass - EmitMoveImmToReg]
-// ============================================================================
+Error X86RAPass::emitRegToStack(uint32_t dstTypeId, const X86Mem* dst, uint32_t srcTypeId, uint32_t srcPhysId) noexcept {
+  ASMJIT_ASSERT(srcPhysId != kInvalidReg);
 
-void X86RAPass::emitMoveImmToReg(uint32_t dstType, uint32_t dstIndex, const Imm* src) {
-  ASMJIT_ASSERT(dstIndex != kInvalidReg);
+  X86Mem m0(*dst);
+  X86Reg r0, r1;
 
-  X86Reg r0;
-  Imm imm(*src);
+  uint32_t gpSize = cc()->getGpSize();
+  uint32_t instId = 0;
 
-  switch (dstType) {
-    case VirtType::kIdI8:
-    case VirtType::kIdU8:
-      imm.truncateTo8Bits();
-      goto _Move32;
+  switch (dstTypeId) {
+    case TypeId::kI64:
+    case TypeId::kU64:
+      // Extend BYTE->QWORD (GP).
+      if (TypeId::isGpb(srcTypeId)) {
+        r1.setX86RegT<X86Reg::kRegGpbLo>(srcPhysId);
 
-    case VirtType::kIdI16:
-    case VirtType::kIdU16:
-      imm.truncateTo16Bits();
-      goto _Move32;
+        instId = (dstTypeId == TypeId::kI64 && srcTypeId == TypeId::kI8) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
+        goto _ExtendMovGpXQ;
+      }
 
-    case VirtType::kIdI32:
-    case VirtType::kIdU32:
-_Move32Truncate:
-      imm.truncateTo32Bits();
-_Move32:
-      r0.setX86RegT<X86Reg::kRegGpd>(dstIndex);
-      cc()->emit(X86Inst::kIdMov, r0, imm);
+      // Extend WORD->QWORD (GP).
+      if (TypeId::isGpw(srcTypeId)) {
+        r1.setX86RegT<X86Reg::kRegGpw>(srcPhysId);
+
+        instId = (dstTypeId == TypeId::kI64 && srcTypeId == TypeId::kI16) ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
+        goto _ExtendMovGpXQ;
+      }
+
+      // Extend DWORD->QWORD (GP).
+      if (TypeId::isGpd(srcTypeId)) {
+        r1.setX86RegT<X86Reg::kRegGpd>(srcPhysId);
+
+        instId = X86Inst::kIdMovsxd;
+        if (dstTypeId == TypeId::kI64 && srcTypeId == TypeId::kI32)
+          goto _ExtendMovGpXQ;
+        else
+          goto _ZeroExtendGpDQ;
+      }
+
+      // Move QWORD (GP).
+      if (TypeId::isGpq(srcTypeId)) goto MovGpQ;
+      if (TypeId::isMmx(srcTypeId)) goto MovMmQ;
+      if (TypeId::isVec(srcTypeId)) goto MovXmmQ;
       break;
 
-    case VirtType::kIdI64:
-    case VirtType::kIdU64:
-      // Move to GPD register will also clear high DWORD of GPQ register in
-      // 64-bit mode.
-      if (imm.isUInt32())
-        goto _Move32Truncate;
+    case TypeId::kI32:
+    case TypeId::kU32:
+    case TypeId::kI16:
+    case TypeId::kU16:
+      // DWORD <- WORD (Zero|Sign Extend).
+      if (TypeId::isGpw(srcTypeId)) {
+        bool isDstSigned = dstTypeId == TypeId::kI16 || dstTypeId == TypeId::kI32;
+        bool isSrcSigned = srcTypeId == TypeId::kI8  || srcTypeId == TypeId::kI16;
 
-      r0.setX86RegT<X86Reg::kRegGpq>(dstIndex);
-      cc()->emit(X86Inst::kIdMov, r0, imm);
+        r1.setX86RegT<X86Reg::kRegGpw>(srcPhysId);
+        instId = isDstSigned && isSrcSigned ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
+        goto _ExtendMovGpD;
+      }
+
+      // DWORD <- BYTE (Zero|Sign Extend).
+      if (TypeId::isGpb(srcTypeId)) {
+        bool isDstSigned = dstTypeId == TypeId::kI16 || dstTypeId == TypeId::kI32;
+        bool isSrcSigned = srcTypeId == TypeId::kI8  || srcTypeId == TypeId::kI16;
+
+        r1.setX86RegT<X86Reg::kRegGpbLo>(srcPhysId);
+        instId = isDstSigned && isSrcSigned ? X86Inst::kIdMovsx : X86Inst::kIdMovzx;
+        goto _ExtendMovGpD;
+      }
+      ASMJIT_FALLTHROUGH;
+
+    case TypeId::kI8:
+    case TypeId::kU8:
+      if (TypeId::isInt(srcTypeId)) goto MovGpD;
+      if (TypeId::isMmx(srcTypeId)) goto MovMmD;
+      if (TypeId::isVec(srcTypeId)) goto MovXmmD;
       break;
 
-    case VirtType::kIdF32:
-    case VirtType::kIdF64:
-      // cc() doesn't manage FPU stack.
-      ASMJIT_NOT_REACHED();
+    case TypeId::kMmx32:
+    case TypeId::kMmx64:
+      // Extend BYTE->QWORD (GP).
+      if (TypeId::isGpb(srcTypeId)) {
+        r1.setX86RegT<X86Reg::kRegGpbLo>(srcPhysId);
+
+        instId = X86Inst::kIdMovzx;
+        goto _ExtendMovGpXQ;
+      }
+
+      // Extend WORD->QWORD (GP).
+      if (TypeId::isGpw(srcTypeId)) {
+        r1.setX86RegT<X86Reg::kRegGpw>(srcPhysId);
+
+        instId = X86Inst::kIdMovzx;
+        goto _ExtendMovGpXQ;
+      }
+
+      if (TypeId::isGpd(srcTypeId)) goto _ExtendMovGpDQ;
+      if (TypeId::isGpq(srcTypeId)) goto MovGpQ;
+      if (TypeId::isMmx(srcTypeId)) goto MovMmQ;
+      if (TypeId::isVec(srcTypeId)) goto MovXmmQ;
       break;
 
-    case VirtType::kIdX86Mm:
-      // TODO: [COMPILER] EmitMoveImmToReg.
+    case TypeId::kF32:
+    case TypeId::kF32x1:
+      if (TypeId::isVec(srcTypeId)) goto MovXmmD;
       break;
 
-    case VirtType::kIdX86Xmm:
-    case VirtType::kIdX86XmmSs:
-    case VirtType::kIdX86XmmSd:
-    case VirtType::kIdX86XmmPs:
-    case VirtType::kIdX86XmmPd:
-      // TODO: [COMPILER] EmitMoveImmToReg.
+    case TypeId::kF64:
+    case TypeId::kF64x1:
+      if (TypeId::isVec(srcTypeId)) goto MovXmmQ;
       break;
 
     default:
-      ASMJIT_NOT_REACHED();
+      // TODO: Vector types by stack.
       break;
   }
+  return DebugUtils::errored(kErrorInvalidState);
+
+  // Extend+Move Gp.
+_ExtendMovGpD:
+  m0.setSize(4);
+  r0.setX86RegT<X86Reg::kRegGpd>(srcPhysId);
+
+  cc()->emit(instId, r0, r1);
+  cc()->emit(X86Inst::kIdMov, m0, r0);
+  return kErrorOk;
+
+_ExtendMovGpXQ:
+  if (gpSize == 8) {
+    m0.setSize(8);
+    r0.setX86RegT<X86Reg::kRegGpq>(srcPhysId);
+
+    cc()->emit(instId, r0, r1);
+    cc()->emit(X86Inst::kIdMov, m0, r0);
+  }
+  else {
+    m0.setSize(4);
+    r0.setX86RegT<X86Reg::kRegGpd>(srcPhysId);
+
+    cc()->emit(instId, r0, r1);
+
+_ExtendMovGpDQ:
+    cc()->emit(X86Inst::kIdMov, m0, r0);
+    m0.addOffsetLo32(4);
+    cc()->emit(X86Inst::kIdAnd, m0, 0);
+  }
+  return kErrorOk;
+
+_ZeroExtendGpDQ:
+  m0.setSize(4);
+  r0.setX86RegT<X86Reg::kRegGpd>(srcPhysId);
+  goto _ExtendMovGpDQ;
+
+  // Move Gp.
+MovGpD:
+  m0.setSize(4);
+  r0.setX86RegT<X86Reg::kRegGpd>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMov, m0, r0);
+
+MovGpQ:
+  m0.setSize(8);
+  r0.setX86RegT<X86Reg::kRegGpq>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMov, m0, r0);
+
+  // Move Mm.
+MovMmD:
+  m0.setSize(4);
+  r0.setX86RegT<X86Reg::kRegMm>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMovd, m0, r0);
+
+MovMmQ:
+  m0.setSize(8);
+  r0.setX86RegT<X86Reg::kRegMm>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMovq, m0, r0);
+
+  // Move XMM.
+MovXmmD:
+  m0.setSize(4);
+  r0.setX86RegT<X86Reg::kRegXmm>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMovss, m0, r0);
+
+MovXmmQ:
+  m0.setSize(8);
+  r0.setX86RegT<X86Reg::kRegXmm>(srcPhysId);
+  return cc()->emit(X86Inst::kIdMovlps, m0, r0);
+}
+
+Error X86RAPass::emitPushSequence(uint32_t regMask) noexcept {
+  if (regMask == 0) return kErrorOk;
+
+  uint32_t i = 0;
+  X86Gp reg(_zsp);
+
+  do {
+    ASMJIT_ASSERT(i < _regCount.getGp());
+    if ((regMask & 0x1) != 0) {
+      reg.setId(i);
+      ASMJIT_PROPAGATE(cc()->emit(X86Inst::kIdPush, reg));
+    }
+    i++;
+    regMask >>= 1;
+  } while (regMask);
+  return kErrorOk;
+}
+
+Error X86RAPass::emitPopSequence(uint32_t regMask) noexcept {
+  if (regMask == 0) return kErrorOk;
+
+  uint32_t i = static_cast<int32_t>(_regCount.getGp());
+  uint32_t mask = 0x1 << static_cast<uint32_t>(i - 1);
+  X86Gp reg(_zsp);
+
+  while (i) {
+    i--;
+    if ((regMask & mask) != 0) {
+      reg.setId(i);
+      ASMJIT_PROPAGATE(cc()->emit(X86Inst::kIdPop, reg));
+    }
+    mask >>= 1;
+  }
+  return kErrorOk;
 }
 
 // ============================================================================
@@ -1069,7 +957,7 @@ static ASMJIT_INLINE void X86RAPass_checkStateVars(X86RAPass* self) {
       ASMJIT_ASSERT((occupied & regMask) != 0);
       ASMJIT_ASSERT((modified & regMask) == (static_cast<uint32_t>(vreg->isModified()) << physId));
 
-      ASMJIT_ASSERT(vreg->getRegClass() == C);
+      ASMJIT_ASSERT(vreg->getRegKind() == C);
       ASMJIT_ASSERT(vreg->getState() == VirtReg::kStateReg);
       ASMJIT_ASSERT(vreg->getPhysId() == physId);
     }
@@ -1077,9 +965,9 @@ static ASMJIT_INLINE void X86RAPass_checkStateVars(X86RAPass* self) {
 }
 
 void X86RAPass::_checkState() {
-  X86RAPass_checkStateVars<X86Reg::kClassGp >(this);
-  X86RAPass_checkStateVars<X86Reg::kClassMm >(this);
-  X86RAPass_checkStateVars<X86Reg::kClassXyz>(this);
+  X86RAPass_checkStateVars<X86Reg::kKindGp >(this);
+  X86RAPass_checkStateVars<X86Reg::kKindMm >(this);
+  X86RAPass_checkStateVars<X86Reg::kKindXyz>(this);
 }
 #else
 void X86RAPass::_checkState() {}
@@ -1119,9 +1007,9 @@ void X86RAPass::loadState(RAState* src_) {
   uint32_t count = static_cast<uint32_t>(_contextVd.getLength());
 
   // Load allocated variables.
-  X86RAPass_loadStateVars<X86Reg::kClassGp >(this, src);
-  X86RAPass_loadStateVars<X86Reg::kClassMm >(this, src);
-  X86RAPass_loadStateVars<X86Reg::kClassXyz>(this, src);
+  X86RAPass_loadStateVars<X86Reg::kKindGp >(this, src);
+  X86RAPass_loadStateVars<X86Reg::kKindMm >(this, src);
+  X86RAPass_loadStateVars<X86Reg::kKindXyz>(this, src);
 
   // Load masks.
   cur->_occupied = src->_occupied;
@@ -1242,7 +1130,7 @@ _MoveOrLoad:
         else {
           if (cell.getState() == VirtReg::kStateReg) {
             if (dVReg->getPhysId() != kInvalidReg && sVd->getPhysId() != kInvalidReg) {
-              if (C == X86Reg::kClassGp) {
+              if (C == X86Reg::kKindGp) {
                 self->swapGp(dVReg, sVd);
               }
               else {
@@ -1301,9 +1189,9 @@ void X86RAPass::switchState(RAState* src_) {
     return;
 
   // Switch variables.
-  X86RAPass_switchStateVars<X86Reg::kClassGp >(this, src);
-  X86RAPass_switchStateVars<X86Reg::kClassMm >(this, src);
-  X86RAPass_switchStateVars<X86Reg::kClassXyz>(this, src);
+  X86RAPass_switchStateVars<X86Reg::kKindGp >(this, src);
+  X86RAPass_switchStateVars<X86Reg::kKindMm >(this, src);
+  X86RAPass_switchStateVars<X86Reg::kKindXyz>(this, src);
 
   // Calculate changed state.
   VirtReg** vregs = _contextVd.getData();
@@ -1401,7 +1289,7 @@ static ASMJIT_INLINE void X86RAPass_intersectStateVars(X86RAPass* self, X86RASta
           didWork = true;
           continue;
         }
-        else if (C == X86Reg::kClassGp) {
+        else if (C == X86Reg::kKindGp) {
           if (aCell.getState() == VirtReg::kStateReg) {
             if (dVReg->getPhysId() != kInvalidReg && aVReg->getPhysId() != kInvalidReg) {
               self->swapGp(dVReg, aVReg);
@@ -1437,9 +1325,9 @@ void X86RAPass::intersectStates(RAState* a_, RAState* b_) {
   ASMJIT_ASSERT(a != nullptr);
   ASMJIT_ASSERT(b != nullptr);
 
-  X86RAPass_intersectStateVars<X86Reg::kClassGp >(this, a, b);
-  X86RAPass_intersectStateVars<X86Reg::kClassMm >(this, a, b);
-  X86RAPass_intersectStateVars<X86Reg::kClassXyz>(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kKindGp >(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kKindMm >(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kKindXyz>(this, a, b);
 
   ASMJIT_X86_CHECK_STATE
 }
@@ -1509,12 +1397,12 @@ static ASMJIT_INLINE X86RegMask X86RAPass_getUsedArgs(X86RAPass* self, X86CCCall
   regs.reset();
 
   uint32_t i;
-  uint32_t argCount = decl->getNumArgs();
+  uint32_t argCount = decl->getArgCount();
 
   for (i = 0; i < argCount; i++) {
     const FuncInOut& arg = decl->getArg(i);
-    if (!arg.hasRegId()) continue;
-    regs.or_(x86TypeIdToClass(arg.getTypeId()), Utils::mask(arg.getRegId()));
+    if (!arg.byReg()) continue;
+    regs.or_(x86RegTypeToKind(arg.getRegType()), Utils::mask(arg.getRegId()));
   }
 
   return regs;
@@ -1531,56 +1419,24 @@ struct SArgData {
   uint32_t aType;
 };
 
-#define SARG(dst, s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24) \
-  (s0  <<  0) | (s1  <<  1) | (s2  <<  2) | (s3  <<  3) | (s4  <<  4) | (s5  <<  5) | (s6  <<  6) | (s7  <<  7) | \
-  (s8  <<  8) | (s9  <<  9) | (s10 << 10) | (s11 << 11) | (s12 << 12) | (s13 << 13) | (s14 << 14) | (s15 << 15) | \
-  (s16 << 16) | (s17 << 17) | (s18 << 18) | (s19 << 19) | (s20 << 20) | (s21 << 21) | (s22 << 22) | (s23 << 23) | \
-  (s24 << 24)
-#define A 0 // Auto-convert (doesn't need conversion step).
-static const uint32_t X86RAPass_sArgConvTable[VirtType::kIdCount] = {
-  // dst <- | i8| u8|i16|u16|i32|u32|i64|u64| iP| uP|f32|f64|mmx| k |xmm|xSs|xPs|xSd|xPd|ymm|yPs|yPd|zmm|zPs|zPd|
-  //--------+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-  SARG(i8   , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(u8   , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(i16  , A , A , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(u16  , A , A , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(i32  , A , A , A , A , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(u32  , A , A , A , A , 0 , 0 , 0 , 0 , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(i64  , A , A , A , A , A , A , 0 , 0 , A , A , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(u64  , A , A , A , A , A , A , 0 , 0 , A , A , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(iPtr , A , A , A , A , A , A , A , A , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(uPtr , A , A , A , A , A , A , A , A , 0 , 0 , A , A , 0 , 0 , 0 , 1 , 1 , 1 , 1 , 0 , 1 , 1 , 0 , 1 , 1 ),
-  SARG(f32  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , A , 0 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 1 , 0 , 0 , 1 ),
-  SARG(f64  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , A , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 0 , 0 , 1 , 0 ),
-  SARG(mmx  , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ),
-  SARG(k    , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ),
-  SARG(xmm  , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ),
-  SARG(xSs  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 1 , 0 , 0 , 1 ),
-  SARG(xPs  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 1 , 0 , 0 , 1 ),
-  SARG(xSd  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 0 , 0 , 1 , 0 ),
-  SARG(xPd  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 0 , 0 , 1 , 0 ),
-  SARG(ymm  , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ),
-  SARG(yPs  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 1 , 0 , 0 , 1 ),
-  SARG(yPd  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 0 , 0 , 1 , 0 ),
-  SARG(zmm  , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ),
-  SARG(zPs  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 1 , 0 , 0 , 1 ),
-  SARG(zPd  , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 1 , 0 , 0 , 1 , 0 )
-};
-#undef A
-#undef SARG
+static ASMJIT_INLINE bool X86RAPass_mustConvertSArg(X86RAPass* self, uint32_t dstTypeId, uint32_t srcTypeId) noexcept{
+  bool dstFloatSize = dstTypeId == TypeId::kF32   ? 4 :
+                      dstTypeId == TypeId::kF64   ? 8 : 0;
 
-static ASMJIT_INLINE bool X86RAPass_mustConvertSArg(X86RAPass* self, uint32_t aType, uint32_t sType) {
-  return (X86RAPass_sArgConvTable[aType] & (1 << sType)) != 0;
+  bool srcFloatSize = srcTypeId == TypeId::kF32   ? 4 :
+                      srcTypeId == TypeId::kF32x1 ? 4 :
+                      srcTypeId == TypeId::kF64   ? 8 :
+                      srcTypeId == TypeId::kF64x1 ? 8 : 0;
+
+  if (dstFloatSize && srcFloatSize)
+    return dstFloatSize != srcFloatSize;
+  else
+    return false;
 }
 
-static ASMJIT_INLINE uint32_t X86RAPass_typeOfConvertedSArg(X86RAPass* self, uint32_t aType, uint32_t sType) {
-  ASMJIT_ASSERT(X86RAPass_mustConvertSArg(self, aType, sType));
-  if (VirtType::isIntTypeId(aType)) return aType;
-
-  if (aType == VirtType::kIdF32) return VirtType::kIdX86XmmSs;
-  if (aType == VirtType::kIdF64) return VirtType::kIdX86XmmSd;
-
-  return aType;
+static ASMJIT_INLINE uint32_t X86RAPass_typeOfConvertedSArg(X86RAPass* self, uint32_t dstTypeId, uint32_t srcTypeId) noexcept {
+  ASMJIT_ASSERT(X86RAPass_mustConvertSArg(self, dstTypeId, srcTypeId));
+  return dstTypeId == TypeId::kF32 ? TypeId::kF32x1 : TypeId::kF64x1;
 }
 
 static ASMJIT_INLINE Error X86RAPass_insertPushArg(
@@ -1591,8 +1447,8 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
 
   X86Compiler* cc = self->cc();
   uint32_t i;
-  uint32_t aType = arg.getTypeId();
-  uint32_t sType = sReg->getTypeId();
+  uint32_t dstTypeId = arg.getTypeId();
+  uint32_t srcTypeId = sReg->getTypeId();
 
   // First locate or create sArgBase.
   for (i = 0; i < sArgCount; i++)
@@ -1608,28 +1464,26 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
     sArgCount++;
   }
 
-  const VirtType& sInfo = _x86TypeData.typeInfo[sType];
-  uint32_t sClass = sInfo.getRegClass();
+  uint32_t srcRegKind = sReg->getRegKind();
 
-  if (X86RAPass_mustConvertSArg(self, aType, sType)) {
-    uint32_t cType = X86RAPass_typeOfConvertedSArg(self, aType, sType);
-
-    const VirtType& cInfo = _x86TypeData.typeInfo[cType];
-    uint32_t cClass = cInfo.getRegClass();
+  // Only handles float<->double conversion.
+  if (X86RAPass_mustConvertSArg(self, dstTypeId, srcTypeId)) {
+    uint32_t cvtTypeId = X86RAPass_typeOfConvertedSArg(self, dstTypeId, srcTypeId);
+    uint32_t cvtRegKind = X86Reg::kKindXyz;
 
     while (++i < sArgCount) {
       sArgData = &sArgList[i];
       if (sArgData->sVd != sReg)
         break;
 
-      if (sArgData->cVd->getTypeId() != cType || sArgData->aType != aType)
+      if (sArgData->cVd->getTypeId() != cvtTypeId || sArgData->aType != dstTypeId)
         continue;
 
       sArgData->sArg->_args |= Utils::mask(argIndex);
       return kErrorOk;
     }
 
-    VirtReg* cReg = cc->newVirtReg(cInfo, nullptr);
+    VirtReg* cReg = cc->newVirtReg(dstTypeId, x86OpData.regInfo[X86Reg::kRegXmm].signature, nullptr);
     if (!cReg) return DebugUtils::errored(kErrorNoHeapMemory);
 
     CCPushArg* sArg = cc->newNodeT<CCPushArg>(call, sReg, cReg);
@@ -1643,23 +1497,23 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
 
     raData->tiedTotal = 2;
     raData->tiedCount.reset();
-    raData->tiedCount.add(sClass);
-    raData->tiedCount.add(cClass);
+    raData->tiedCount.add(srcRegKind);
+    raData->tiedCount.add(cvtRegKind);
 
     raData->tiedIndex.reset();
     raData->inRegs.reset();
     raData->outRegs.reset();
     raData->clobberedRegs.reset();
 
-    if (sClass <= cClass) {
-      raData->tiedArray[0].setup(sReg, TiedReg::kRReg, 0, gaRegs[sClass]);
-      raData->tiedArray[1].setup(cReg, TiedReg::kWReg, 0, gaRegs[cClass]);
-      raData->tiedIndex.set(cClass, sClass != cClass);
+    if (srcRegKind <= cvtRegKind) {
+      raData->tiedArray[0].setup(sReg, TiedReg::kRReg, 0, gaRegs[srcRegKind]);
+      raData->tiedArray[1].setup(cReg, TiedReg::kWReg, 0, gaRegs[cvtRegKind]);
+      raData->tiedIndex.set(cvtRegKind, srcRegKind != cvtRegKind);
     }
     else {
-      raData->tiedArray[0].setup(cReg, TiedReg::kWReg, 0, gaRegs[cClass]);
-      raData->tiedArray[1].setup(sReg, TiedReg::kRReg, 0, gaRegs[sClass]);
-      raData->tiedIndex.set(sClass, 1);
+      raData->tiedArray[0].setup(cReg, TiedReg::kWReg, 0, gaRegs[cvtRegKind]);
+      raData->tiedArray[1].setup(sReg, TiedReg::kRReg, 0, gaRegs[srcRegKind]);
+      raData->tiedIndex.set(srcRegKind, 1);
     }
 
     sArg->setPassData(raData);
@@ -1671,7 +1525,7 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
     sArgData->sVd = sReg;
     sArgData->cVd = cReg;
     sArgData->sArg = sArg;
-    sArgData->aType = aType;
+    sArgData->aType = dstTypeId;
 
     sArgCount++;
     return kErrorOk;
@@ -1690,11 +1544,11 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
       raData->tiedTotal = 1;
       raData->tiedIndex.reset();
       raData->tiedCount.reset();
-      raData->tiedCount.add(sClass);
+      raData->tiedCount.add(srcRegKind);
       raData->inRegs.reset();
       raData->outRegs.reset();
       raData->clobberedRegs.reset();
-      raData->tiedArray[0].setup(sReg, TiedReg::kRReg, 0, gaRegs[sClass]);
+      raData->tiedArray[0].setup(sReg, TiedReg::kRReg, 0, gaRegs[srcRegKind]);
 
       sArg->setPassData(raData);
       sArgData->sArg = sArg;
@@ -1732,25 +1586,20 @@ Error X86RAPass::fetch() {
   SArgData sArgList[80];
 
   uint32_t flowId = 0;
-  PodList<CBNode*>::Link* jLink = nullptr;
+  ZoneList<CBNode*>::Link* jLink = nullptr;
 
   // Function flags.
-  func->clearFuncFlags(kFuncFlagIsNaked   |
-                       kFuncFlagX86Emms   |
-                       kFuncFlagX86SFence |
-                       kFuncFlagX86LFence );
+  func->clearFuncFlags(kFuncFlagIsNaked | kFuncFlagX86Emms);
 
   if (func->getHint(kFuncHintNaked    ) != 0) func->addFuncFlags(kFuncFlagIsNaked);
   if (func->getHint(kFuncHintCompact  ) != 0) func->addFuncFlags(kFuncFlagX86Leave);
   if (func->getHint(kFuncHintX86Emms  ) != 0) func->addFuncFlags(kFuncFlagX86Emms);
-  if (func->getHint(kFuncHintX86SFence) != 0) func->addFuncFlags(kFuncFlagX86SFence);
-  if (func->getHint(kFuncHintX86LFence) != 0) func->addFuncFlags(kFuncFlagX86LFence);
 
   // Global allocable registers.
   uint32_t* gaRegs = _gaRegs;
 
   if (!func->hasFuncFlag(kFuncFlagIsNaked))
-    gaRegs[X86Reg::kClassGp] &= ~Utils::mask(X86Gp::kIdBp);
+    gaRegs[X86Reg::kKindGp] &= ~Utils::mask(X86Gp::kIdBp);
 
   // Allowed index registers (GP/XMM/YMM).
   const uint32_t indexMask = Utils::bits(_regCount.getGp()) & ~(Utils::mask(4));
@@ -1798,16 +1647,16 @@ Error X86RAPass::fetch() {
       while (tiedTotal) { \
         VirtReg* vreg = tied->vreg; \
         \
-        uint32_t _class = vreg->getRegClass(); \
-        uint32_t _index = tiedIndex.get(_class); \
+        uint32_t _kind  = vreg->getRegKind(); \
+        uint32_t _index = tiedIndex.get(_kind); \
         \
-        tiedIndex.add(_class); \
+        tiedIndex.add(_kind); \
         if (tied->inRegs) \
           tied->allocableRegs = tied->inRegs; \
         else if (tied->outPhysId != kInvalidReg) \
           tied->allocableRegs = Utils::mask(tied->outPhysId); \
         else \
-          tied->allocableRegs &= ~inRegs.get(_class); \
+          tied->allocableRegs &= ~inRegs.get(_kind); \
         \
         vreg->_tied = nullptr; \
         raData->setTiedAt(_index, *tied); \
@@ -1828,7 +1677,7 @@ Error X86RAPass::fetch() {
     REG->_tied = LNK; \
     \
     if (assignRAId(REG) != kErrorOk) goto NoMem; \
-    tiedCount.add(REG->getRegClass()); \
+    tiedCount.add(REG->getRegKind()); \
   } while (0)
 
 #define RA_MERGE(REG, LNK, FLAGS, NEW_ALLOCABLE) \
@@ -1841,7 +1690,7 @@ Error X86RAPass::fetch() {
       REG->_tied = LNK; \
       \
       if (assignRAId(REG) != kErrorOk) goto NoMem; \
-      tiedCount.add(REG->getRegClass()); \
+      tiedCount.add(REG->getRegKind()); \
     } \
     \
     LNK->flags |= FLAGS; \
@@ -1891,20 +1740,20 @@ _NextGroup:
         RA_DECLARE();
 
         if (node->getHint() == CCHint::kHintAlloc) {
-          uint32_t remain[X86Reg::_kClassManagedCount];
+          uint32_t remain[X86Reg::_kKindRACount];
           CCHint* cur = node;
 
-          remain[X86Reg::kClassGp ] = _regCount.getGp() - 1 - func->hasFuncFlag(kFuncFlagIsNaked);
-          remain[X86Reg::kClassMm ] = _regCount.getMm();
-          remain[X86Reg::kClassK  ] = _regCount.getK();
-          remain[X86Reg::kClassXyz] = _regCount.getXyz();
+          remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->hasFuncFlag(kFuncFlagIsNaked);
+          remain[X86Reg::kKindMm ] = _regCount.getMm();
+          remain[X86Reg::kKindK  ] = _regCount.getK();
+          remain[X86Reg::kKindXyz] = _regCount.getXyz();
 
           // Merge as many alloc-hints as possible.
           for (;;) {
             VirtReg* vreg = static_cast<VirtReg*>(cur->getVReg());
             TiedReg* tied = vreg->_tied;
 
-            uint32_t regClass = vreg->getRegClass();
+            uint32_t kind = vreg->getRegKind();
             uint32_t physId = cur->getValue();
             uint32_t regMask = 0;
 
@@ -1913,22 +1762,22 @@ _NextGroup:
               regMask = Utils::mask(physId);
 
             if (!tied) {
-              if (inRegs.has(regClass, regMask) || remain[regClass] == 0)
+              if (inRegs.has(kind, regMask) || remain[kind] == 0)
                 break;
-              RA_INSERT(vreg, tied, TiedReg::kRReg, gaRegs[regClass]);
+              RA_INSERT(vreg, tied, TiedReg::kRReg, gaRegs[kind]);
 
               if (regMask != 0) {
-                inRegs.xor_(regClass, regMask);
+                inRegs.xor_(kind, regMask);
                 tied->inRegs = regMask;
                 tied->setInPhysId(physId);
               }
-              remain[regClass]--;
+              remain[kind]--;
             }
             else if (regMask != 0) {
-              if (inRegs.has(regClass, regMask) && tied->inRegs != regMask)
+              if (inRegs.has(kind, regMask) && tied->inRegs != regMask)
                 break;
 
-              inRegs.xor_(regClass, tied->inRegs | regMask);
+              inRegs.xor_(kind, tied->inRegs | regMask);
               tied->inRegs = regMask;
               tied->setInPhysId(physId);
             }
@@ -2007,7 +1856,7 @@ _NextGroup:
 
             if (op->isVirtReg()) {
               vreg = cc()->getVirtRegById(op->getId());
-              RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegClass()] & gpAllowedMask);
+              RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegKind()] & gpAllowedMask);
 
               if (static_cast<X86Reg*>(op)->isGpb()) {
                 tied->flags |= static_cast<X86Gp*>(op)->isGpbLo() ? TiedReg::kX86GpbLo : TiedReg::kX86GpbHi;
@@ -2041,9 +1890,9 @@ _NextGroup:
                 uint32_t c;
 
                 if (static_cast<const X86Reg*>(op)->isGp())
-                  c = X86Reg::kClassGp;
+                  c = X86Reg::kKindGp;
                 else
-                  c = X86Reg::kClassXyz;
+                  c = X86Reg::kKindXyz;
 
                 if (inReg != kInvalidReg) {
                   uint32_t mask = Utils::mask(inReg);
@@ -2136,7 +1985,7 @@ _NextGroup:
                 if (cc()->isVirtRegValid(id)) {
                   vreg = cc()->getVirtRegById(id);
                   if (!vreg->isStack()) {
-                    RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegClass()] & gpAllowedMask);
+                    RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegKind()] & gpAllowedMask);
                     if (m->isRegHome()) {
                       uint32_t inFlags = TiedReg::kRMem;
                       uint32_t outFlags = TiedReg::kWMem;
@@ -2185,7 +2034,7 @@ _NextGroup:
                   // TODO: AVX vector operands support.
                   // Restrict allocation to all registers except ESP/RSP/R12.
                   vreg = cc()->getVirtRegById(m->getIndexId());
-                  RA_MERGE(vreg, tied, 0, gaRegs[X86Reg::kClassGp] & gpAllowedMask);
+                  RA_MERGE(vreg, tied, 0, gaRegs[X86Reg::kKindGp] & gpAllowedMask);
                   tied->allocableRegs &= indexMask;
                   tied->flags |= TiedReg::kRReg;
                 }
@@ -2264,7 +2113,7 @@ _NextGroup:
         X86FuncDecl* decl = func->getDecl();
 
         RA_DECLARE();
-        for (uint32_t i = 0, argCount = decl->getNumArgs(); i < argCount; i++) {
+        for (uint32_t i = 0, argCount = decl->getArgCount(); i < argCount; i++) {
           const FuncInOut& arg = decl->getArg(i);
 
           VirtReg* vreg = func->getArg(i);
@@ -2277,11 +2126,11 @@ _NextGroup:
           TiedReg* tied;
           RA_INSERT(vreg, tied, 0, 0);
 
-          uint32_t aType = arg.getTypeId();
-          uint32_t typeId = vreg->getTypeId();
+          uint32_t aTypeId = arg.getTypeId();
+          uint32_t vTypeId = vreg->getTypeId();
 
-          if (arg.hasRegId()) {
-            if (x86TypeIdToClass(aType) == vreg->getRegClass()) {
+          if (arg.byReg()) {
+            if (x86RegTypeToKind(arg.getRegType()) == vreg->getRegKind()) {
               tied->flags |= TiedReg::kWReg;
               tied->setOutPhysId(arg.getRegId());
             }
@@ -2290,9 +2139,8 @@ _NextGroup:
             }
           }
           else {
-            if ((x86TypeIdToClass(aType) == vreg->getRegClass()) ||
-                (typeId == VirtType::kIdX86XmmSs && aType == VirtType::kIdF32) ||
-                (typeId == VirtType::kIdX86XmmSd && aType == VirtType::kIdF64)) {
+            if ((TypeId::isInt(aTypeId) && TypeId::isInt(vTypeId)) ||
+                (TypeId::sizeOf(aTypeId) == vreg->getSize())) {
               tied->flags |= TiedReg::kWMem;
             }
             else {
@@ -2328,7 +2176,7 @@ _NextGroup:
 
         if (decl->hasRet()) {
           const FuncInOut& ret = decl->getRet(0);
-          uint32_t retClass = x86TypeIdToClass(ret.getTypeId());
+          uint32_t retKind = x86RegTypeToKind(ret.getRegType());
 
           for (uint32_t i = 0; i < 2; i++) {
             Operand_* op = &node->_ret[i];
@@ -2337,14 +2185,13 @@ _NextGroup:
               TiedReg* tied;
               RA_MERGE(vreg, tied, 0, 0);
 
-              if (retClass == vreg->getRegClass()) {
-                // TODO: [COMPILER] Fix CCFuncRet fetch.
+              if (retKind == vreg->getRegKind()) {
                 tied->flags |= TiedReg::kRReg;
-                tied->inRegs = (i == 0) ? Utils::mask(X86Gp::kIdAx) : Utils::mask(X86Gp::kIdDx);
-                inRegs.or_(retClass, tied->inRegs);
+                tied->inRegs = Utils::mask(ret.getRegId());
+                inRegs.or_(retKind, tied->inRegs);
               }
-              else if (retClass == X86Reg::kClassFp) {
-                uint32_t fldFlag = ret.getTypeId() == VirtType::kIdF32 ? TiedReg::kX86Fld4 : TiedReg::kX86Fld8;
+              else if (retKind == X86Reg::kKindFp) {
+                uint32_t fldFlag = ret.getTypeId() == TypeId::kF32 ? TiedReg::kX86Fld4 : TiedReg::kX86Fld8;
                 tied->flags |= TiedReg::kRMem | fldFlag;
               }
               else {
@@ -2378,9 +2225,9 @@ _NextGroup:
         node->_usedArgs = X86RAPass_getUsedArgs(this, node, decl);
 
         uint32_t i;
-        uint32_t argCount = decl->getNumArgs();
+        uint32_t argCount = decl->getArgCount();
         uint32_t sArgCount = 0;
-        uint32_t gpAllocableMask = gaRegs[X86Reg::kClassGp] & ~node->_usedArgs.get(X86Reg::kClassGp);
+        uint32_t gpAllocableMask = gaRegs[X86Reg::kKindGp] & ~node->_usedArgs.get(X86Reg::kKindGp);
 
         VirtReg* vreg;
         TiedReg* tied;
@@ -2415,7 +2262,7 @@ _NextGroup:
           }
 
           if (m->hasIndexReg() && Operand::isPackedId(m->getIndexId())) {
-            // Restrict allocation to all registers except ESP/RSP/R12.
+            // Restrict allocation to all registers except ESP/RSP.
             vreg = cc()->getVirtRegById(m->getIndexId());
             RA_MERGE(vreg, tied, 0, 0);
 
@@ -2433,13 +2280,13 @@ _NextGroup:
           vreg = cc()->getVirtRegById(op->getId());
           const FuncInOut& arg = decl->getArg(i);
 
-          if (arg.hasRegId()) {
+          if (arg.byReg()) {
             RA_MERGE(vreg, tied, 0, 0);
 
             uint32_t argType = arg.getTypeId();
-            uint32_t argClass = x86TypeIdToClass(argType);
+            uint32_t argClass = x86RegTypeToKind(arg.getRegType());
 
-            if (vreg->getRegClass() == argClass) {
+            if (vreg->getRegKind() == argClass) {
               tied->inRegs |= Utils::mask(arg.getRegId());
               tied->flags |= TiedReg::kRReg | TiedReg::kRFunc;
             }
@@ -2459,20 +2306,20 @@ _NextGroup:
           }
         }
 
-        // Function-call return(s).
+        // Function-call returns.
         for (i = 0; i < 2; i++) {
           Operand_* op = &rets[i];
           if (!op->isVirtReg()) continue;
 
           const FuncInOut& ret = decl->getRet(i);
-          if (ret.hasRegId()) {
+          if (ret.byReg()) {
             uint32_t retType = ret.getTypeId();
-            uint32_t retClass = x86TypeIdToClass(retType);
+            uint32_t retKind = x86RegTypeToKind(ret.getRegType());
 
             vreg = cc()->getVirtRegById(op->getId());
             RA_MERGE(vreg, tied, 0, 0);
 
-            if (vreg->getRegClass() == retClass) {
+            if (vreg->getRegKind() == retKind) {
               tied->setOutPhysId(ret.getRegId());
               tied->flags |= TiedReg::kWReg | TiedReg::kWFunc;
             }
@@ -2483,10 +2330,10 @@ _NextGroup:
         }
 
         // Init clobbered.
-        clobberedRegs.set(X86Reg::kClassGp , Utils::bits(_regCount.getGp())  & (~decl->getPreserved(X86Reg::kClassGp )));
-        clobberedRegs.set(X86Reg::kClassMm , Utils::bits(_regCount.getMm())  & (~decl->getPreserved(X86Reg::kClassMm )));
-        clobberedRegs.set(X86Reg::kClassK  , Utils::bits(_regCount.getK())   & (~decl->getPreserved(X86Reg::kClassK  )));
-        clobberedRegs.set(X86Reg::kClassXyz, Utils::bits(_regCount.getXyz()) & (~decl->getPreserved(X86Reg::kClassXyz)));
+        clobberedRegs.set(X86Reg::kKindGp , Utils::bits(_regCount.getGp())  & (~decl->_callConv.getPreservedMask(X86Reg::kKindGp )));
+        clobberedRegs.set(X86Reg::kKindMm , Utils::bits(_regCount.getMm())  & (~decl->_callConv.getPreservedMask(X86Reg::kKindMm )));
+        clobberedRegs.set(X86Reg::kKindK  , Utils::bits(_regCount.getK())   & (~decl->_callConv.getPreservedMask(X86Reg::kKindK  )));
+        clobberedRegs.set(X86Reg::kKindXyz, Utils::bits(_regCount.getXyz()) & (~decl->_callConv.getPreservedMask(X86Reg::kKindXyz)));
 
         RA_FINALIZE(node_);
         break;
@@ -2532,7 +2379,7 @@ Error X86RAPass::annotate() {
   CBNode* node_ = func;
   CBNode* end = func->getEnd();
 
-  Zone& zone = cc()->_dataAllocator;
+  Zone& dataZone = cc()->_cbDataZone;
   StringBuilderTmp<256> sb;
 
   uint32_t maxLen = 0;
@@ -2543,11 +2390,11 @@ Error X86RAPass::annotate() {
         _formatter.formatInstruction(sb, 0,
           node->getInstId(),
           node->getOptions(),
-          node->getOpMask(),
+          node->getOpExtra(),
           node->getOpArray(), node->getOpCount());
 
         node_->setInlineComment(
-          static_cast<char*>(zone.dup(sb.getData(), sb.getLength() + 1)));
+          static_cast<char*>(dataZone.dup(sb.getData(), sb.getLength(), true)));
         maxLen = Utils::iMax<uint32_t>(maxLen, static_cast<uint32_t>(sb.getLength()));
 
         sb.clear();
@@ -2592,24 +2439,24 @@ struct X86BaseAlloc {
   //! Get TiedReg list (all).
   ASMJIT_INLINE TiedReg* getTiedArray() const { return _tiedArray[0]; }
   //! Get TiedReg list (per class).
-  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t rc) const { return _tiedArray[rc]; }
+  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t kind) const { return _tiedArray[kind]; }
 
   //! Get TiedReg count (all).
   ASMJIT_INLINE uint32_t getTiedCount() const { return _tiedTotal; }
   //! Get TiedReg count (per class).
-  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t rc) const { return _tiedCount.get(rc); }
+  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t kind) const { return _tiedCount.get(kind); }
 
-  //! Get whether all variables of class `c` are done.
-  ASMJIT_INLINE bool isTiedDone(uint32_t rc) const { return _tiedDone.get(rc) == _tiedCount.get(rc); }
+  //! Get if all variables of the given register `kind` are done.
+  ASMJIT_INLINE bool isTiedDone(uint32_t kind) const { return _tiedDone.get(kind) == _tiedCount.get(kind); }
 
   //! Get how many variables have been allocated.
-  ASMJIT_INLINE uint32_t getTiedDone(uint32_t rc) const { return _tiedDone.get(rc); }
+  ASMJIT_INLINE uint32_t getTiedDone(uint32_t kind) const { return _tiedDone.get(kind); }
   //! Add to the count of variables allocated.
-  ASMJIT_INLINE void addTiedDone(uint32_t rc, uint32_t n = 1) { _tiedDone.add(rc, n); }
+  ASMJIT_INLINE void addTiedDone(uint32_t kind, uint32_t n = 1) { _tiedDone.add(kind, n); }
 
   //! Get number of allocable registers per class.
-  ASMJIT_INLINE uint32_t getGaRegs(uint32_t rc) const {
-    return _context->_gaRegs[rc];
+  ASMJIT_INLINE uint32_t getGaRegs(uint32_t kind) const {
+    return _context->_gaRegs[kind];
   }
 
   // --------------------------------------------------------------------------
@@ -2646,8 +2493,8 @@ protected:
 
   //! Register allocator (RA) data.
   X86RAData* _raData;
-  //! TiedReg list (per register class).
-  TiedReg* _tiedArray[X86Reg::_kClassManagedCount];
+  //! TiedReg list (per register kind).
+  TiedReg* _tiedArray[X86Reg::_kKindRACount];
 
   //! Count of all TiedReg's.
   uint32_t _tiedTotal;
@@ -2674,10 +2521,10 @@ ASMJIT_INLINE void X86BaseAlloc::init(CBNode* node, X86RAData* raData) {
   // Setup the lists of variables.
   {
     TiedReg* tied = raData->getTiedArray();
-    _tiedArray[X86Reg::kClassGp ] = tied;
-    _tiedArray[X86Reg::kClassMm ] = tied + raData->getTiedStart(X86Reg::kClassMm );
-    _tiedArray[X86Reg::kClassK  ] = tied + raData->getTiedStart(X86Reg::kClassK  );
-    _tiedArray[X86Reg::kClassXyz] = tied + raData->getTiedStart(X86Reg::kClassXyz);
+    _tiedArray[X86Reg::kKindGp ] = tied;
+    _tiedArray[X86Reg::kKindMm ] = tied + raData->getTiedStart(X86Reg::kKindMm );
+    _tiedArray[X86Reg::kKindK  ] = tied + raData->getTiedStart(X86Reg::kKindK  );
+    _tiedArray[X86Reg::kKindXyz] = tied + raData->getTiedStart(X86Reg::kKindXyz);
   }
 
   // Setup counters.
@@ -2828,25 +2675,25 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
 
   if (raData->tiedTotal != 0) {
     // Unuse overwritten variables.
-    unuseBefore<X86Reg::kClassGp>();
-    unuseBefore<X86Reg::kClassMm>();
-    unuseBefore<X86Reg::kClassXyz>();
+    unuseBefore<X86Reg::kKindGp>();
+    unuseBefore<X86Reg::kKindMm>();
+    unuseBefore<X86Reg::kKindXyz>();
 
     // Plan the allocation. Planner assigns input/output registers for each
     // variable and decides whether to allocate it in register or stack.
-    plan<X86Reg::kClassGp>();
-    plan<X86Reg::kClassMm>();
-    plan<X86Reg::kClassXyz>();
+    plan<X86Reg::kKindGp>();
+    plan<X86Reg::kKindMm>();
+    plan<X86Reg::kKindXyz>();
 
     // Spill all variables marked by plan().
-    spill<X86Reg::kClassGp>();
-    spill<X86Reg::kClassMm>();
-    spill<X86Reg::kClassXyz>();
+    spill<X86Reg::kKindGp>();
+    spill<X86Reg::kKindMm>();
+    spill<X86Reg::kKindXyz>();
 
     // Alloc all variables marked by plan().
-    alloc<X86Reg::kClassGp>();
-    alloc<X86Reg::kClassMm>();
-    alloc<X86Reg::kClassXyz>();
+    alloc<X86Reg::kKindGp>();
+    alloc<X86Reg::kKindMm>();
+    alloc<X86Reg::kKindXyz>();
 
     // Translate node operands.
     if (node_->getType() == CBNode::kNodeInst) {
@@ -2870,19 +2717,17 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
 
       if (cvtReg) {
         ASMJIT_ASSERT(cvtReg->getPhysId() != kInvalidReg);
-        _context->emitConvertVarToVar(
-          cvtReg->getTypeId(), cvtReg->getPhysId(),
-          srcReg->getTypeId(), srcReg->getPhysId());
+        _context->emitCvtOp(cvtReg, cvtReg->getPhysId(), srcReg, srcReg->getPhysId());
         srcReg = cvtReg;
       }
 
       while (argMask != 0) {
         if (argMask & 0x1) {
           FuncInOut& arg = decl->getArg(argIndex);
-          ASMJIT_ASSERT(arg.hasStackOffset());
+          ASMJIT_ASSERT(arg.byStack());
 
           X86Mem dst = x86::ptr(_context->_zsp, -static_cast<int>(_context->getGpSize()) + arg.getStackOffset());
-          _context->emitMoveVarOnStack(arg.getTypeId(), &dst, srcReg->getTypeId(), srcReg->getPhysId());
+          _context->emitRegToStack(arg.getTypeId(), &dst, srcReg->getTypeId(), srcReg->getPhysId());
         }
 
         argIndex++;
@@ -2891,9 +2736,9 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
     }
 
     // Mark variables as modified.
-    modified<X86Reg::kClassGp>();
-    modified<X86Reg::kClassMm>();
-    modified<X86Reg::kClassXyz>();
+    modified<X86Reg::kKindGp>();
+    modified<X86Reg::kKindMm>();
+    modified<X86Reg::kKindXyz>();
 
     // Cleanup; disconnect Vd->Va.
     cleanup();
@@ -2907,9 +2752,9 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
 
   // Unuse.
   if (raData->tiedTotal != 0) {
-    unuseAfter<X86Reg::kClassGp>();
-    unuseAfter<X86Reg::kClassMm>();
-    unuseAfter<X86Reg::kClassXyz>();
+    unuseAfter<X86Reg::kKindGp>();
+    unuseAfter<X86Reg::kKindMm>();
+    unuseAfter<X86Reg::kKindXyz>();
   }
 
   return kErrorOk;
@@ -3226,7 +3071,7 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
         // allocation tasks by a single 'xchg' instruction, swapping
         // two registers required by the instruction/node or one register
         // required with another non-required.
-        if (C == X86Reg::kClassGp && aPhysId != kInvalidReg) {
+        if (C == X86Reg::kKindGp && aPhysId != kInvalidReg) {
           TiedReg* bTied = bVReg->_tied;
           _context->swapGp(aVReg, bVReg);
 
@@ -3326,7 +3171,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
     return safeRegs;
 
   uint32_t counter = 0;
-  uint32_t maxInst = _cc->getMaxLookAhead();
+  uint32_t maxInst = _cc->_maxLookAhead;
 
   uint32_t raId = vreg->_raId;
   uint32_t localToken = _cc->_generateUniqueToken();
@@ -3522,7 +3367,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   uint32_t safeRegs = allocableRegs;
 
   uint32_t i;
-  uint32_t maxLookAhead = _cc->getMaxLookAhead();
+  uint32_t maxLookAhead = _cc->_maxLookAhead;
 
   // Look ahead and calculate mask of special registers on both - input/output.
   CBNode* node = _node;
@@ -3555,7 +3400,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
       uint32_t mask;
 
       if (tied) {
-        // If the variable is overwritten it doesn't mase sense to continue.
+        // If the variable is overwritten it doesn't make sense to continue.
         if ((tied->flags & TiedReg::kRAll) == 0)
           break;
 
@@ -3734,33 +3579,33 @@ ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
 
   // Plan register allocation. Planner is only able to assign one register per
   // variable. If any variable is used multiple times it will be handled later.
-  plan<X86Reg::kClassGp >();
-  plan<X86Reg::kClassMm >();
-  plan<X86Reg::kClassXyz>();
+  plan<X86Reg::kKindGp >();
+  plan<X86Reg::kKindMm >();
+  plan<X86Reg::kKindXyz>();
 
   // Spill.
-  spill<X86Reg::kClassGp >();
-  spill<X86Reg::kClassMm >();
-  spill<X86Reg::kClassXyz>();
+  spill<X86Reg::kKindGp >();
+  spill<X86Reg::kKindMm >();
+  spill<X86Reg::kKindXyz>();
 
   // Alloc.
-  alloc<X86Reg::kClassGp >();
-  alloc<X86Reg::kClassMm >();
-  alloc<X86Reg::kClassXyz>();
+  alloc<X86Reg::kKindGp >();
+  alloc<X86Reg::kKindMm >();
+  alloc<X86Reg::kKindXyz>();
 
   // Unuse clobbered registers that are not used to pass function arguments and
   // save variables used to pass function arguments that will be reused later on.
-  save<X86Reg::kClassGp >();
-  save<X86Reg::kClassMm >();
-  save<X86Reg::kClassXyz>();
+  save<X86Reg::kKindGp >();
+  save<X86Reg::kKindMm >();
+  save<X86Reg::kKindXyz>();
 
   // Allocate immediates in registers and on the stack.
   allocImmsOnStack();
 
   // Duplicate.
-  duplicate<X86Reg::kClassGp >();
-  duplicate<X86Reg::kClassMm >();
-  duplicate<X86Reg::kClassXyz>();
+  duplicate<X86Reg::kKindGp >();
+  duplicate<X86Reg::kKindMm >();
+  duplicate<X86Reg::kKindXyz>();
 
   // Translate call operand.
   ASMJIT_PROPAGATE(X86RAPass_translateOperands(_context, node->getOpArray(), node->getOpCount()));
@@ -3770,21 +3615,21 @@ ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
 
   // If the callee pops stack it has to be manually adjusted back.
   X86FuncDecl* decl = node->getDecl();
-  if (decl->getCalleePopsStack() && decl->getArgStackSize() != 0)
+  if (decl->_callConv.calleePopsStack() && decl->getArgStackSize() != 0)
     _cc->emit(X86Inst::kIdSub, _context->_zsp, static_cast<int>(decl->getArgStackSize()));
 
   // Clobber.
-  clobber<X86Reg::kClassGp >();
-  clobber<X86Reg::kClassMm >();
-  clobber<X86Reg::kClassXyz>();
+  clobber<X86Reg::kKindGp >();
+  clobber<X86Reg::kKindMm >();
+  clobber<X86Reg::kKindXyz>();
 
   // Return.
   ret();
 
   // Unuse.
-  unuseAfter<X86Reg::kClassGp >();
-  unuseAfter<X86Reg::kClassMm >();
-  unuseAfter<X86Reg::kClassXyz>();
+  unuseAfter<X86Reg::kKindGp >();
+  unuseAfter<X86Reg::kKindMm >();
+  unuseAfter<X86Reg::kKindXyz>();
 
   // Cleanup; disconnect Vd->Va.
   cleanup();
@@ -3887,7 +3732,7 @@ ASMJIT_INLINE void X86CallAlloc::plan() {
 
     // All registers except Gp used by call itself must have inPhysId.
     uint32_t m = tied->inRegs;
-    if (C != X86Reg::kClassGp || m) {
+    if (C != X86Reg::kKindGp || m) {
       ASMJIT_ASSERT(m != 0);
       tied->setInPhysId(Utils::findFirstBit(m));
       willSpill |= occupied & m;
@@ -4001,7 +3846,7 @@ ASMJIT_INLINE void X86CallAlloc::alloc() {
         // allocation tasks by a single 'xchg' instruction, swapping
         // two registers required by the instruction/node or one register
         // required with another non-required.
-        if (C == X86Reg::kClassGp) {
+        if (C == X86Reg::kKindGp) {
           _context->swapGp(aVReg, bVReg);
 
           aTied->flags |= TiedReg::kRDone;
@@ -4049,7 +3894,7 @@ ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
   X86CCCall* node = getNode();
   X86FuncDecl* decl = node->getDecl();
 
-  uint32_t argCount = decl->getNumArgs();
+  uint32_t argCount = decl->getArgCount();
   Operand_* args = node->_args;
 
   for (uint32_t i = 0; i < argCount; i++) {
@@ -4060,12 +3905,12 @@ ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
     const FuncInOut& arg = decl->getArg(i);
     uint32_t varType = arg.getTypeId();
 
-    if (arg.hasStackOffset()) {
-      X86Mem dst = x86::ptr(_context->_zsp, -static_cast<int>(_context->getGpSize()) + arg.getStackOffset());
-      _context->emitMoveImmOnStack(varType, &dst, &imm);
+    if (arg.byReg()) {
+      _context->emitImmToReg(varType, arg.getRegId(), &imm);
     }
     else {
-      _context->emitMoveImmToReg(varType, arg.getRegId(), &imm);
+      X86Mem dst = x86::ptr(_context->_zsp, -static_cast<int>(_context->getGpSize()) + arg.getStackOffset());
+      _context->emitImmToStack(varType, &dst, &imm);
     }
   }
 }
@@ -4117,7 +3962,7 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessAlloc(VirtReg* vreg, uint32_t allocabl
 
   uint32_t i;
   uint32_t safeRegs = allocableRegs;
-  uint32_t maxLookAhead = _cc->getMaxLookAhead();
+  uint32_t maxLookAhead = _cc->_maxLookAhead;
 
   // Look ahead and calculate mask of special registers on both - input/output.
   CBNode* node = _node;
@@ -4234,48 +4079,42 @@ ASMJIT_INLINE void X86CallAlloc::ret() {
   X86CCCall* node = getNode();
   X86FuncDecl* decl = node->getDecl();
 
-  uint32_t i;
   Operand_* rets = node->_ret;
-
-  for (i = 0; i < 2; i++) {
+  for (uint32_t i = 0; i < 2; i++) {
     const FuncInOut& ret = decl->getRet(i);
     Operand_* op = &rets[i];
-    if (!ret.hasRegId() || !op->isVirtReg()) continue;
+
+    if (!ret.byReg() || !op->isVirtReg())
+      continue;
 
     VirtReg* vreg = _cc->getVirtRegById(op->getId());
-    uint32_t flags = _x86TypeData.typeInfo[vreg->getTypeId()].getTypeFlags();
     uint32_t regId = ret.getRegId();
 
-    switch (vreg->getRegClass()) {
-      case X86Reg::kClassGp:
-        ASMJIT_ASSERT(x86TypeIdToClass(ret.getTypeId()) == vreg->getRegClass());
-
-        _context->unuse<X86Reg::kClassGp>(vreg);
-        _context->attach<X86Reg::kClassGp>(vreg, regId, true);
+    switch (vreg->getRegKind()) {
+      case X86Reg::kKindGp:
+        _context->unuse<X86Reg::kKindGp>(vreg);
+        _context->attach<X86Reg::kKindGp>(vreg, regId, true);
         break;
 
-      case X86Reg::kClassMm:
-        ASMJIT_ASSERT(x86TypeIdToClass(ret.getTypeId()) == vreg->getRegClass());
-
-        _context->unuse<X86Reg::kClassMm>(vreg);
-        _context->attach<X86Reg::kClassMm>(vreg, regId, true);
+      case X86Reg::kKindMm:
+        _context->unuse<X86Reg::kKindMm>(vreg);
+        _context->attach<X86Reg::kKindMm>(vreg, regId, true);
         break;
 
-      case X86Reg::kClassXyz:
-        if (ret.getTypeId() == VirtType::kIdF32 || ret.getTypeId() == VirtType::kIdF64) {
-          X86Mem m = _context->getVarMem(vreg);
-          m.setSize((flags & VirtType::kFlagF32) ? 4 :
-                    (flags & VirtType::kFlagF64) ? 8 :
-                    (ret.getTypeId() == VirtType::kIdF32) ? 4 : 8);
-
-          _context->unuse<X86Reg::kClassXyz>(vreg, VirtReg::kStateMem);
-          _cc->fstp(m);
+      case X86Reg::kKindXyz:
+        if (x86RegTypeToKind(ret.getRegType()) == X86Reg::kKindXyz) {
+          _context->unuse<X86Reg::kKindXyz>(vreg);
+          _context->attach<X86Reg::kKindXyz>(vreg, regId, true);
         }
         else {
-          ASMJIT_ASSERT(x86TypeIdToClass(ret.getTypeId()) == vreg->getRegClass());
+          uint32_t elementId = TypeId::elementOf(vreg->getTypeId());
+          uint32_t size = (elementId == TypeId::kF32) ? 4 : 8;
 
-          _context->unuse<X86Reg::kClassXyz>(vreg);
-          _context->attach<X86Reg::kClassXyz>(vreg, regId, true);
+          X86Mem m = _context->getVarMem(vreg);
+          m.setSize(size);
+
+          _context->unuse<X86Reg::kKindXyz>(vreg, VirtReg::kStateMem);
+          _cc->fstp(m);
         }
         break;
     }
@@ -4343,12 +4182,12 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
   uint32_t gpSize = cc->getGpSize();
 
   // Setup "Save-Restore" registers.
-  func->_saveRestoreRegs.set(X86Reg::kClassGp , clobberedRegs.get(X86Reg::kClassGp ) & decl->getPreserved(X86Reg::kClassGp ));
-  func->_saveRestoreRegs.set(X86Reg::kClassMm , clobberedRegs.get(X86Reg::kClassMm ) & decl->getPreserved(X86Reg::kClassMm ));
-  func->_saveRestoreRegs.set(X86Reg::kClassK  , 0);
-  func->_saveRestoreRegs.set(X86Reg::kClassXyz, clobberedRegs.get(X86Reg::kClassXyz) & decl->getPreserved(X86Reg::kClassXyz));
+  func->_saveRestoreRegs.set(X86Reg::kKindGp , clobberedRegs.get(X86Reg::kKindGp ) & decl->_callConv.getPreservedMask(X86Reg::kKindGp ));
+  func->_saveRestoreRegs.set(X86Reg::kKindMm , clobberedRegs.get(X86Reg::kKindMm ) & decl->_callConv.getPreservedMask(X86Reg::kKindMm ));
+  func->_saveRestoreRegs.set(X86Reg::kKindK  , 0);
+  func->_saveRestoreRegs.set(X86Reg::kKindXyz, clobberedRegs.get(X86Reg::kKindXyz) & decl->_callConv.getPreservedMask(X86Reg::kKindXyz));
 
-  ASMJIT_ASSERT(!func->_saveRestoreRegs.has(X86Reg::kClassGp, Utils::mask(X86Gp::kIdSp)));
+  ASMJIT_ASSERT(!func->_saveRestoreRegs.has(X86Reg::kKindGp, Utils::mask(X86Gp::kIdSp)));
 
   // Setup required stack alignment and kFuncFlagIsStackMisaligned.
   {
@@ -4358,7 +4197,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
       // Require 16-byte alignment if 8-byte vars are used.
       if (self->_mem8ByteVarsUsed)
         requiredStackAlignment = 16;
-      else if (func->_saveRestoreRegs.get(X86Reg::kClassMm) || func->_saveRestoreRegs.get(X86Reg::kClassXyz))
+      else if (func->_saveRestoreRegs.get(X86Reg::kKindMm) || func->_saveRestoreRegs.get(X86Reg::kKindXyz))
         requiredStackAlignment = 16;
       else if (Utils::inInterval<uint32_t>(func->getRequiredStackAlignment(), 8, 16))
         requiredStackAlignment = 16;
@@ -4395,16 +4234,16 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
     uint32_t fRegMask = Utils::bits(self->_regCount.getGp());
     uint32_t stackFrameCopyRegs;
 
-    fRegMask &= ~(decl->getUsed(X86Reg::kClassGp) | Utils::mask(X86Gp::kIdSp));
+    fRegMask &= ~(decl->getUsedMask(X86Reg::kKindGp) | Utils::mask(X86Gp::kIdSp));
     stackFrameCopyRegs = fRegMask;
 
     // Try to remove modified registers from the mask.
-    uint32_t tRegMask = fRegMask & ~self->getClobberedRegs(X86Reg::kClassGp);
+    uint32_t tRegMask = fRegMask & ~self->getClobberedRegs(X86Reg::kKindGp);
     if (tRegMask != 0)
       fRegMask = tRegMask;
 
     // Try to remove preserved registers from the mask.
-    tRegMask = fRegMask & ~decl->getPreserved(X86Reg::kClassGp);
+    tRegMask = fRegMask & ~decl->_callConv.getPreservedMask(X86Reg::kKindGp);
     if (tRegMask != 0)
       fRegMask = tRegMask;
 
@@ -4417,8 +4256,8 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
     // and epilog), however we shouldn't save it twice, so we will remove it
     // from '_saveRestoreRegs' in case that it is preserved.
     fRegMask = Utils::mask(fRegIndex);
-    if ((fRegMask & decl->getPreserved(X86Reg::kClassGp)) != 0) {
-      func->_saveRestoreRegs.andNot(X86Reg::kClassGp, fRegMask);
+    if ((fRegMask & decl->_callConv.getPreservedMask(X86Reg::kKindGp)) != 0) {
+      func->_saveRestoreRegs.andNot(X86Reg::kKindGp, fRegMask);
       func->_isStackFrameRegPreserved = true;
     }
 
@@ -4426,7 +4265,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
       uint32_t maxRegs = (func->getArgStackSize() + gpSize - 1) / gpSize;
       stackFrameCopyRegs &= ~fRegMask;
 
-      tRegMask = stackFrameCopyRegs & self->getClobberedRegs(X86Reg::kClassGp);
+      tRegMask = stackFrameCopyRegs & self->getClobberedRegs(X86Reg::kKindGp);
       uint32_t tRegCnt = Utils::bitCount(tRegMask);
 
       if (tRegCnt > 1 || (tRegCnt > 0 && tRegCnt <= maxRegs))
@@ -4434,7 +4273,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
       else
         stackFrameCopyRegs = Utils::keepNOnesFromRight(stackFrameCopyRegs, Utils::iMin<uint32_t>(maxRegs, 2));
 
-      func->_saveRestoreRegs.or_(X86Reg::kClassGp, stackFrameCopyRegs & decl->getPreserved(X86Reg::kClassGp));
+      func->_saveRestoreRegs.or_(X86Reg::kKindGp, stackFrameCopyRegs & decl->_callConv.getPreservedMask(X86Reg::kKindGp));
       Utils::indexNOnesFromRight(func->_stackFrameCopyGpIndex, stackFrameCopyRegs, maxRegs);
     }
   }
@@ -4455,9 +4294,9 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
 
   // Setup stack size used to save preserved registers.
   {
-    uint32_t memGpSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kClassGp )) * gpSize;
-    uint32_t memMmSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kClassMm )) * 8;
-    uint32_t memXmmSize = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kClassXyz)) * 16;
+    uint32_t memGpSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindGp )) * gpSize;
+    uint32_t memMmSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindMm )) * 8;
+    uint32_t memXmmSize = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindXyz)) * 16;
 
     func->_pushPopStackSize = memGpSize;
     func->_moveStackSize = memXmmSize + Utils::alignTo<uint32_t>(memMmSize, 16);
@@ -4609,9 +4448,9 @@ static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
   }
 
   uint32_t i, mask;
-  uint32_t regsGp  = func->getSaveRestoreRegs(X86Reg::kClassGp );
-  uint32_t regsMm  = func->getSaveRestoreRegs(X86Reg::kClassMm );
-  uint32_t regsXmm = func->getSaveRestoreRegs(X86Reg::kClassXyz);
+  uint32_t regsGp  = func->getSaveRestoreRegs(X86Reg::kKindGp );
+  uint32_t regsMm  = func->getSaveRestoreRegs(X86Reg::kKindMm );
+  uint32_t regsXmm = func->getSaveRestoreRegs(X86Reg::kKindXyz);
 
   bool earlyPushPop = false;
   bool useLeaEpilog = false;
@@ -4770,14 +4609,6 @@ static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
   if (func->hasFuncFlag(kFuncFlagX86Emms))
     cc->emit(X86Inst::kIdEmms);
 
-  // MFence/SFence/LFence.
-  if (func->hasFuncFlag(kFuncFlagX86SFence) & func->hasFuncFlag(kFuncFlagX86LFence))
-    cc->emit(X86Inst::kIdMfence);
-  else if (func->hasFuncFlag(kFuncFlagX86SFence))
-    cc->emit(X86Inst::kIdSfence);
-  else if (func->hasFuncFlag(kFuncFlagX86LFence))
-    cc->emit(X86Inst::kIdLfence);
-
   // Leave.
   if (func->isNaked()) {
     if (func->isStackMisaligned()) {
@@ -4804,7 +4635,7 @@ static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
   }
 
   // Emit return.
-  if (decl->getCalleePopsStack())
+  if (decl->_callConv.calleePopsStack())
     cc->emit(X86Inst::kIdRet, static_cast<int32_t>(decl->getArgStackSize()));
   else
     cc->emit(X86Inst::kIdRet);
@@ -4869,9 +4700,9 @@ static Error X86RAPass_translateRet(X86RAPass* self, CCFuncRet* rNode, CBLabel* 
         VirtReg* vreg = tied->vreg;
         X86Mem m(self->getVarMem(vreg));
 
-        uint32_t flags = _x86TypeData.typeInfo[vreg->getTypeId()].getTypeFlags();
-        m.setSize((flags & VirtType::kFlagF32) ? 4 :
-                  (flags & VirtType::kFlagF64) ? 8 :
+        uint32_t elementId = TypeId::elementOf(vreg->getTypeId());
+        m.setSize(elementId == TypeId::kF32 ? 4 :
+                  elementId == TypeId::kF64 ? 8 :
                   (tied->flags & TiedReg::kX86Fld4) ? 4 : 8);
 
         cc->fld(m);
@@ -4940,7 +4771,7 @@ Error X86RAPass::translate() {
   CBNode* next = nullptr;
   CBNode* stop = getStop();
 
-  PodList<CBNode*>::Link* jLink = _jccList.getFirst();
+  ZoneList<CBNode*>::Link* jLink = _jccList.getFirst();
 
   for (;;) {
     while (node_->isTranslated()) {
@@ -5114,7 +4945,7 @@ _NextGroup:
           X86RAData* raData = func->getPassData<X86RAData>();
 
           uint32_t i;
-          uint32_t argCount = func->_x86Decl.getNumArgs();
+          uint32_t argCount = func->_x86Decl.getArgCount();
 
           for (i = 0; i < argCount; i++) {
             const FuncInOut& arg = decl->getArg(i);
@@ -5130,10 +4961,10 @@ _NextGroup:
 
             uint32_t physId = tied->outPhysId;
             if (physId != kInvalidReg && (tied->flags & TiedReg::kWConv) == 0) {
-              switch (vreg->getRegClass()) {
-                case X86Reg::kClassGp : attach<X86Reg::kClassGp >(vreg, physId, true); break;
-                case X86Reg::kClassMm : attach<X86Reg::kClassMm >(vreg, physId, true); break;
-                case X86Reg::kClassXyz: attach<X86Reg::kClassXyz>(vreg, physId, true); break;
+              switch (vreg->getRegKind()) {
+                case X86Reg::kKindGp : attach<X86Reg::kKindGp >(vreg, physId, true); break;
+                case X86Reg::kKindMm : attach<X86Reg::kKindMm >(vreg, physId, true); break;
+                case X86Reg::kKindXyz: attach<X86Reg::kKindXyz>(vreg, physId, true); break;
               }
             }
             else if (tied->flags & TiedReg::kWConv) {

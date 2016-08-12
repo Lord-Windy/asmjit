@@ -3392,7 +3392,7 @@ static const X86ValidationData _x64ValidationData = {
 Error X86Inst::validate(
   uint32_t archId,
   uint32_t instId, uint32_t options,
-  const Operand_& opMask, const Operand_* opArray, uint32_t opCount) noexcept {
+  const Operand_& opExtra, const Operand_* opArray, uint32_t opCount) noexcept {
 
   uint32_t i;
   uint32_t archMask;
@@ -3411,7 +3411,7 @@ Error X86Inst::validate(
   }
 
   if (ASMJIT_UNLIKELY(instId >= X86Inst::_kIdCount))
-    return DebugUtils::errored(kErrorUnknownInstruction);
+    return DebugUtils::errored(kErrorInvalidInstruction);
   const X86Inst* instData = _x86InstData + instId;
 
   // Translate the given operands to `X86Inst::OSignature`.

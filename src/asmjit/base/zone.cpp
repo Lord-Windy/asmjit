@@ -22,15 +22,15 @@ static const Zone::Block Zone_zeroBlock = { nullptr, nullptr, 0, { 0 } };
 
 static ASMJIT_INLINE uint32_t Zone_getAlignmentOffsetFromAlignment(uint32_t x) noexcept {
   switch (x) {
-    case 0 : return 0;
-    case 1 : return 1;
-    case 2 : return 2;
-    case 4 : return 3;
-    case 8 : return 4;
-    case 16: return 5;
-    case 32: return 6;
-    case 64: return 7;
     default: return 0;
+    case 0 : return 0;
+    case 1 : return 0;
+    case 2 : return 1;
+    case 4 : return 2;
+    case 8 : return 3;
+    case 16: return 4;
+    case 32: return 5;
+    case 64: return 6;
   }
 }
 
@@ -159,34 +159,21 @@ void* Zone::_alloc(size_t size) noexcept {
 
 void* Zone::allocZeroed(size_t size) noexcept {
   void* p = alloc(size);
-  if (ASMJIT_LIKELY(p))
-    ::memset(p, 0, size);
-  return p;
+  if (ASMJIT_UNLIKELY(!p)) return p;
+  return ::memset(p, 0, size);
 }
 
-void* Zone::dup(const void* data, size_t size) noexcept {
-  if (!data || size == 0) return nullptr;
+void* Zone::dup(const void* data, size_t size, bool nullTerminate) noexcept {
+  if (ASMJIT_UNLIKELY(!data || !size)) return nullptr;
 
-  void* m = alloc(size);
+  ASMJIT_ASSERT(size != IntTraits<size_t>::maxValue());
+  uint8_t* m = allocT<uint8_t>(size + nullTerminate);
   if (ASMJIT_UNLIKELY(!m)) return nullptr;
 
   ::memcpy(m, data, size);
-  return m;
-}
+  if (nullTerminate) m[size] = '\0';
 
-char* Zone::sdup(const char* str) noexcept {
-  size_t len;
-  if (!str || (len = ::strlen(str)) == 0) return nullptr;
-
-  // Include null terminator and limit the string length.
-  if (++len > 256) len = 256;
-
-  char* m = static_cast<char*>(alloc(len));
-  if (ASMJIT_UNLIKELY(!m)) return nullptr;
-
-  ::memcpy(m, str, len);
-  m[len - 1] = '\0';
-  return m;
+  return static_cast<void*>(m);
 }
 
 char* Zone::sformat(const char* fmt, ...) noexcept {

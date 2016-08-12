@@ -185,11 +185,13 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(CodeHolder::SectionEntry);
   DUMP_TYPE(CodeSection);
   DUMP_TYPE(ConstPool);
-  DUMP_TYPE(PodList<void*>);
-  DUMP_TYPE(PodVector<void*>);
   DUMP_TYPE(Runtime);
   DUMP_TYPE(StringBuilder);
   DUMP_TYPE(Zone);
+  DUMP_TYPE(ZoneAllocator);
+  DUMP_TYPE(ZoneHash<ZoneHashNode>);
+  DUMP_TYPE(ZoneList<void*>);
+  DUMP_TYPE(ZoneVector<void*>);
   INFO("");
 
   INFO("Size of core operands:");

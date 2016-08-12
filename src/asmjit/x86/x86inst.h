@@ -1994,8 +1994,7 @@ struct X86Inst {
     kOpCode_PP_F3         = 0x02U << kOpCode_PP_Shift,
     kOpCode_PP_F2         = 0x03U << kOpCode_PP_Shift,
 
-    // AsmJit specific to emit FPU's 9B byte, collides with L.256 used only by.
-    // VEX/EVEX 9B and L.256 can never appear in the same opcode value.
+    // AsmJit specific to emit FPU's 9B byte.
     kOpCode_PP_9B         = 0x07U << kOpCode_PP_Shift,
 
     // ------------------------------------------------------------------------
@@ -2447,7 +2446,7 @@ struct X86Inst {
 #if !defined(ASMJIT_DISABLE_VALIDATION)
   ASMJIT_API static Error validate(
     uint32_t archId, uint32_t instId, uint32_t options,
-    const Operand_& opMask,
+    const Operand_& opExtra,
     const Operand_* opArray, uint32_t opCount) noexcept;
 #endif // !ASMJIT_DISABLE_VALIDATION
 

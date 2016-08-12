@@ -13,8 +13,9 @@
 
 // [Dependencies]
 #include "../base/codecompiler.h"
-#include "../base/containers.h"
 #include "../base/zone.h"
+#include "../base/zoneallocator.h"
+#include "../base/zonecontainers.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -448,7 +449,7 @@ public:
 
   //! Add unreachable-flow data to the unreachable flow list.
   ASMJIT_INLINE Error addUnreachableNode(CBNode* node) {
-    PodList<CBNode*>::Link* link = _zone->allocT<PodList<CBNode*>::Link>();
+    ZoneList<CBNode*>::Link* link = _zone->allocT<ZoneList<CBNode*>::Link>();
     if (!link) return DebugUtils::errored(kErrorNoHeapMemory);
 
     link->setValue(node);
@@ -467,7 +468,7 @@ public:
   //! Add returning node (i.e. node that returns and where liveness analysis
   //! should start).
   ASMJIT_INLINE Error addReturningNode(CBNode* node) {
-    PodList<CBNode*>::Link* link = _zone->allocT<PodList<CBNode*>::Link>();
+    ZoneList<CBNode*>::Link* link = _zone->allocT<ZoneList<CBNode*>::Link>();
     if (!link) return DebugUtils::errored(kErrorNoHeapMemory);
 
     link->setValue(node);
@@ -478,7 +479,7 @@ public:
 
   //! Add jump-flow data to the jcc flow list.
   ASMJIT_INLINE Error addJccNode(CBNode* node) {
-    PodList<CBNode*>::Link* link = _zone->allocT<PodList<CBNode*>::Link>();
+    ZoneList<CBNode*>::Link* link = _zone->allocT<ZoneList<CBNode*>::Link>();
     if (!link) return DebugUtils::errored(kErrorNoHeapMemory);
 
     link->setValue(node);
@@ -522,7 +523,8 @@ public:
   // --------------------------------------------------------------------------
 
   CodeCompiler* _cc;                     //!< CodeCompiler.
-  Zone* _zone;                           //!< Zone allocator passed to `process()`.
+  Zone* _zone;                           //!< Zone passed to `process()`.
+  ZoneAllocator _allocator;              //!< Zone allocator using `_zone`.
 
   CCFunc* _func;                         //!< Function being processed.
   CBNode* _stop;                         //!< Stop node.
@@ -540,11 +542,11 @@ public:
 
   uint8_t _emitComments;                 //!< Whether to emit comments.
 
-  PodList<CBNode*> _unreachableList;     //!< Unreachable nodes.
-  PodList<CBNode*> _returningList;       //!< Returning nodes.
-  PodList<CBNode*> _jccList;             //!< Jump nodes.
+  ZoneList<CBNode*> _unreachableList;     //!< Unreachable nodes.
+  ZoneList<CBNode*> _returningList;       //!< Returning nodes.
+  ZoneList<CBNode*> _jccList;             //!< Jump nodes.
 
-  PodVector<VirtReg*> _contextVd;        //!< All variables used by the current function.
+  ZoneVector<VirtReg*> _contextVd;       //!< All variables used by the current function.
 
   RACell* _memVarCells;                  //!< Memory used to spill variables.
   RACell* _memStackCells;                //!< Memory used to allocate memory on the stack.

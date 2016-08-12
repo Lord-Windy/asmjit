@@ -107,8 +107,8 @@ public:
     kOptionHasOp4 = 0x0000020U,
     //! Instruction has `_op5` (6th operand, indexed from zero).
     kOptionHasOp5 = 0x0000040U,
-    //! Instruction has mask-op (k) operand.
-    kOptionHasOpMask = 0x00000080U,
+    //! Instruction has `_opExtra` operand (mask-op {k} operand when using AVX-512).
+    kOptionHasOpExtra = 0x00000080U,
 
     //! Don't follow the jump (CodeCompiler).
     //!
@@ -188,8 +188,9 @@ public:
   //!
   //! Returns invalid Label in case that the name is invalid or label was not found.
   //!
-  //! NOTE: This function doesn't trigger ErrorHandler in case the Label is
-  //! invalid or was not found. You must check the validity of the Label returned.
+  //! NOTE: This function doesn't trigger ErrorHandler in case the name is
+  //! invalid or no such label exist. You must always check the validity of the
+  //! \ref Label returned.
   ASMJIT_API Label getLabelByName(const char* name, size_t nameLength = kInvalidIndex, uint32_t parentId = kInvalidValue) noexcept;
 
   //! Bind the `label` to the current position of the current section.
@@ -246,6 +247,17 @@ public:
   ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _codeInfo._arch.getGpCount(); }
 
   // --------------------------------------------------------------------------
+  // [Code-Emitter Type]
+  // --------------------------------------------------------------------------
+
+  //! Get the type of this CodeEmitter, see \ref Type.
+  ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
+
+  ASMJIT_INLINE bool isAssembler() const noexcept { return _type == kTypeAssembler; }
+  ASMJIT_INLINE bool isCodeBuilder() const noexcept { return _type == kTypeBuilder; }
+  ASMJIT_INLINE bool isCodeCompiler() const noexcept { return _type == kTypeCompiler; }
+
+  // --------------------------------------------------------------------------
   // [Global Information]
   // --------------------------------------------------------------------------
 
@@ -262,13 +274,6 @@ public:
   ASMJIT_INLINE uint32_t getGlobalOptions() const noexcept { return _globalOptions; }
 
   // --------------------------------------------------------------------------
-  // [Code-Emitter Information]
-  // --------------------------------------------------------------------------
-
-  //! Get the type of this CodeEmitter, see \ref Type.
-  ASMJIT_INLINE uint32_t getType() const noexcept { return _type; }
-
-  // --------------------------------------------------------------------------
   // [Error Handling]
   // --------------------------------------------------------------------------
 
@@ -283,8 +288,8 @@ public:
   ASMJIT_INLINE Error getLastError() const noexcept { return _lastError; }
   //! Set the last error code and propagate it through the error handler.
   ASMJIT_API Error setLastError(Error error, const char* message = nullptr);
-  //! Clear the last error code.
-  ASMJIT_INLINE void resetLastError() noexcept { setLastError(kErrorOk); }
+  //! Clear the last error code and return `kErrorOk`.
+  ASMJIT_INLINE Error resetLastError() noexcept { return setLastError(kErrorOk); }
 
   // --------------------------------------------------------------------------
   // [Accessors That Affect the Next Instruction]
@@ -304,15 +309,15 @@ public:
   //! Get if the 6th operand (indexed from zero) of the next instruction is used.
   ASMJIT_INLINE bool hasOp5() const noexcept { return (_options & kOptionHasOp5) != 0; }
   //! Get if the op-mask operand of the next instruction is used.
-  ASMJIT_INLINE bool hasOpMask() const noexcept { return (_options & kOptionHasOpMask) != 0; }
+  ASMJIT_INLINE bool hasOpExtra() const noexcept { return (_options & kOptionHasOpExtra) != 0; }
 
   ASMJIT_INLINE const Operand& getOp4() const noexcept { return static_cast<const Operand&>(_op4); }
   ASMJIT_INLINE const Operand& getOp5() const noexcept { return static_cast<const Operand&>(_op5); }
-  ASMJIT_INLINE const Operand& getOpMask() const noexcept { return static_cast<const Operand&>(_opMask); }
+  ASMJIT_INLINE const Operand& getOpExtra() const noexcept { return static_cast<const Operand&>(_opExtra); }
 
   ASMJIT_INLINE void setOp4(const Operand_& op4) noexcept { _options |= kOptionHasOp4; _op4 = op4; }
   ASMJIT_INLINE void setOp5(const Operand_& op5) noexcept { _options |= kOptionHasOp5; _op5 = op5; }
-  ASMJIT_INLINE void setOpMask(const Operand_& opMask) noexcept { _options |= kOptionHasOpMask; _opMask = opMask; }
+  ASMJIT_INLINE void setOpExtra(const Operand_& opExtra) noexcept { _options |= kOptionHasOpExtra; _opExtra = opExtra; }
 
   //! Get annotation of the next instruction.
   ASMJIT_INLINE const char* getInlineComment() const noexcept { return _inlineComment; }
@@ -400,7 +405,7 @@ public:
   // --------------------------------------------------------------------------
 
   CodeInfo _codeInfo;                    //!< Basic information about the code (matches CodeHolder::_codeInfo).
-  CodeHolder* _code;                     //!< CodeHolder.
+  CodeHolder* _code;                     //!< CodeHolder the CodeEmitter is attached to.
   CodeEmitter* _nextEmitter;             //!< Linked list of `CodeEmitter`s attached to a single \ref CodeHolder.
 
   uint8_t _type;                         //!< See CodeEmitter::Type.
@@ -417,7 +422,7 @@ public:
   const char* _inlineComment;            //!< Inline comment of the next instruction (affects the next instruction).
   Operand_ _op4;                         //!< 5th operand data (indexed from zero)   (affects the next instruction).
   Operand_ _op5;                         //!< 6th operand data (indexed from zero)   (affects the next instruction).
-  Operand_ _opMask;                      //!< op-mask (k) operand data               (affects the next instruction).
+  Operand_ _opExtra;                     //!< Extra operand (op-mask {k} on AVX-512) (affects the next instruction).
 
   Operand_ _none;                        //!< Used to pass unused operands to `_emit()` instead of passing null.
   Reg _nativeGpReg;                      //!< Native GP register with zero id.

@@ -49,7 +49,12 @@ class X86DReg;
 
 //! X86/X64 register traits.
 template<uint32_t Type>
-struct X86RegTraits {};
+struct X86RegTraits {
+  enum {
+    // Default everything to void.
+    kTypeId = TypeId::kVoid
+  };
+};
 
 // ============================================================================
 // [asmjit::X86Mem]
@@ -217,67 +222,67 @@ public:
     kRegCount           = 19             //!< Count of register types.
   };
 
-  //! Register class.
-  ASMJIT_ENUM(Class) {
-    kClassGp            = 0,             //!< GP register class or none (universal).
-    kClassMm            = 1,             //!< MMX register class.
-    kClassK             = 2,             //!< K register class.
-    kClassXyz           = 3,             //!< XMM|YMM|ZMM register class.
-    _kClassManagedCount = 4,             //!< Count of register classes managed by \ref X86Compiler.
+  //! Register kind.
+  ASMJIT_ENUM(Kind) {
+    kKindGp             = 0,             //!< GP register kind or none (universal).
+    kKindMm             = 1,             //!< MMX register kind.
+    kKindK              = 2,             //!< K register kind.
+    kKindXyz            = 3,             //!< XMM|YMM|ZMM register kind.
+    _kKindRACount       = 4,             //!< Count of register kinds used by \ref Compiler.
 
-    kClassFp            = 4,             //!< FPU (x87) register class.
-    kClassCr            = 5,             //!< Control register class.
-    kClassDr            = 6,             //!< Debug register class.
-    kClassBnd           = 7,             //!< Bound register class.
-    kClassSeg           = 8,             //!< Segment register class.
-    kClassRip           = 9,             //!< IP register class.
-    kClassCount         = 10             //!< Count of all register classes.
+    kKindFp             = 4,             //!< FPU (x87) register kind.
+    kKindCr             = 5,             //!< Control register kind.
+    kKindDr             = 6,             //!< Debug register kind.
+    kKindBnd            = 7,             //!< Bound register kind.
+    kKindSeg            = 8,             //!< Segment register kind.
+    kKindRip            = 9,             //!< IP register kind.
+    kKindCount          = 10             //!< Count of all register kinds.
   };
 
   ASMJIT_DEFINE_ABSTRACT_REG(X86Reg, Reg)
 
   //! Get if the register is a GP register (any size).
-  ASMJIT_INLINE bool isGp() const noexcept { return _reg.regClass == kClassGp; }
+  ASMJIT_INLINE bool isGp() const noexcept { return _reg.regKind == kKindGp; }
   //! Get if the register is a GPB register (8-bit).
   ASMJIT_INLINE bool isGpb() const noexcept { return _reg.size == 1; }
   //! Get if the register is XMM, YMM, or ZMM (SIMD).
-  ASMJIT_INLINE bool isXyz() const noexcept { return _reg.regClass == kClassXyz; }
+  ASMJIT_INLINE bool isXyz() const noexcept { return _reg.regKind == kKindXyz; }
 
   // This is not that well designed as X86RegTraits is defined after the
   // X64Reg, which means that we cannot use the traits here, which would be great.
 
   //! Get if the register is RIP.
-  ASMJIT_INLINE bool isRip() const noexcept { return hasSignature(kOpReg, kRegRip, kClassRip, 8); }
+  ASMJIT_INLINE bool isRip() const noexcept { return hasSignature(kOpReg, kRegRip, kKindRip, 8); }
   //! Get if the register is a segment register.
-  ASMJIT_INLINE bool isSeg() const noexcept { return hasSignature(kOpReg, kRegSeg, kClassSeg, 2); }
+  ASMJIT_INLINE bool isSeg() const noexcept { return hasSignature(kOpReg, kRegSeg, kKindSeg, 2); }
   //! Get if the register is a low GPB register (8-bit).
-  ASMJIT_INLINE bool isGpbLo() const noexcept { return hasSignature(kOpReg, kRegGpbLo, kClassGp, 1); }
+  ASMJIT_INLINE bool isGpbLo() const noexcept { return hasSignature(kOpReg, kRegGpbLo, kKindGp, 1); }
   //! Get if the register is a high GPB register (8-bit).
-  ASMJIT_INLINE bool isGpbHi() const noexcept { return hasSignature(kOpReg, kRegGpbHi, kClassGp, 1); }
+  ASMJIT_INLINE bool isGpbHi() const noexcept { return hasSignature(kOpReg, kRegGpbHi, kKindGp, 1); }
   //! Get if the register is a GPW register (16-bit).
-  ASMJIT_INLINE bool isGpw() const noexcept { return hasSignature(kOpReg, kRegGpw, kClassGp, 2); }
+  ASMJIT_INLINE bool isGpw() const noexcept { return hasSignature(kOpReg, kRegGpw, kKindGp, 2); }
   //! Get if the register is a GPD register (32-bit).
-  ASMJIT_INLINE bool isGpd() const noexcept { return hasSignature(kOpReg, kRegGpd, kClassGp, 4); }
+  ASMJIT_INLINE bool isGpd() const noexcept { return hasSignature(kOpReg, kRegGpd, kKindGp, 4); }
   //! Get if the register is a GPQ register (64-bit).
-  ASMJIT_INLINE bool isGpq() const noexcept { return hasSignature(kOpReg, kRegGpq, kClassGp, 8); }
+  ASMJIT_INLINE bool isGpq() const noexcept { return hasSignature(kOpReg, kRegGpq, kKindGp, 8); }
   //! Get if the register is an FPU register (80-bit).
-  ASMJIT_INLINE bool isFp() const noexcept { return hasSignature(kOpReg, kRegFp, kClassFp, 10); }
+  ASMJIT_INLINE bool isFp() const noexcept { return hasSignature(kOpReg, kRegFp, kKindFp, 10); }
   //! Get if the register is an MMX register (64-bit).
-  ASMJIT_INLINE bool isMm() const noexcept { return hasSignature(kOpReg, kRegMm, kClassMm, 8); }
+  ASMJIT_INLINE bool isMm() const noexcept { return hasSignature(kOpReg, kRegMm, kKindMm, 8); }
   //! Get if the register is a K register (64-bit).
-  ASMJIT_INLINE bool isK() const noexcept { return hasSignature(kOpReg, kRegK, kClassK, 8); }
+  ASMJIT_INLINE bool isK() const noexcept { return hasSignature(kOpReg, kRegK, kKindK, 8); }
   //! Get if the register is an XMM register (128-bit).
-  ASMJIT_INLINE bool isXmm() const noexcept { return hasSignature(kOpReg, kRegXmm, kClassXyz, 16); }
+  ASMJIT_INLINE bool isXmm() const noexcept { return hasSignature(kOpReg, kRegXmm, kKindXyz, 16); }
   //! Get if the register is a YMM register (256-bit).
-  ASMJIT_INLINE bool isYmm() const noexcept { return hasSignature(kOpReg, kRegYmm, kClassXyz, 32); }
+  ASMJIT_INLINE bool isYmm() const noexcept { return hasSignature(kOpReg, kRegYmm, kKindXyz, 32); }
   //! Get if the register is a ZMM register (512-bit).
-  ASMJIT_INLINE bool isZmm() const noexcept { return hasSignature(kOpReg, kRegZmm, kClassXyz, 64); }
+  ASMJIT_INLINE bool isZmm() const noexcept { return hasSignature(kOpReg, kRegZmm, kKindXyz, 64); }
   //! Get if the register is a bound register.
-  ASMJIT_INLINE bool isBnd() const noexcept { return hasSignature(kOpReg, kRegBnd, kClassBnd, 16); }
+  ASMJIT_INLINE bool isBnd() const noexcept { return hasSignature(kOpReg, kRegBnd, kKindBnd, 16); }
   //! Get if the register is a control register.
-  ASMJIT_INLINE bool isCr() const noexcept { return hasSignature(kOpReg, kRegCr, kClassCr, 8); }
+  ASMJIT_INLINE bool isCr() const noexcept { return hasSignature(kOpReg, kRegCr, kKindCr, 8); }
   //! Get if the register is a debug register.
-  ASMJIT_INLINE bool isDr() const noexcept { return hasSignature(kOpReg, kRegDr, kClassDr, 8); }
+  ASMJIT_INLINE bool isDr() const noexcept { return hasSignature(kOpReg, kRegDr, kKindDr, 8); }
 
   template<uint32_t Type>
   ASMJIT_INLINE void setX86RegT(uint32_t id) noexcept {
@@ -315,36 +320,37 @@ public:
 #undef ASMJIT_DEFINE_REG_MEM
 };
 
-#define ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(REG, TYPE, CLASS, SIZE) \
-template<>                                                        \
-struct X86RegTraits< TYPE > {                                     \
-  typedef REG Reg;                                                \
-                                                                  \
-  enum {                                                          \
-    kType      = TYPE,                                            \
-    kClass     = CLASS,                                           \
-    kSize      = SIZE,                                            \
-    kSignature = ASMJIT_PACK32_4x8(                               \
-      Operand::kOpReg, TYPE, CLASS, SIZE)                         \
-  };                                                              \
+#define ASMJIT_DEFINE_X86_REG_TRAITS(REG, TYPE, KIND, SIZE, TYPE_ID)  \
+template<>                                                            \
+struct X86RegTraits< TYPE > {                                         \
+  typedef REG Reg;                                                    \
+                                                                      \
+  enum {                                                              \
+    kType      = TYPE,                                                \
+    kKind      = KIND,                                                \
+    kSize      = SIZE,                                                \
+                                                                      \
+    kTypeId    = TYPE_ID,                                             \
+    kSignature = ASMJIT_PACK32_4x8(Operand::kOpReg, TYPE, KIND, SIZE) \
+  };                                                                  \
 }
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Rip , X86Reg::kRegRip         , X86Reg::kClassRip, 8 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Seg , X86Reg::kRegSeg         , X86Reg::kClassSeg, 2 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Gp  , X86Reg::kRegGpbLo       , X86Reg::kClassGp , 1 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Gp  , X86Reg::kRegGpbHi       , X86Reg::kClassGp , 1 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Gp  , X86Reg::kRegGpw         , X86Reg::kClassGp , 2 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Gp  , X86Reg::kRegGpd         , X86Reg::kClassGp , 4 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Gp  , X86Reg::kRegGpq         , X86Reg::kClassGp , 8 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Fp  , X86Reg::kRegFp          , X86Reg::kClassFp , 10);
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Mm  , X86Reg::kRegMm          , X86Reg::kClassMm , 8 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86KReg, X86Reg::kRegK           , X86Reg::kClassK  , 8 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Xmm , X86Reg::kRegXmm         , X86Reg::kClassXyz, 16);
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Ymm , X86Reg::kRegYmm         , X86Reg::kClassXyz, 32);
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Zmm , X86Reg::kRegZmm         , X86Reg::kClassXyz, 64);
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86Bnd , X86Reg::kRegBnd         , X86Reg::kClassBnd, 16);
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86CReg, X86Reg::kRegCr          , X86Reg::kClassCr , 8 );
-ASMJIT_DEFINE_X86_REG_TYPE_TRAITS(X86DReg, X86Reg::kRegDr          , X86Reg::kClassDr , 8 );
-#undef ASMJIT_DEFINE_X86_REG_TYPE_TRAITS
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Rip , X86Reg::kRegRip         , X86Reg::kKindRip, 8 , TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Seg , X86Reg::kRegSeg         , X86Reg::kKindSeg, 2 , TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Gp  , X86Reg::kRegGpbLo       , X86Reg::kKindGp , 1 , TypeId::kU8    );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Gp  , X86Reg::kRegGpbHi       , X86Reg::kKindGp , 1 , TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Gp  , X86Reg::kRegGpw         , X86Reg::kKindGp , 2 , TypeId::kU16   );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Gp  , X86Reg::kRegGpd         , X86Reg::kKindGp , 4 , TypeId::kU32   );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Gp  , X86Reg::kRegGpq         , X86Reg::kKindGp , 8 , TypeId::kU64   );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Fp  , X86Reg::kRegFp          , X86Reg::kKindFp , 10, TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Mm  , X86Reg::kRegMm          , X86Reg::kKindMm , 8 , TypeId::kMmx64 );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86KReg, X86Reg::kRegK           , X86Reg::kKindK  , 8 , TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Xmm , X86Reg::kRegXmm         , X86Reg::kKindXyz, 16, TypeId::kI32x4 );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Ymm , X86Reg::kRegYmm         , X86Reg::kKindXyz, 32, TypeId::kI32x8 );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Zmm , X86Reg::kRegZmm         , X86Reg::kKindXyz, 64, TypeId::kI32x16);
+ASMJIT_DEFINE_X86_REG_TRAITS(X86Bnd , X86Reg::kRegBnd         , X86Reg::kKindBnd, 16, TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86CReg, X86Reg::kRegCr          , X86Reg::kKindCr , 8 , TypeId::kVoid  );
+ASMJIT_DEFINE_X86_REG_TRAITS(X86DReg, X86Reg::kRegDr          , X86Reg::kKindDr , 8 , TypeId::kVoid  );
+#undef ASMJIT_DEFINE_X86_REG_TRAITS
 
 // ============================================================================
 // [asmjit::X86...]
@@ -464,6 +470,11 @@ ASMJIT_INLINE X86Seg X86Mem::getSegment() const noexcept {
   return X86Seg(Init, X86RegTraits<X86Reg::kRegSeg>::kSignature, getSegmentId());
 }
 
+ASMJIT_DEFINE_TYPE_ID(X86Mm , TypeId::kMmx64);
+ASMJIT_DEFINE_TYPE_ID(X86Xmm, TypeId::kI32x4);
+ASMJIT_DEFINE_TYPE_ID(X86Ymm, TypeId::kI32x8);
+ASMJIT_DEFINE_TYPE_ID(X86Zmm, TypeId::kI32x16);
+
 // ============================================================================
 // [asmjit::X86OpData]
 // ============================================================================
@@ -473,8 +484,10 @@ struct X86OpData {
   // [Signatures]
   // --------------------------------------------------------------------------
 
-  //! Contains register information and signatures from \ref X86Reg::RegType.
-  Operand::RegInfo regInfo[20];
+  //! Register information and signatures indexed by \ref X86Reg::RegType.
+  RegInfo regInfo[20];
+  //! Converts RegType to TypeId, see \ref TypeId.
+  uint8_t regTypeToTypeId[32];
 
   // --------------------------------------------------------------------------
   // [Operands]
@@ -810,26 +823,26 @@ static ASMJIT_INLINE X86CReg cr(uint32_t id) noexcept { return X86CReg(Init, X86
 static ASMJIT_INLINE X86DReg dr(uint32_t id) noexcept { return X86DReg(Init, X86RegTraits<X86Reg::kRegDr>::kSignature, id); }
 
 static ASMJIT_INLINE bool isGp(const Operand_& op) noexcept {
-  // Check operand type and register class. Not interested in register type and size.
+  // Check operand type and register kind. Not interested in register type and size.
   const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF            , 0x00);
-  const uint32_t kTag = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kClassGp, 0x00);
-  return (op.getSignature() & kMsk) == kTag;
+  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 0x00);
+  return (op.getSignature() & kMsk) == kSgn;
 }
 
 //! Get if the `op` operand is either a low or high 8-bit GPB register.
 static ASMJIT_INLINE bool isGpb(const Operand_& op) noexcept {
-  // Check operand type, register class, and size. Not interested in register type.
+  // Check operand type, register kind, and size. Not interested in register type.
   const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF            , 0xFF);
-  const uint32_t kTag = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kClassGp, 1   );
-  return (op.getSignature() & kMsk) == kTag;
+  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 1   );
+  return (op.getSignature() & kMsk) == kSgn;
 }
 
 //! Get if the `op` operand is either a low or high 8-bit GPB register.
 static ASMJIT_INLINE bool isXyz(const Operand_& op) noexcept {
-  // Check operand type and register class. Not interested in register type and size.
+  // Check operand type and register kind. Not interested in register type and size.
   const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF             , 0x00);
-  const uint32_t kTag = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kClassXyz, 0   );
-  return (op.getSignature() & kMsk) == kTag;
+  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindXyz, 0   );
+  return (op.getSignature() & kMsk) == kSgn;
 }
 
 static ASMJIT_INLINE bool isRip(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isRip(); }

@@ -60,7 +60,7 @@ public:
       numArgs, numVars, naked ? 'Y' : 'N');
   }
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     for (unsigned int i = 0; i <= 6; i++) {
       for (unsigned int j = 0; j <= 4; j++) {
         tests.append(new X86Test_AlignBase(i, j, false));
@@ -71,13 +71,13 @@ public:
 
   virtual void compile(X86Compiler& c) {
     switch (_numArgs) {
-      case 0: c.addFunc(FuncSignature0<int>(kCallConvHost)); break;
-      case 1: c.addFunc(FuncSignature1<int, int>(kCallConvHost)); break;
-      case 2: c.addFunc(FuncSignature2<int, int, int>(kCallConvHost)); break;
-      case 3: c.addFunc(FuncSignature3<int, int, int, int>(kCallConvHost)); break;
-      case 4: c.addFunc(FuncSignature4<int, int, int, int, int>(kCallConvHost)); break;
-      case 5: c.addFunc(FuncSignature5<int, int, int, int, int, int>(kCallConvHost)); break;
-      case 6: c.addFunc(FuncSignature6<int, int, int, int, int, int, int>(kCallConvHost)); break;
+      case 0: c.addFunc(FuncSignature0<int>(CallConv::kIdHost)); break;
+      case 1: c.addFunc(FuncSignature1<int, int>(CallConv::kIdHost)); break;
+      case 2: c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost)); break;
+      case 3: c.addFunc(FuncSignature3<int, int, int, int>(CallConv::kIdHost)); break;
+      case 4: c.addFunc(FuncSignature4<int, int, int, int, int>(CallConv::kIdHost)); break;
+      case 5: c.addFunc(FuncSignature5<int, int, int, int, int, int>(CallConv::kIdHost)); break;
+      case 6: c.addFunc(FuncSignature6<int, int, int, int, int, int, int>(CallConv::kIdHost)); break;
     }
 
     c.getFunc()->setHint(kFuncHintNaked, _naked);
@@ -92,7 +92,7 @@ public:
       uint32_t varIndex = 0;
       uint32_t physId = 0;
       uint32_t regMask = 0x1;
-      uint32_t preservedMask = c.getFunc()->getDecl()->getPreserved(Reg::kClassGp);
+      uint32_t preservedMask = c.getFunc()->getDecl()->_callConv.getPreservedMask(Reg::kKindGp);
 
       do {
         if ((preservedMask & regMask) != 0 && (physId != X86Gp::kIdSp && physId != X86Gp::kIdBp)) {
@@ -194,12 +194,12 @@ class X86Test_AlignNone : public X86Test {
 public:
   X86Test_AlignNone() : X86Test("[Align] None") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AlignNone());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<void>(kCallConvHost));
+    c.addFunc(FuncSignature0<void>(CallConv::kIdHost));
     c.align(kAlignCode, 0);
     c.align(kAlignCode, 1);
     c.endFunc();
@@ -222,12 +222,12 @@ class X86Test_JumpCross : public X86Test {
 public:
   X86Test_JumpCross() : X86Test("[Jump] Cross jump") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_JumpCross());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<void>(kCallConvHost));
+    c.addFunc(FuncSignature0<void>(CallConv::kIdHost));
 
     Label L_1 = c.newLabel();
     Label L_2 = c.newLabel();
@@ -264,12 +264,12 @@ class X86Test_JumpMany : public X86Test {
 public:
   X86Test_JumpMany() : X86Test("[Jump] Many jumps") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_JumpMany());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
     for (uint32_t i = 0; i < 1000; i++) {
       Label L = c.newLabel();
       c.jmp(L);
@@ -305,12 +305,12 @@ class X86Test_JumpUnreachable1 : public X86Test {
 public:
   X86Test_JumpUnreachable1() : X86Test("[Jump] Unreachable #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_JumpUnreachable1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<void>(kCallConvHost));
+    c.addFunc(FuncSignature0<void>(CallConv::kIdHost));
 
     Label L_1 = c.newLabel();
     Label L_2 = c.newLabel();
@@ -368,12 +368,12 @@ class X86Test_JumpUnreachable2 : public X86Test {
 public:
   X86Test_JumpUnreachable2() : X86Test("[Jump] Unreachable #2") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_JumpUnreachable2());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<void>(kCallConvHost));
+    c.addFunc(FuncSignature0<void>(CallConv::kIdHost));
 
     Label L_1 = c.newLabel();
     Label L_2 = c.newLabel();
@@ -415,12 +415,12 @@ class X86Test_AllocBase : public X86Test {
 public:
   X86Test_AllocBase() : X86Test("[Alloc] Base") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocBase());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     X86Gp v0 = c.newInt32("v0");
     X86Gp v1 = c.newInt32("v1");
@@ -466,12 +466,12 @@ class X86Test_AllocManual : public X86Test {
 public:
   X86Test_AllocManual() : X86Test("[Alloc] Manual alloc/spill") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocManual());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     X86Gp v0  = c.newInt32("v0");
     X86Gp v1  = c.newInt32("v1");
@@ -522,12 +522,12 @@ class X86Test_AllocUseMem : public X86Test {
 public:
   X86Test_AllocUseMem() : X86Test("[Alloc] Alloc/use mem") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocUseMem());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp iIdx = c.newInt32("iIdx");
     X86Gp iEnd = c.newInt32("iEnd");
@@ -577,12 +577,12 @@ public:
 
   enum { kCount = 8 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocMany1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<void, int*, int*>(kCallConvHost));
+    c.addFunc(FuncSignature2<void, int*, int*>(CallConv::kIdHost));
 
     X86Gp a0 = c.newIntPtr("a0");
     X86Gp a1 = c.newIntPtr("a1");
@@ -655,12 +655,12 @@ class X86Test_AllocMany2 : public X86Test {
 public:
   X86Test_AllocMany2() : X86Test("[Alloc] Many #2") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocMany2());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature1<void, int*>(kCallConvHost));
+    c.addFunc(FuncSignature1<void, int*>(CallConv::kIdHost));
 
     X86Gp var[32];
     X86Gp a = c.newIntPtr("a");
@@ -730,12 +730,12 @@ class X86Test_AllocImul1 : public X86Test {
 public:
   X86Test_AllocImul1() : X86Test("[Alloc] Imul #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocImul1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature4<void, int*, int*, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature4<void, int*, int*, int, int>(CallConv::kIdHost));
 
     X86Gp dstHi = c.newIntPtr("dstHi");
     X86Gp dstLo = c.newIntPtr("dstLo");
@@ -786,12 +786,12 @@ class X86Test_AllocImul2 : public X86Test {
 public:
   X86Test_AllocImul2() : X86Test("[Alloc] Imul #2") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocImul2());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<void, int*, const int*>(kCallConvHost));
+    c.addFunc(FuncSignature2<void, int*, const int*>(CallConv::kIdHost));
 
     X86Gp dst = c.newIntPtr("dst");
     X86Gp src = c.newIntPtr("src");
@@ -840,12 +840,12 @@ class X86Test_AllocIdiv1 : public X86Test {
 public:
   X86Test_AllocIdiv1() : X86Test("[Alloc] Idiv #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIdiv1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp a = c.newInt32("a");
     X86Gp b = c.newInt32("b");
@@ -886,12 +886,12 @@ class X86Test_AllocSetz : public X86Test {
 public:
   X86Test_AllocSetz() : X86Test("[Alloc] Setz") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocSetz());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature3<void, int, int, char*>(kCallConvHost));
+    c.addFunc(FuncSignature3<void, int, int, char*>(CallConv::kIdHost));
 
     X86Gp src0 = c.newInt32("src0");
     X86Gp src1 = c.newInt32("src1");
@@ -937,12 +937,12 @@ class X86Test_AllocShlRor : public X86Test {
 public:
   X86Test_AllocShlRor() : X86Test("[Alloc] Shl/Ror") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocShlRor());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature4<void, int*, int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature4<void, int*, int, int, int>(CallConv::kIdHost));
 
     X86Gp dst = c.newIntPtr("dst");
     X86Gp var = c.newInt32("var");
@@ -989,12 +989,12 @@ public:
 
   enum { kCount = 32 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocGpLo());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature1<uint32_t, uint32_t*>(kCallConvHost));
+    c.addFunc(FuncSignature1<uint32_t, uint32_t*>(CallConv::kIdHost));
 
     X86Gp rPtr = c.newUIntPtr("rPtr");
     X86Gp rSum = c.newUInt32("rSum");
@@ -1078,12 +1078,12 @@ class X86Test_AllocRepMovsb : public X86Test {
 public:
   X86Test_AllocRepMovsb() : X86Test("[Alloc] Rep MovsB") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocRepMovsb());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature3<void, void*, void*, size_t>(kCallConvHost));
+    c.addFunc(FuncSignature3<void, void*, void*, size_t>(CallConv::kIdHost));
 
     X86Gp dst = c.newIntPtr("dst");
     X86Gp src = c.newIntPtr("src");
@@ -1120,12 +1120,12 @@ class X86Test_AllocIfElse1 : public X86Test {
 public:
   X86Test_AllocIfElse1() : X86Test("[Alloc] If-Else #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIfElse1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp v1 = c.newInt32("v1");
     X86Gp v2 = c.newInt32("v2");
@@ -1172,12 +1172,12 @@ class X86Test_AllocIfElse2 : public X86Test {
 public:
   X86Test_AllocIfElse2() : X86Test("[Alloc] If-Else #2") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIfElse2());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp v1 = c.newInt32("v1");
     X86Gp v2 = c.newInt32("v2");
@@ -1233,12 +1233,12 @@ class X86Test_AllocIfElse3 : public X86Test {
 public:
   X86Test_AllocIfElse3() : X86Test("[Alloc] If-Else #3") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIfElse3());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp v1 = c.newInt32("v1");
     X86Gp v2 = c.newInt32("v2");
@@ -1294,12 +1294,12 @@ class X86Test_AllocIfElse4 : public X86Test {
 public:
   X86Test_AllocIfElse4() : X86Test("[Alloc] If-Else #4") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIfElse4());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp v1 = c.newInt32("v1");
     X86Gp v2 = c.newInt32("v2");
@@ -1360,7 +1360,7 @@ class X86Test_AllocInt8 : public X86Test {
 public:
   X86Test_AllocInt8() : X86Test("[Alloc] Int8") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocInt8());
   }
 
@@ -1368,7 +1368,7 @@ public:
     X86Gp x = c.newInt8("x");
     X86Gp y = c.newInt32("y");
 
-    c.addFunc(FuncSignature1<int, char>(kCallConvHost));
+    c.addFunc(FuncSignature1<int, char>(CallConv::kIdHost));
     c.setArg(0, x);
 
     c.movsx(y, x);
@@ -1399,12 +1399,12 @@ class X86Test_AllocArgsIntPtr : public X86Test {
 public:
   X86Test_AllocArgsIntPtr() : X86Test("[Alloc] Args IntPtr") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocArgsIntPtr());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature8<void, void*, void*, void*, void*, void*, void*, void*, void*>(kCallConvHost));
+    c.addFunc(FuncSignature8<void, void*, void*, void*, void*, void*, void*, void*, void*>(CallConv::kIdHost));
 
     uint32_t i;
     X86Gp var[8];
@@ -1458,12 +1458,12 @@ class X86Test_AllocArgsFloat : public X86Test {
 public:
   X86Test_AllocArgsFloat() : X86Test("[Alloc] Args Float") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocArgsFloat());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature8<void, float, float, float, float, float, float, float, void*>(kCallConvHost));
+    c.addFunc(FuncSignature8<void, float, float, float, float, float, float, float, void*>(CallConv::kIdHost));
 
     uint32_t i;
 
@@ -1512,12 +1512,12 @@ class X86Test_AllocArgsDouble : public X86Test {
 public:
   X86Test_AllocArgsDouble() : X86Test("[Alloc] Args Double") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocArgsDouble());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature8<void, double, double, double, double, double, double, double, void*>(kCallConvHost));
+    c.addFunc(FuncSignature8<void, double, double, double, double, double, double, double, void*>(CallConv::kIdHost));
 
     uint32_t i;
 
@@ -1566,12 +1566,12 @@ class X86Test_AllocRetFloat : public X86Test {
 public:
   X86Test_AllocRetFloat() : X86Test("[Alloc] Ret Float") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocRetFloat());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<float, float, float>(kCallConvHost));
+    c.addFunc(FuncSignature2<float, float, float>(CallConv::kIdHost));
 
     X86Xmm a = c.newXmmSs("a");
     X86Xmm b = c.newXmmSs("b");
@@ -1607,12 +1607,12 @@ class X86Test_AllocRetDouble : public X86Test {
 public:
   X86Test_AllocRetDouble() : X86Test("[Alloc] Ret Double") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocRetDouble());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<double, double, double>(kCallConvHost));
+    c.addFunc(FuncSignature2<double, double, double>(CallConv::kIdHost));
 
     X86Xmm a = c.newXmmSd("a");
     X86Xmm b = c.newXmmSd("b");
@@ -1650,12 +1650,12 @@ public:
 
   enum { kSize = 256 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocStack1());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     X86Mem stack = c.newStack(kSize, 1);
     stack.setSize(1);
@@ -1718,12 +1718,12 @@ public:
 
   enum { kSize = 256 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocStack2());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     const int kTokenSize = 32;
 
@@ -1743,19 +1743,19 @@ public:
     c.lea(p2, s2);
 
     // Try to corrupt the stack if wrongly allocated.
-    call = c.call(imm_ptr((void*)memcpy), FuncSignature3<void*, void*, void*, size_t>(kCallConvHostCDecl));
+    call = c.call(imm_ptr((void*)memcpy), FuncSignature3<void*, void*, void*, size_t>(CallConv::kIdHostCDecl));
     call->setArg(0, p1);
     call->setArg(1, imm_ptr(token));
     call->setArg(2, imm(kTokenSize));
     call->setRet(0, p1);
 
-    call = c.call(imm_ptr((void*)memcpy), FuncSignature3<void*, void*, void*, size_t>(kCallConvHostCDecl));
+    call = c.call(imm_ptr((void*)memcpy), FuncSignature3<void*, void*, void*, size_t>(CallConv::kIdHostCDecl));
     call->setArg(0, p2);
     call->setArg(1, imm_ptr(token));
     call->setArg(2, imm(kTokenSize));
     call->setRet(0, p2);
 
-    call = c.call(imm_ptr((void*)memcmp), FuncSignature3<int, void*, void*, size_t>(kCallConvHostCDecl));
+    call = c.call(imm_ptr((void*)memcmp), FuncSignature3<int, void*, void*, size_t>(CallConv::kIdHostCDecl));
     call->setArg(0, p1);
     call->setArg(1, p2);
     call->setArg(2, imm(kTokenSize));
@@ -1800,7 +1800,7 @@ public:
 
   enum { kCount = 32 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocMemcpy());
   }
 
@@ -1812,7 +1812,7 @@ public:
     Label L_Loop = c.newLabel();                   // Create base labels we use
     Label L_Exit = c.newLabel();                   // in our function.
 
-    c.addFunc(FuncSignature3<void, uint32_t*, const uint32_t*, size_t>(kCallConvHost));
+    c.addFunc(FuncSignature3<void, uint32_t*, const uint32_t*, size_t>(CallConv::kIdHost));
     c.setArg(0, dst);
     c.setArg(1, src);
     c.setArg(2, cnt);
@@ -1886,7 +1886,7 @@ public:
 
   enum { kCount = 17 };
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocAlphaBlend());
   }
 
@@ -1963,7 +1963,7 @@ class X86Test_CallBase : public X86Test {
 public:
   X86Test_CallBase() : X86Test("[Call] CDecl") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallBase());
   }
 
@@ -1972,7 +1972,7 @@ public:
     X86Gp v1 = c.newInt32("v1");
     X86Gp v2 = c.newInt32("v2");
 
-    c.addFunc(FuncSignature3<int, int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature3<int, int, int, int>(CallConv::kIdHost));
     c.setArg(0, v0);
     c.setArg(1, v1);
     c.setArg(2, v2);
@@ -1986,7 +1986,7 @@ public:
     X86Gp fn = c.newIntPtr("fn");
     c.mov(fn, imm_ptr(calledFunc));
 
-    X86CCCall* call = c.call(fn, FuncSignature3<int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature3<int, int, int, int>(CallConv::kIdHost));
     call->setArg(0, v2);
     call->setArg(1, v1);
     call->setArg(2, v0);
@@ -2020,7 +2020,7 @@ class X86Test_CallFast : public X86Test {
 public:
   X86Test_CallFast() : X86Test("[Call] Fastcall") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallFast());
   }
 
@@ -2028,17 +2028,17 @@ public:
     X86Gp var = c.newInt32("var");
     X86Gp fn = c.newIntPtr("fn");
 
-    c.addFunc(FuncSignature1<int, int>(kCallConvHost));
+    c.addFunc(FuncSignature1<int, int>(CallConv::kIdHost));
     c.setArg(0, var);
 
     c.mov(fn, imm_ptr(calledFunc));
     X86CCCall* call;
 
-    call = c.call(fn, FuncSignature1<int, int>(kCallConvHostFastCall));
+    call = c.call(fn, FuncSignature1<int, int>(CallConv::kIdHostFastCall));
     call->setArg(0, var);
     call->setRet(0, var);
 
-    call = c.call(fn, FuncSignature1<int, int>(kCallConvHostFastCall));
+    call = c.call(fn, FuncSignature1<int, int>(CallConv::kIdHostFastCall));
     call->setArg(0, var);
     call->setRet(0, var);
 
@@ -2073,7 +2073,7 @@ class X86Test_CallManyArgs : public X86Test {
 public:
   X86Test_CallManyArgs() : X86Test("[Call] Many Args") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallManyArgs());
   }
 
@@ -2082,7 +2082,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     // Prepare.
     X86Gp fn = c.newIntPtr("fn");
@@ -2110,7 +2110,7 @@ public:
     c.mov(vj, 0x1E);
 
     // Call function.
-    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(CallConv::kIdHost));
     call->setArg(0, va);
     call->setArg(1, vb);
     call->setArg(2, vc);
@@ -2149,7 +2149,7 @@ class X86Test_CallDuplicateArgs : public X86Test {
 public:
   X86Test_CallDuplicateArgs() : X86Test("[Call] Duplicate Args") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallDuplicateArgs());
   }
 
@@ -2158,7 +2158,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     // Prepare.
     X86Gp fn = c.newIntPtr("fn");
@@ -2168,7 +2168,7 @@ public:
     c.mov(a, 3);
 
     // Call function.
-    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(CallConv::kIdHost));
     call->setArg(0, a);
     call->setArg(1, a);
     call->setArg(2, a);
@@ -2207,12 +2207,12 @@ class X86Test_CallImmArgs : public X86Test {
 public:
   X86Test_CallImmArgs() : X86Test("[Call] Imm Args") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallImmArgs());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     // Prepare.
     X86Gp fn = c.newIntPtr("fn");
@@ -2221,7 +2221,7 @@ public:
     c.mov(fn, imm_ptr(X86Test_CallManyArgs::calledFunc));
 
     // Call function.
-    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, int, int, int, int, int, int, int, int, int, int>(CallConv::kIdHost));
     call->setArg(0, imm(0x03));
     call->setArg(1, imm(0x12));
     call->setArg(2, imm(0xA0));
@@ -2260,7 +2260,7 @@ class X86Test_CallPtrArgs : public X86Test {
 public:
   X86Test_CallPtrArgs() : X86Test("[Call] Ptr Args") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallPtrArgs());
   }
 
@@ -2278,7 +2278,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     // Prepare.
     X86Gp fn = c.newIntPtr("fn");
@@ -2287,7 +2287,7 @@ public:
     c.mov(fn, imm_ptr(calledFunc));
 
     // Call function.
-    X86CCCall* call = c.call(fn, FuncSignature10<int, void*, void*, void*, void*, void*, void*, void*, void*, void*, void*>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature10<int, void*, void*, void*, void*, void*, void*, void*, void*, void*, void*>(CallConv::kIdHost));
     call->setArg(0, imm(0x01));
     call->setArg(1, imm(0x02));
     call->setArg(2, imm(0x03));
@@ -2326,7 +2326,7 @@ class X86Test_CallFloatAsXmmRet : public X86Test {
 public:
   X86Test_CallFloatAsXmmRet() : X86Test("[Call] Float As Xmm Ret") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallFloatAsXmmRet());
   }
 
@@ -2335,7 +2335,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<float, float, float>(kCallConvHost));
+    c.addFunc(FuncSignature2<float, float, float>(CallConv::kIdHost));
 
     X86Xmm a = c.newXmmSs("a");
     X86Xmm b = c.newXmmSs("b");
@@ -2349,7 +2349,7 @@ public:
     c.mov(fn, imm_ptr(calledFunc));
 
     // Call function.
-    X86CCCall* call = c.call(fn, FuncSignature2<float, float, float>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature2<float, float, float>(CallConv::kIdHost));
 
     call->setArg(0, a);
     call->setArg(1, b);
@@ -2381,7 +2381,7 @@ class X86Test_CallDoubleAsXmmRet : public X86Test {
 public:
   X86Test_CallDoubleAsXmmRet() : X86Test("[Call] Double As Xmm Ret") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallDoubleAsXmmRet());
   }
 
@@ -2390,7 +2390,7 @@ public:
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature2<double, double, double>(kCallConvHost));
+    c.addFunc(FuncSignature2<double, double, double>(CallConv::kIdHost));
 
     X86Xmm a = c.newXmmSd("a");
     X86Xmm b = c.newXmmSd("b");
@@ -2402,7 +2402,7 @@ public:
     X86Gp fn = c.newIntPtr("fn");
     c.mov(fn, imm_ptr(calledFunc));
 
-    X86CCCall* call = c.call(fn, FuncSignature2<double, double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature2<double, double, double>(CallConv::kIdHost));
 
     call->setArg(0, a);
     call->setArg(1, b);
@@ -2434,7 +2434,7 @@ class X86Test_CallConditional : public X86Test {
 public:
   X86Test_CallConditional() : X86Test("[Call] Conditional") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallConditional());
   }
 
@@ -2446,7 +2446,7 @@ public:
     X86CCCall* call;
     X86Gp result;
 
-    c.addFunc(FuncSignature3<int, int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature3<int, int, int, int>(CallConv::kIdHost));
     c.setArg(0, x);
     c.setArg(1, y);
     c.setArg(2, op);
@@ -2466,7 +2466,7 @@ public:
     c.bind(opAdd);
     result = c.newInt32("result_1");
 
-    call = c.call((uint64_t)calledFuncAdd, FuncSignature2<int, int, int>(kCallConvHost));
+    call = c.call((uint64_t)calledFuncAdd, FuncSignature2<int, int, int>(CallConv::kIdHost));
     call->setArg(0, x);
     call->setArg(1, y);
     call->setRet(0, result);
@@ -2475,7 +2475,7 @@ public:
     c.bind(opMul);
     result = c.newInt32("result_2");
 
-    call = c.call((uint64_t)calledFuncMul, FuncSignature2<int, int, int>(kCallConvHost));
+    call = c.call((uint64_t)calledFuncMul, FuncSignature2<int, int, int>(CallConv::kIdHost));
     call->setArg(0, x);
     call->setArg(1, y);
     call->setRet(0, result);
@@ -2515,7 +2515,7 @@ class X86Test_CallMultiple : public X86Test {
 public:
   X86Test_CallMultiple() : X86Test("[Call] Multiple") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMultiple());
   }
 
@@ -2530,7 +2530,7 @@ public:
     X86Gp acc0 = c.newInt32("acc0");
     X86Gp acc1 = c.newInt32("acc1");
 
-    c.addFunc(FuncSignature1<int, int*>(kCallConvHost));
+    c.addFunc(FuncSignature1<int, int*>(CallConv::kIdHost));
     c.setArg(0, buf);
 
     c.mov(acc0, 0);
@@ -2545,7 +2545,7 @@ public:
       c.mov(ptr, buf);
       c.mov(idx, static_cast<int>(i));
 
-      call = c.call((uint64_t)calledFunc, FuncSignature2<int, int*, int>(kCallConvHostFastCall));
+      call = c.call((uint64_t)calledFunc, FuncSignature2<int, int*, int>(CallConv::kIdHostFastCall));
       call->setArg(0, ptr);
       call->setArg(1, idx);
       call->setRet(0, ret);
@@ -2555,7 +2555,7 @@ public:
       c.mov(ptr, buf);
       c.mov(idx, static_cast<int>(i));
 
-      call = c.call((uint64_t)calledFunc, FuncSignature2<int, int*, int>(kCallConvHostFastCall));
+      call = c.call((uint64_t)calledFunc, FuncSignature2<int, int*, int>(CallConv::kIdHostFastCall));
       call->setArg(0, ptr);
       call->setArg(1, idx);
       call->setRet(0, ret);
@@ -2592,7 +2592,7 @@ class X86Test_CallRecursive : public X86Test {
 public:
   X86Test_CallRecursive() : X86Test("[Call] Recursive") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallRecursive());
   }
 
@@ -2600,7 +2600,7 @@ public:
     X86Gp val = c.newInt32("val");
     Label skip = c.newLabel();
 
-    X86Func* func = c.addFunc(FuncSignature1<int, int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<int, int>(CallConv::kIdHost));
     c.setArg(0, val);
 
     c.cmp(val, 1);
@@ -2610,7 +2610,7 @@ public:
     c.mov(tmp, val);
     c.dec(tmp);
 
-    X86CCCall* call = c.call(func->getLabel(), FuncSignature1<int, int>(kCallConvHost));
+    X86CCCall* call = c.call(func->getLabel(), FuncSignature1<int, int>(CallConv::kIdHost));
     call->setArg(0, tmp);
     call->setRet(0, tmp);
     c.mul(c.newInt32(), val, tmp);
@@ -2642,7 +2642,7 @@ class X86Test_CallMisc1 : public X86Test {
 public:
   X86Test_CallMisc1() : X86Test("[Call] Misc #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMisc1());
   }
 
@@ -2652,7 +2652,7 @@ public:
     X86Gp val = c.newInt32("val");
     Label skip = c.newLabel();
 
-    X86Func* func = c.addFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     X86Gp a = c.newInt32("a");
     X86Gp b = c.newInt32("b");
@@ -2664,7 +2664,7 @@ public:
     c.alloc(a, x86::eax);
     c.alloc(b, x86::ebx);
 
-    X86CCCall* call = c.call(imm_ptr(dummy), FuncSignature2<void, int, int>(kCallConvHost));
+    X86CCCall* call = c.call(imm_ptr(dummy), FuncSignature2<void, int, int>(CallConv::kIdHost));
     call->setArg(0, a);
     call->setArg(1, b);
 
@@ -2696,12 +2696,12 @@ class X86Test_CallMisc2 : public X86Test {
 public:
   X86Test_CallMisc2() : X86Test("[Call] Misc #2") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMisc2());
   }
 
   virtual void compile(X86Compiler& c) {
-    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(CallConv::kIdHost));
 
     X86Gp p = c.newIntPtr("p");
     X86Gp fn = c.newIntPtr("fn");
@@ -2713,7 +2713,7 @@ public:
     c.movsd(arg, x86::ptr(p));
     c.mov(fn, imm_ptr(op));
 
-    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(CallConv::kIdHost));
     call->setArg(0, arg);
     call->setRet(0, ret);
 
@@ -2747,12 +2747,12 @@ class X86Test_CallMisc3 : public X86Test {
 public:
   X86Test_CallMisc3() : X86Test("[Call] Misc #3") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMisc3());
   }
 
   virtual void compile(X86Compiler& c) {
-    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature1<double, const double*>(CallConv::kIdHost));
 
     X86Gp p = c.newIntPtr("p");
     X86Gp fn = c.newIntPtr("fn");
@@ -2764,7 +2764,7 @@ public:
     c.movsd(arg, x86::ptr(p));
     c.mov(fn, imm_ptr(op));
 
-    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(kCallConvHost));
+    X86CCCall* call = c.call(fn, FuncSignature1<double, double>(CallConv::kIdHost));
     call->setArg(0, arg);
     call->setRet(0, ret);
 
@@ -2801,20 +2801,20 @@ class X86Test_CallMisc4 : public X86Test {
 public:
   X86Test_CallMisc4() : X86Test("[Call] Misc #4") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMisc4());
   }
 
   virtual void compile(X86Compiler& c) {
     FuncSignatureX funcPrototype;
 
-    funcPrototype.setCallConv(kCallConvHost);
-    funcPrototype.setRet(VirtType::kIdF64);
+    funcPrototype.setCallConv(CallConv::kIdHost);
+    funcPrototype.setRet(TypeId::kF64);
     X86Func* func = c.addFunc(funcPrototype);
 
     FuncSignatureX callPrototype;
-    callPrototype.setCallConv(kCallConvHost);
-    callPrototype.setRet(VirtType::kIdF64);
+    callPrototype.setCallConv(CallConv::kIdHost);
+    callPrototype.setRet(TypeId::kF64);
     X86CCCall* call = c.call(imm_ptr(calledFunc), callPrototype);
 
     X86Xmm ret = c.newXmmSd("ret");
@@ -2849,12 +2849,12 @@ class X86Test_CallMisc5 : public X86Test {
 public:
   X86Test_CallMisc5() : X86Test("[Call] Misc #5") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_CallMisc5());
   }
 
   virtual void compile(X86Compiler& c) {
-    X86Func* func = c.addFunc(FuncSignature0<int>(kCallConvHost));
+    X86Func* func = c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     X86Gp pFn = c.newIntPtr("pFn");
     X86Gp vars[16];
@@ -2874,7 +2874,7 @@ public:
       c.mov(vars[i], 1);
     }
 
-    X86CCCall* call = c.call(pFn, FuncSignature0<void>(kCallConvHost));
+    X86CCCall* call = c.call(pFn, FuncSignature0<void>(CallConv::kIdHost));
 
     for (i = 1; i < regCount; i++) {
       if (vars[i].isValid())
@@ -2909,12 +2909,12 @@ class X86Test_MiscConstPool : public X86Test {
 public:
   X86Test_MiscConstPool() : X86Test("[Misc] ConstPool #1") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_MiscConstPool());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature0<int>(kCallConvHost));
+    c.addFunc(FuncSignature0<int>(CallConv::kIdHost));
 
     X86Gp v0 = c.newInt32("v0");
     X86Gp v1 = c.newInt32("v1");
@@ -2951,12 +2951,12 @@ public:
 struct X86Test_MiscMultiRet : public X86Test {
   X86Test_MiscMultiRet() : X86Test("[Misc] MultiRet") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_MiscMultiRet());
   }
 
   virtual void compile(X86Compiler& c) {
-    c.addFunc(FuncSignature3<int, int, int, int>(kCallConvHost));
+    c.addFunc(FuncSignature3<int, int, int, int>(CallConv::kIdHost));
 
     X86Gp op = c.newInt32("op");
     X86Gp a = c.newInt32("a");
@@ -3044,13 +3044,13 @@ class X86Test_MiscMultiFunc : public X86Test {
 public:
   X86Test_MiscMultiFunc() : X86Test("[Misc] MultiFunc") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_MiscMultiFunc());
   }
 
   virtual void compile(X86Compiler& c) {
-    X86Func* f1 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
-    X86Func* f2 = c.newFunc(FuncSignature2<int, int, int>(kCallConvHost));
+    X86Func* f1 = c.newFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
+    X86Func* f2 = c.newFunc(FuncSignature2<int, int, int>(CallConv::kIdHost));
 
     {
       X86Gp a = c.newInt32("a");
@@ -3060,7 +3060,7 @@ public:
       c.setArg(0, a);
       c.setArg(1, b);
 
-      X86CCCall* call = c.call(f2->getLabel(), FuncSignature2<int, int, int>(kCallConvHost));
+      X86CCCall* call = c.call(f2->getLabel(), FuncSignature2<int, int, int>(CallConv::kIdHost));
       call->setArg(0, a);
       call->setArg(1, b);
       call->setRet(0, a);
@@ -3109,16 +3109,16 @@ class X86Test_MiscUnfollow : public X86Test {
 public:
   X86Test_MiscUnfollow() : X86Test("[Misc] Unfollow") {}
 
-  static void add(PodVector<X86Test*>& tests) {
+  static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_MiscUnfollow());
   }
 
   virtual void compile(X86Compiler& c) {
     // NOTE: Fastcall calling convention is the most appropriate here, as all
-    // arguments will be passed in registers and there won't be any stack
+    // arguments will be passed by registers and there won't be any stack
     // misalignment when we call the `handler()`. This was failing on OSX
     // when targeting 32-bit.
-    c.addFunc(FuncSignature2<void, int, void*>(kCallConvHostFastCall));
+    c.addFunc(FuncSignature2<void, int, void*>(CallConv::kIdHostFastCall));
 
     X86Gp a = c.newInt32("a");
     X86Gp b = c.newIntPtr("b");
@@ -3184,21 +3184,25 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  PodVector<X86Test*> tests;
-  StringBuilder output;
+  Zone _zone;
+  ZoneAllocator _allocator;
+  ZoneVector<X86Test*> _tests;
 
-  int returnCode;
-  int binSize;
-  bool alwaysPrintLog;
+  int _returnCode;
+  int _binSize;
+  bool _alwaysPrintLog;
+  StringBuilder _output;
 };
 
-#define ADD_TEST(_Class_) \
-  _Class_::add(tests)
+#define ADD_TEST(CLASS) CLASS::add(_tests)
 
 X86TestSuite::X86TestSuite() :
-  returnCode(0),
-  binSize(0),
-  alwaysPrintLog(false) {
+  _zone(8096 - Zone::kZoneOverhead),
+  _allocator(&_zone),
+  _tests(&_allocator),
+  _returnCode(0),
+  _binSize(0),
+  _alwaysPrintLog(false) {
 
   // Align.
   ADD_TEST(X86Test_AlignBase);
@@ -3206,6 +3210,7 @@ X86TestSuite::X86TestSuite() :
 
   // Jump.
   ADD_TEST(X86Test_JumpCross);
+
   ADD_TEST(X86Test_JumpMany);
   ADD_TEST(X86Test_JumpUnreachable1);
   ADD_TEST(X86Test_JumpUnreachable2);
@@ -3265,17 +3270,17 @@ X86TestSuite::X86TestSuite() :
 
 X86TestSuite::~X86TestSuite() {
   size_t i;
-  size_t count = tests.getLength();
+  size_t count = _tests.getLength();
 
   for (i = 0; i < count; i++) {
-    X86Test* test = tests[i];
+    X86Test* test = _tests[i];
     delete test;
   }
 }
 
 int X86TestSuite::run() {
   size_t i;
-  size_t count = tests.getLength();
+  size_t count = _tests.getLength();
 
   FILE* file = stdout;
 
@@ -3291,11 +3296,10 @@ int X86TestSuite::run() {
     JitRuntime runtime;
 
     CodeHolder code;
-
     code.init(runtime.getCodeInfo());
     code.setErrorHandler(&errorHandler);
 
-    if (alwaysPrintLog) {
+    if (_alwaysPrintLog) {
       fprintf(file, "\n");
       code.setLogger(&fileLogger);
     }
@@ -3304,16 +3308,16 @@ int X86TestSuite::run() {
       code.setLogger(&stringLogger);
     }
 
-    X86Compiler c(&code);
-    X86Test* test = tests[i];
-    test->compile(c);
+    X86Compiler cc(&code);
+    X86Test* test = _tests[i];
+    test->compile(cc);
 
-    Error err = c.finalize();
+    Error err = cc.finalize();
     void* func;
 
     if (err == kErrorOk)
       err = runtime.add(&func, &code);
-    if (alwaysPrintLog) fflush(file);
+    if (_alwaysPrintLog) fflush(file);
 
     if (err == kErrorOk) {
       StringBuilder result;
@@ -3323,7 +3327,7 @@ int X86TestSuite::run() {
         fprintf(file, "[Success] %s.\n", test->getName());
       }
       else {
-        if (!alwaysPrintLog) {
+        if (!_alwaysPrintLog) {
           fprintf(file, "\n%s", stringLogger.getString());
         }
 
@@ -3334,13 +3338,13 @@ int X86TestSuite::run() {
         fprintf(file, "Expected: %s\n", expect.getData());
         fprintf(file, "===============================================================================\n");
 
-        returnCode = 1;
+        _returnCode = 1;
       }
 
       runtime.release(func);
     }
     else {
-      if (!alwaysPrintLog) {
+      if (!_alwaysPrintLog) {
         fprintf(file, "%s\n", stringLogger.getString());
       }
 
@@ -3348,17 +3352,17 @@ int X86TestSuite::run() {
       fprintf(file, "[Failure] %s (%s).\n", test->getName(), DebugUtils::errorAsString(err));
       fprintf(file, "===============================================================================\n");
 
-      returnCode = 1;
+      _returnCode = 1;
     }
 
     fflush(file);
   }
 
   fputs("\n", file);
-  fputs(output.getData(), file);
+  fputs(_output.getData(), file);
   fflush(file);
 
-  return returnCode;
+  return _returnCode;
 }
 
 // ============================================================================
@@ -3395,9 +3399,8 @@ int main(int argc, char* argv[]) {
   X86TestSuite testSuite;
   CmdLine cmd(argc, argv);
 
-  if (cmd.hasArg("--always-print-log")) {
-    testSuite.alwaysPrintLog = true;
-  }
+  if (cmd.hasArg("--always-print-log"))
+    testSuite._alwaysPrintLog = true;
 
   return testSuite.run();
 }

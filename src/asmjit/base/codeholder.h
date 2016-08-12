@@ -9,12 +9,14 @@
 #define _ASMJIT_BASE_CODEHOLDER_H
 
 // [Dependencies]
-#include "../base/containers.h"
+#include "../base/func.h"
 #include "../base/logging.h"
 #include "../base/operand.h"
 #include "../base/simdtypes.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
+#include "../base/zoneallocator.h"
+#include "../base/zonecontainers.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -120,9 +122,9 @@ public:
   ASMJIT_INLINE CodeInfo() noexcept
     : _arch(),
       _stackAlignment(0),
-      _cdeclCallConv(kCallConvNone),
-      _stdCallConv(kCallConvNone),
-      _fastCallConv(kCallConvNone),
+      _cdeclCallConv(CallConv::kIdNone),
+      _stdCallConv(CallConv::kIdNone),
+      _fastCallConv(CallConv::kIdNone),
       _baseAddress(kNoBaseAddress) {}
   ASMJIT_INLINE CodeInfo(const CodeInfo& other) noexcept { *this = other; }
 
@@ -154,9 +156,9 @@ public:
   ASMJIT_INLINE void reset() noexcept {
     _arch.reset();
     _stackAlignment = 0;
-    _cdeclCallConv = kCallConvNone;
-    _stdCallConv = kCallConvNone;
-    _fastCallConv = kCallConvNone;
+    _cdeclCallConv = CallConv::kIdNone;
+    _stdCallConv = CallConv::kIdNone;
+    _fastCallConv = CallConv::kIdNone;
     _baseAddress = kNoBaseAddress;
   }
 
@@ -169,8 +171,8 @@ public:
 
   //! Get architecture type, see \ref Arch::Type.
   ASMJIT_INLINE uint32_t getArchType() const noexcept { return _arch._type; }
-  //! Get architecture mode, see \ref Arch::Mode.
-  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _arch._mode; }
+  //! Get architecture sub-type, see \ref Arch::SubType.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _arch._subType; }
   //! Get a size of a GP register of the architecture the code is using.
   ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _arch._gpSize; }
   //! Get number of GP registers available of the architecture the code is using.
@@ -215,7 +217,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  Arch _arch;                            //!< Information about the architecture.
+  Arch _arch;                            //!< Architecture information.
 
   union {
     struct {
@@ -321,9 +323,9 @@ public:
   //!
   //!   * HVal - Hash value of label's name and optionally parentId.
   //!   * HashNext - Hash-table implementation detail.
-  class LabelEntry : public PodHashNode {
+  class LabelEntry : public ZoneHashNode {
   public:
-    // NOTE: Label id is stored in `_customData`, which is provided by PodHashNode
+    // NOTE: Label id is stored in `_customData`, which is provided by ZoneHashNode
     // to fill a padding that a C++ compiler targeting 64-bit CPU will add to align
     // the structure to 64-bits.
 
@@ -459,10 +461,10 @@ public:
 
   //! Get information about the architecture, see \ref Arch.
   ASMJIT_INLINE const Arch& getArch() const noexcept { return _codeInfo._arch; }
-  //! Get the target architecture.
+  //! Get the target's architecture type.
   ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo._arch.getType(); }
-  //! Get the architecture's mode.
-  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _codeInfo._arch.getMode(); }
+  //! Get the target's architecture sub-type.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _codeInfo._arch.getSubType(); }
 
   //! Get if a static base-address is set.
   ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _codeInfo._baseAddress != kNoBaseAddress; }
@@ -522,7 +524,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get array of `SectionEntry*` records.
-  ASMJIT_INLINE const PodVector<SectionEntry*>& getSections() const noexcept { return _sections; }
+  ASMJIT_INLINE const ZoneVector<SectionEntry*>& getSections() const noexcept { return _sections; }
 
   // TODO: Maybe getSectionEntry() would be a better name, like getLabelEntry()?
   //! Get a specific section based on its id.
@@ -554,7 +556,7 @@ public:
   ASMJIT_API LabelLink* newLabelLink() noexcept;
 
   //! Get array of `LabelEntry*` records.
-  ASMJIT_INLINE const PodVector<LabelEntry*>& getLabels() const noexcept { return _labels; }
+  ASMJIT_INLINE const ZoneVector<LabelEntry*>& getLabels() const noexcept { return _labels; }
 
   //! Get number of labels created.
   ASMJIT_INLINE size_t getLabelsCount() const noexcept { return _labels.getLength(); }
@@ -629,9 +631,6 @@ public:
 
   CodeInfo _codeInfo;                    //!< Basic information about the code (architecture and other info).
 
-  uint8_t _isLocked;                     //!< If the `CodeHolder` settings are locked.
-  uint8_t _reserved[3];
-
   uint32_t _globalHints;                 //!< Global hints, propagated to all `CodeEmitter`s.
   uint32_t _globalOptions;               //!< Global options, propagated to all `CodeEmitter`s.
 
@@ -643,16 +642,14 @@ public:
 
   uint32_t _trampolinesSize;             //!< Size of all possible trampolines.
 
-  Zone _baseAllocator;                   //!< Base allocator (sections, labels, and relocations).
-  Zone _nameAllocator;                   //!< Allocates label names.
+  Zone _baseZone;                        //!< Base zone (used to allocate core structures).
+  Zone _dataZone;                        //!< Data zone (used to allocate extra data like label names).
+  ZoneAllocator _baseAllocator;          //!< Zone allocator, used to manage internal containers.
 
-  PodVectorTmp<SectionEntry*, 1> _sections; //!< Section entries.
-  PodVector<LabelEntry*> _labels;        //!< Label entries (each label is stored here).
-  PodHash<LabelEntry> _labelsHash;       //!< Label name -> LabelEntry (only named labels).
-  LabelLink* _unusedLinks;               //!< Pool of unused `LabelLink`s.
-  PodVector<RelocEntry> _relocations;    //!< Relocation entries.
-
-  SectionEntry _defaultSection;          //!< Statically allocated default section.
+  ZoneVector<SectionEntry*> _sections;   //!< Section entries.
+  ZoneVector<LabelEntry*> _labels;       //!< Label entries (each label is stored here).
+  ZoneVector<RelocEntry> _relocations;   //!< Relocation entries.
+  ZoneHash<LabelEntry> _namedLabels;     //!< Label name -> LabelEntry (only named labels).
 };
 
 //! \}

@@ -17,7 +17,6 @@
 #include "./base/codeemitter.h"
 #include "./base/codeholder.h"
 #include "./base/constpool.h"
-#include "./base/containers.h"
 #include "./base/cpuinfo.h"
 #include "./base/func.h"
 #include "./base/globals.h"
@@ -30,6 +29,8 @@
 #include "./base/utils.h"
 #include "./base/vmem.h"
 #include "./base/zone.h"
+#include "./base/zoneallocator.h"
+#include "./base/zonecontainers.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_H

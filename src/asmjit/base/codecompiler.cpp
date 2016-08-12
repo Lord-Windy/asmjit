@@ -39,9 +39,9 @@ enum { kCompilerDefaultLookAhead = 64 };
 CodeCompiler::CodeCompiler() noexcept
   : CodeBuilder(),
     _maxLookAhead(kCompilerDefaultLookAhead),
-    _typeIdMap(nullptr),
     _func(nullptr),
-    _vRegAllocator(4096 - Zone::kZoneOverhead),
+    _vRegZone(4096 - Zone::kZoneOverhead),
+    _vRegArray(&_cbBaseAllocator),
     _localConstPool(nullptr),
     _globalConstPool(nullptr) {
 
@@ -64,8 +64,8 @@ Error CodeCompiler::onDetach(CodeHolder* code) noexcept {
   _localConstPool = nullptr;
   _globalConstPool = nullptr;
 
-  _vRegAllocator.reset(false);
-  _vRegArray.reset(false);
+  _vRegArray.reset(&_cbBaseAllocator);
+  _vRegZone.reset(false);
 
   return Base::onDetach(code);
 }
@@ -116,46 +116,141 @@ Error CodeCompiler::_hint(Reg& r, uint32_t hint, uint32_t value) {
 // [asmjit::CodeCompiler - Vars]
 // ============================================================================
 
-VirtReg* CodeCompiler::newVirtReg(const VirtType& typeInfo, const char* name) noexcept {
+VirtReg* CodeCompiler::newVirtReg(uint32_t typeId, uint32_t signature, const char* name) noexcept {
   size_t index = _vRegArray.getLength();
-  if (index <= Operand::kPackedIdCount) {
-    VirtReg* vreg;
-    if (_vRegArray.willGrow(1) != kErrorOk || !(vreg = _vRegAllocator.allocT<VirtReg>()))
-      return nullptr;
+  if (ASMJIT_UNLIKELY(index > Operand::kPackedIdCount))
+    return nullptr;
 
-    vreg->_id = Operand::packId(static_cast<uint32_t>(index));
-    vreg->_regInfo.signature = typeInfo.getSignature();
+  VirtReg* vreg;
+  if (_vRegArray.willGrow(1) != kErrorOk || !(vreg = _vRegZone.allocT<VirtReg>()))
+    return nullptr;
 
-    vreg->_name = noName;
+  vreg->_id = Operand::packId(static_cast<uint32_t>(index));
+  vreg->_regInfo.signature = signature;
+  vreg->_name = noName;
+
 #if !defined(ASMJIT_DISABLE_LOGGING)
-    if (name && name[0] != '\0')
-      vreg->_name = _dataAllocator.sdup(name);
+  if (name && name[0] != '\0')
+    vreg->_name = static_cast<char*>(_cbDataZone.dup(name, ::strlen(name), true));
 #endif // !ASMJIT_DISABLE_LOGGING
 
-    vreg->_typeId = static_cast<uint8_t>(typeInfo.getTypeId());
-    vreg->_size = typeInfo.getTypeSize();
-    vreg->_alignment = static_cast<uint8_t>(Utils::iMin<uint32_t>(typeInfo.getTypeSize(), 64));
-    vreg->_priority = 10;
-    vreg->_isStack = false;
-    vreg->_isMemArg = false;
-    vreg->_isMaterialized = false;
-    vreg->_saveOnUnuse = false;
+  vreg->_size = TypeId::sizeOf(typeId);
+  vreg->_typeId = typeId;
+  vreg->_alignment = static_cast<uint8_t>(Utils::iMin<uint32_t>(vreg->_size, 64));
+  vreg->_priority = 10;
+  vreg->_isStack = false;
+  vreg->_isMemArg = false;
+  vreg->_isMaterialized = false;
+  vreg->_saveOnUnuse = false;
 
-    // The following are only used by `RAPass`.
-    vreg->_raId = kInvalidValue;
-    vreg->_memOffset = 0;
-    vreg->_homeMask = 0;
-    vreg->_state = VirtReg::kStateNone;
-    vreg->_physId = kInvalidReg;
-    vreg->_modified = false;
-    vreg->_memCell = nullptr;
-    vreg->_tied = nullptr;
+  // The following are only used by `RAPass`.
+  vreg->_raId = kInvalidValue;
+  vreg->_memOffset = 0;
+  vreg->_homeMask = 0;
+  vreg->_state = VirtReg::kStateNone;
+  vreg->_physId = kInvalidReg;
+  vreg->_modified = false;
+  vreg->_memCell = nullptr;
+  vreg->_tied = nullptr;
 
-    _vRegArray.appendUnsafe(vreg);
-    return vreg;
+  _vRegArray.appendUnsafe(vreg);
+  return vreg;
+}
+
+Error CodeCompiler::_newReg(Reg& out, uint32_t typeId, const char* name) {
+  uint32_t signature = 0;
+
+  Error err = _prepareTypeId(typeId, signature);
+  if (ASMJIT_UNLIKELY(err)) return setLastError(err);
+
+  VirtReg* vreg = newVirtReg(typeId, signature, name);
+  if (ASMJIT_UNLIKELY(!vreg)) {
+    out.reset();
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  return nullptr;
+  out._initReg(signature, vreg->getId());
+  return kErrorOk;
+}
+
+Error CodeCompiler::_newReg(Reg& out, uint32_t typeId, const char* nameFmt, va_list ap) {
+  StringBuilderTmp<256> sb;
+  sb.appendFormatVA(nameFmt, ap);
+  return _newReg(out, typeId, sb.getData());
+}
+
+Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* name) {
+  uint32_t typeId = ref.getRegType();
+  uint32_t signature = 0;
+
+  Error err = _prepareTypeId(typeId, signature);
+  if (ASMJIT_UNLIKELY(err)) return setLastError(err);
+
+  VirtReg* vreg = newVirtReg(typeId, signature, name);
+  if (ASMJIT_UNLIKELY(!vreg)) {
+    out.reset();
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  }
+
+  out._initReg(signature, vreg->getId());
+  return kErrorOk;
+}
+
+Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* nameFmt, va_list ap) {
+  StringBuilderTmp<256> sb;
+  sb.appendFormatVA(nameFmt, ap);
+  return _newReg(out, ref, sb.getData());
+}
+
+Error CodeCompiler::_newStack(Mem& out, uint32_t size, uint32_t alignment, const char* name) {
+  if (size == 0)
+    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
+
+  if (alignment == 0) alignment = 1;
+  if (alignment > 64) alignment = 64;
+
+  VirtReg* vreg = newVirtReg(0, 0, name);
+  if (ASMJIT_UNLIKELY(!vreg)) {
+    out.reset();
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  }
+
+  vreg->_size = size;
+  vreg->_isStack = true;
+  vreg->_alignment = static_cast<uint8_t>(alignment);
+
+  // Set the memory operand to GPD/GPQ and its id to VirtReg.
+  out = Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
+  return kErrorOk;
+}
+
+Error CodeCompiler::_newConst(Mem& out, uint32_t scope, const void* data, size_t size) {
+  CBConstPool** pPool;
+  if (scope == kConstScopeLocal)
+    pPool = &_localConstPool;
+  else if (scope == kConstScopeGlobal)
+    pPool = &_globalConstPool;
+  else
+    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
+
+  if (!*pPool && !(*pPool = newConstPool()))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  CBConstPool* pool = *pPool;
+  size_t off;
+
+  Error err = pool->add(data, size, off);
+  if (ASMJIT_UNLIKELY(err)) return setLastError(err);
+
+  out = Mem(Init,
+    Label::kLabelTag,             // Base type.
+    pool->getId(),                // Base id.
+    0,                            // Index type.
+    kInvalidValue,                // Index id.
+    static_cast<int32_t>(off),    // Offset.
+    static_cast<uint32_t>(size),  // Size.
+    0);                           // Flags.
+  return kErrorOk;
 }
 
 Error CodeCompiler::alloc(Reg& reg) {
@@ -233,7 +328,7 @@ void CodeCompiler::rename(Reg& reg, const char* fmt, ...) {
     vsnprintf(buf, ASMJIT_ARRAY_SIZE(buf), fmt, ap);
     buf[ASMJIT_ARRAY_SIZE(buf) - 1] = '\0';
 
-    vreg->_name = _dataAllocator.sdup(buf);
+    vreg->_name = static_cast<char*>(_cbDataZone.dup(buf, ::strlen(buf), true));
     va_end(ap);
   }
 }

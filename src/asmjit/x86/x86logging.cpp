@@ -222,7 +222,7 @@ Error X86Formatter::formatInstruction(
   uint32_t logOptions,
   uint32_t instId,
   uint32_t options,
-  const Operand_& opMask,
+  const Operand_& opExtra,
   const Operand_* opArray, uint32_t opCount) const noexcept {
 
   // Rex, lock and short prefix.
@@ -264,9 +264,9 @@ Error X86Formatter::formatInstruction(
 
     // Support AVX-512 {k}{z}.
     if (i == 0) {
-      if (options & CodeEmitter::kOptionHasOpMask) {
+      if (options & CodeEmitter::kOptionHasOpExtra) {
         out.appendString(" {");
-        formatOperand(out, logOptions, opMask);
+        formatOperand(out, logOptions, opExtra);
         out.appendChar('}');
 
         if (options & X86Inst::kOptionKZ)

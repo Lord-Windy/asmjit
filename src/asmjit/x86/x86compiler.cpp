@@ -23,85 +23,11 @@
 namespace asmjit {
 
 // ============================================================================
-// [Debug]
-// ============================================================================
-
-#if !defined(ASMJIT_DEBUG)
-#define ASMJIT_ASSERT_OPERAND(op) \
-  do {} while(0)
-#else
-#define ASMJIT_ASSERT_OPERAND(op) \
-  do { \
-    if (op.isReg() || op.isLabel()) { \
-      ASMJIT_ASSERT(op.getId() != kInvalidValue); \
-    } \
-  } while(0)
-#endif
-
-// ============================================================================
-// [asmjit::X86TypeData]
-// ============================================================================
-
-#define INVALID_TYPE() {{ 0, 0, 0, 0 }}
-#define SIGNATURE_OF(REG_TYPE) {{          \
-  uint8_t(Operand::kOpReg),                \
-  uint8_t(REG_TYPE),                       \
-  uint8_t(X86RegTraits<REG_TYPE>::kClass), \
-  uint8_t(X86RegTraits<REG_TYPE>::kSize)   \
-}}
-
-#define F(FLAG) VirtType::kFlag##FLAG    // Type-Flags.
-#define U kInvalidValue                  // Unsupported.
-
-const X86TypeData _x86TypeData = {
-  {// Signature                       , Type-Id              , Sz, Type-Flags        , Type-Name
-    { SIGNATURE_OF(X86Reg::kRegGpbLo), VirtType::kIdI8      , 1 , 0                 , "gp.i8"   }, // #0
-    { SIGNATURE_OF(X86Reg::kRegGpbLo), VirtType::kIdU8      , 1 , 0                 , "gp.u8"   }, // #1
-    { SIGNATURE_OF(X86Reg::kRegGpw)  , VirtType::kIdI16     , 2 , 0                 , "gp.i16"  }, // #2
-    { SIGNATURE_OF(X86Reg::kRegGpw)  , VirtType::kIdU16     , 2 , 0                 , "gp.u16"  }, // #3
-    { SIGNATURE_OF(X86Reg::kRegGpd)  , VirtType::kIdI32     , 4 , 0                 , "gp.i32"  }, // #4
-    { SIGNATURE_OF(X86Reg::kRegGpd)  , VirtType::kIdU32     , 4 , 0                 , "gp.u32"  }, // #5
-    { SIGNATURE_OF(X86Reg::kRegGpq)  , VirtType::kIdI64     , 8 , 0                 , "gp.i64"  }, // #6
-    { SIGNATURE_OF(X86Reg::kRegGpq)  , VirtType::kIdU64     , 8 , 0                 , "gp.u64"  }, // #7
-    { INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #8
-    { INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #9
-  //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #10
-  //{ INVALID_TYPE()                 , kInvalidValue        , 0 , 0                 , ""        }, // #11
-    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF32     , 4 , 0         | F(F32), "fp"      }, // #10
-    { SIGNATURE_OF(X86Reg::kRegFp)   , VirtType::kIdF64     , 8 , 0         | F(F64), "fp"      }, // #11
-    { SIGNATURE_OF(X86Reg::kRegK)    , VirtType::kIdX86K    , 8 , 0                 , "k"       }, // #12
-    { SIGNATURE_OF(X86Reg::kRegMm)   , VirtType::kIdX86Mm   , 8 , F(Vector)         , "mm"      }, // #13
-    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86Xmm  , 16, F(Vector)         , "xmm"     }, // #14
-    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmSs, 4 , 0         | F(F32), "xmm.ss"  }, // #15
-    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmSd, 8 , 0         | F(F64), "xmm.sd"  }, // #16
-    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmPs, 16, F(Vector) | F(F32), "xmm.ps"  }, // #17
-    { SIGNATURE_OF(X86Reg::kRegXmm)  , VirtType::kIdX86XmmPd, 16, F(Vector) | F(F64), "xmm.pd"  }, // #18
-    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86Ymm  , 32, F(Vector)         , "ymm"     }, // #19
-    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86YmmPs, 32, F(Vector) | F(F32), "ymm.ps"  }, // #20
-    { SIGNATURE_OF(X86Reg::kRegYmm)  , VirtType::kIdX86YmmPd, 32, F(Vector) | F(F64), "ymm.pd"  }, // #21
-    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86Zmm  , 64, F(Vector)         , "zmm"     }, // #22
-    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86ZmmPs, 64, F(Vector) | F(F32), "zmm.ps"  }, // #23
-    { SIGNATURE_OF(X86Reg::kRegZmm)  , VirtType::kIdX86ZmmPd, 64, F(Vector) | F(F64), "zmm.pd"  }  // #24
-  },
-
-  //#0, #1, #2, #3, #4, #5, #6, #7, #8, #9,#10,#11,#12,#13,#14,#15,#16,#17,#18,#19,#20,#21,#22,#23,#24
-  //I8, U8,I16,U16,I32,U32,I64,U64,PXX,UXX,F32,F64, K , MM,XMM,XSS,XSD,XPS,XPD,YMM,YPS,YPD,ZMM,ZPS,ZPD
-  { 0 , 1 , 2 , 3 , 4 , 5 , U , U , 4 , 5 , 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 }, // IdMapX86.
-  { 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 6 , 7 , 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 }  // IdMapX64.
-};
-
-#undef U
-#undef F
-
-#undef INVALID_TYPE
-#undef SIGNATURE_OF
-
-// ============================================================================
 // [asmjit::X86CCCall - Arg / Ret]
 // ============================================================================
 
 bool X86CCCall::_setArg(uint32_t i, const Operand_& op) noexcept {
-  if ((i & ~kFuncArgHi) >= _x86Decl.getNumArgs())
+  if ((i & ~kFuncArgHi) >= _x86Decl.getArgCount())
     return false;
 
   _args[i] = op;
@@ -134,7 +60,6 @@ Error X86Compiler::onAttach(CodeHolder* code) noexcept {
   if (code->getArchType() == Arch::kTypeX86) {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
-    _typeIdMap = _x86TypeData.idMapX86;
     _nativeGpArray = x86OpData.gpd;
     _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
@@ -143,7 +68,6 @@ Error X86Compiler::onAttach(CodeHolder* code) noexcept {
   if (code->getArchType() == Arch::kTypeX64) {
     ASMJIT_PROPAGATE(Base::onAttach(code));
 
-    _typeIdMap = _x86TypeData.idMapX64;
     _nativeGpArray = x86OpData.gpq;
     _nativeGpReg = _nativeGpArray[0];
     return kErrorOk;
@@ -170,9 +94,9 @@ Error X86Compiler::finalize() {
   }
 
   X86RAPass ra;
-  Error err = ra.process(this, &_pipeAllocator);
+  Error err = ra.process(this, &_cbPassZone);
 
-  _pipeAllocator.reset();
+  _cbPassZone.reset();
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);
 
   // TODO: There must be possibility to attach more assemblers, this is not so nice.
@@ -224,7 +148,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
         Operand(_op5)
       };
 
-      Error err = X86Inst::validate(getArchType(), instId, options, _opMask, opArray, opCount);
+      Error err = X86Inst::validate(getArchType(), instId, options, _opExtra, opArray, opCount);
       if (err) return setLastError(err);
 
       // Clear it as it must be enabled explicitly on assembler side.
@@ -237,7 +161,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
 
   // decide between `CBInst` and `CBJump`.
   if (Utils::inInterval<uint32_t>(instId, X86Inst::_kIdJbegin, X86Inst::_kIdJend)) {
-    CBJump* node = _nodeAllocator.allocT<CBJump>(sizeof(CBJump) + opCount * sizeof(Operand));
+    CBJump* node = _cbBaseAllocator.allocT<CBJump>(sizeof(CBJump) + opCount * sizeof(Operand));
     Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBJump));
 
     if (ASMJIT_UNLIKELY(!node))
@@ -283,7 +207,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     return kErrorOk;
   }
   else {
-    CBInst* node = _nodeAllocator.allocT<CBInst>(sizeof(CBInst) + opCount * sizeof(Operand));
+    CBInst* node = _cbBaseAllocator.allocT<CBInst>(sizeof(CBInst) + opCount * sizeof(Operand));
     Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBInst));
 
     if (ASMJIT_UNLIKELY(!node))
@@ -333,8 +257,8 @@ X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   // Function arguments stack size. Since function requires _argStackSize to be
   // set, we have to copy it from X86FuncDecl.
   func->_argStackSize = func->_x86Decl.getArgStackSize();
-  func->_redZoneSize = static_cast<uint16_t>(func->_x86Decl.getRedZoneSize());
-  func->_spillZoneSize = static_cast<uint16_t>(func->_x86Decl.getSpillZoneSize());
+  func->_redZoneSize = static_cast<uint16_t>(func->_x86Decl._callConv.getRedZoneSize());
+  func->_spillZoneSize = static_cast<uint16_t>(func->_x86Decl._callConv.getSpillZoneSize());
 
   // Expected/Required stack alignment.
   func->_naturalStackAlignment = _codeInfo.getStackAlignment();
@@ -342,11 +266,11 @@ X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
 
   // Allocate space for function arguments.
   func->_args = nullptr;
-  if (func->getNumArgs() != 0) {
-    func->_args = _nodeAllocator.allocT<VirtReg*>(func->getNumArgs() * sizeof(VirtReg*));
+  if (func->getArgCount() != 0) {
+    func->_args = _cbBaseAllocator.allocT<VirtReg*>(func->getArgCount() * sizeof(VirtReg*));
     if (!func->_args) goto _NoMemory;
 
-    ::memset(func->_args, 0, func->getNumArgs() * sizeof(VirtReg*));
+    ::memset(func->_args, 0, func->getArgCount() * sizeof(VirtReg*));
   }
 
   return func;
@@ -417,7 +341,7 @@ X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) n
   Error err;
   uint32_t nArgs;
 
-  X86CCCall* node = _nodeAllocator.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
+  X86CCCall* node = _cbBaseAllocator.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
   Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CCCall));
 
   if (ASMJIT_UNLIKELY(!node))
@@ -432,10 +356,10 @@ X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) n
   }
 
   // If there are no arguments skip the allocation.
-  if ((nArgs = sign.getNumArgs()) == 0)
+  if ((nArgs = sign.getArgCount()) == 0)
     return node;
 
-  node->_args = static_cast<Operand*>(_nodeAllocator.alloc(nArgs * sizeof(Operand)));
+  node->_args = static_cast<Operand*>(_cbBaseAllocator.alloc(nArgs * sizeof(Operand)));
   if (!node->_args) goto _NoMemory;
 
   ::memset(node->_args, 0, nArgs * sizeof(Operand));
@@ -471,90 +395,100 @@ Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
   return kErrorOk;
 }
 
-Error X86Compiler::_newReg(Reg& reg, uint32_t typeId, const char* name) {
-  ASMJIT_ASSERT(typeId < VirtType::kIdCount);
-  typeId = _typeIdMap[typeId];
+Error X86Compiler::_prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept {
+  // Zero this so it's clear in case we return an error.
+  signatureOut = 0;
 
-  // There is currently only one case this could happen - an attempt to
-  // use a 64-bit register (GPQ) when generating for a 32-bit target.
-  if (!VirtType::isValidTypeId(typeId)) {
-    reg.reset();
-    return setLastError(DebugUtils::errored(kErrorIllegalUseOfGpq));
+  uint32_t typeId = typeIdInOut;
+
+  // Passed RegType instead of TypeId?
+  if (typeId < 32)
+    typeId = x86OpData.regTypeToTypeId[typeId];
+
+  if (ASMJIT_UNLIKELY(!TypeId::isValid(typeId)))
+    return DebugUtils::errored(kErrorInvalidTypeId);
+
+  // First normalize architecture dependent types.
+  if (TypeId::isAbstract(typeId)) {
+    if (typeId == TypeId::kIntPtr)
+      typeId = getGpSize() == 4 ? TypeId::kI32 : TypeId::kI64;
+    else
+      typeId = getGpSize() == 4 ? TypeId::kU32 : TypeId::kU64;
   }
 
-  const VirtType& typeInfo = _x86TypeData.typeInfo[typeId];
-  VirtReg* vreg = newVirtReg(typeInfo, name);
+  // Type size helps to construct all kinds of registers. If the size is zero
+  // then the TypeId is invalid.
+  uint32_t size = TypeId::sizeOf(typeId);
+  if (ASMJIT_UNLIKELY(!size))
+    return DebugUtils::errored(kErrorInvalidTypeId);
 
-  if (!vreg) {
-    static_cast<X86Reg&>(reg).reset();
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (ASMJIT_UNLIKELY(typeId == TypeId::kF80))
+    return DebugUtils::errored(kErrorIllegalUseOfF80);
+
+  uint32_t regType = 0;
+
+  switch (typeId) {
+    case TypeId::kI8:
+    case TypeId::kU8:
+      regType = X86Reg::kRegGpbLo;
+      break;
+
+    case TypeId::kI16:
+    case TypeId::kU16:
+      regType = X86Reg::kRegGpw;
+      break;
+
+    case TypeId::kI32:
+    case TypeId::kU32:
+      regType = X86Reg::kRegGpd;
+      break;
+
+    case TypeId::kI64:
+    case TypeId::kU64:
+      if (getGpSize() < 8)
+        return DebugUtils::errored(kErrorIllegalUseOfGpq);
+
+      regType = X86Reg::kRegGpq;
+      break;
+
+    // F32 and F64 are always promoted to use vector registers.
+    case TypeId::kF32:
+      typeId = TypeId::kF32x1;
+      regType = X86Reg::kRegXmm;
+      break;
+
+    case TypeId::kF64:
+      typeId = TypeId::kF64x1;
+      regType = X86Reg::kRegXmm;
+      break;
+
+    // Mask registers {k}.
+    case TypeId::kMask8:
+    case TypeId::kMask16:
+    case TypeId::kMask32:
+    case TypeId::kMask64:
+      regType = X86Reg::kRegK;
+      break;
+
+    // MMX registers.
+    case TypeId::kMmx32:
+    case TypeId::kMmx64:
+      regType = X86Reg::kRegMm;
+      break;
+
+    // XMM|YMM|ZMM registers.
+    default:
+      if (size <= 16)
+        regType = X86Reg::kRegXmm;
+      else if (size == 32)
+        regType = X86Reg::kRegYmm;
+      else
+        regType = X86Reg::kRegZmm;
+      break;
   }
 
-  reg._initReg(typeInfo.getSignature(), vreg->getId());
-  reg._reg.typeId = typeId;
-  return kErrorOk;
-}
-
-Error X86Compiler::_newReg(Reg& r, uint32_t typeId, const char* fmt, va_list ap) {
-  char name[256];
-
-  vsnprintf(name, ASMJIT_ARRAY_SIZE(name), fmt, ap);
-  name[ASMJIT_ARRAY_SIZE(name) - 1] = '\0';
-  return _newReg(r, typeId, name);
-}
-
-// ============================================================================
-// [asmjit::X86Compiler - Stack]
-// ============================================================================
-
-Error X86Compiler::_newStack(Mem& m, uint32_t size, uint32_t alignment, const char* name) {
-  if (size == 0)
-    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
-
-  if (alignment > 64)
-    alignment = 64;
-
-  VirtType typeInfo = { {{ 0, 0, 0, 0 }}, kInvalidValue, 0, 0, "" };
-  VirtReg* vreg = newVirtReg(typeInfo, name);
-
-  if (!vreg) {
-    m.reset();
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-  }
-
-  vreg->_size = size;
-  vreg->_isStack = true;
-  vreg->_alignment = static_cast<uint8_t>(alignment);
-
-  // Set the memory operand to GPD/GPQ and its ID to vreg.
-  m = X86Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
-
-  return kErrorOk;
-}
-
-// ============================================================================
-// [asmjit::X86Compiler - Const]
-// ============================================================================
-
-Error X86Compiler::_newConst(Mem& m, uint32_t scope, const void* data, size_t size) {
-  CBConstPool** pPool;
-  if (scope == kConstScopeLocal)
-    pPool = &_localConstPool;
-  else if (scope == kConstScopeGlobal)
-    pPool = &_globalConstPool;
-  else
-    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
-
-  if (!*pPool && !(*pPool = newConstPool()))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-
-  CBConstPool* pool = *pPool;
-  size_t off;
-
-  Error err = pool->add(data, size, off);
-  if (err != kErrorOk) return setLastError(err);
-
-  static_cast<X86Mem&>(m) = x86::ptr(pool->getLabel(), static_cast<int32_t>(off), static_cast<uint32_t>(size));
+  typeIdInOut = typeId;
+  signatureOut = x86OpData.regInfo[regType].signature;
   return kErrorOk;
 }
 

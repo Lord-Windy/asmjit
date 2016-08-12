@@ -149,7 +149,7 @@ AsmJit's operands all inherit from a base class called `Operand` and then specia
   * **None** (not used or uninitialized operand).
   * **Register** (`Reg`) - Describes either physical or virtual register. Physical registers have id that matches targets machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator. Each `Reg` provides:
     * *Register Type* - Unique id that describes each possible register provided by the target architecture - for example X86 backend provides `X86Reg::RegType`, which defines all variations of general purpose registers (GPB-LO, GPB-HI, GPW, GPD, and GPQ) and all types of other registers like XMM, YMM, and ZMM.
-    * *Register Class* - Groups multiple register types under a single class - for example all general-purpose registers (of all sizes) on X86 are `X86Reg::kClassGp`, all SIMD registers (XMM, YMM, ZMM) are `X86Reg::kClassXyz`, etc.
+    * *Register Kind* - Groups multiple register types under a single kind - for example all general-purpose registers (of all sizes) on X86 are `X86Reg::kKindGp`, all SIMD registers (XMM, YMM, ZMM) are `X86Reg::kKindXyz`, etc.
     * *Register Size* - Contains the size of the register in bytes. If the size depends on the mode (32-bit vs 64-bit) then generally the higher size is used (for example RIP register has size 8 by default).
     * *Register ID* - Contains physical or virtual id of the register.
   * **Memory Address** (`Mem`) - Used to reference a memory location. Each `Mem` provides:
@@ -490,7 +490,7 @@ int main(int argc, char* argv[]) {
   X86Gp src_b;
 
   // Handle the difference between 32-bit and 64-bit calling convention.
-  // (arguments passed through stack vs. arguments passed in registers).
+  // (arguments passed through stack vs. arguments passed by registers).
   if (ASMJIT_ARCH_X86) {
     dst   = eax;
     src_a = ecx;

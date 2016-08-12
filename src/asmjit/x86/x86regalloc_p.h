@@ -50,19 +50,19 @@ struct X86RAData : public RAData {
     return const_cast<TiedReg*>(tiedArray);
   }
 
-  //! Get TiedReg array for a given register class `rc`.
-  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t rc) const noexcept {
-    return const_cast<TiedReg*>(tiedArray) + tiedIndex.get(rc);
+  //! Get TiedReg array for a given register `kind`.
+  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t kind) const noexcept {
+    return const_cast<TiedReg*>(tiedArray) + tiedIndex.get(kind);
   }
 
-  //! Get TiedReg index for a given register class `rc`.
-  ASMJIT_INLINE uint32_t getTiedStart(uint32_t rc) const noexcept {
-    return tiedIndex.get(rc);
+  //! Get TiedReg index for a given register `kind`.
+  ASMJIT_INLINE uint32_t getTiedStart(uint32_t kind) const noexcept {
+    return tiedIndex.get(kind);
   }
 
-  //! Get TiedReg count for a given register class `rc`.
-  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t rc) const noexcept {
-    return tiedCount.get(rc);
+  //! Get TiedReg count for a given register `kind`.
+  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t kind) const noexcept {
+    return tiedCount.get(kind);
   }
 
   //! Get TiedReg at the specified `index`.
@@ -71,10 +71,10 @@ struct X86RAData : public RAData {
     return getTiedArray() + index;
   }
 
-  //! Get TiedReg at the specified index for a given register class `rc`.
-  ASMJIT_INLINE TiedReg* getTiedAtByRC(uint32_t rc, uint32_t index) const noexcept {
-    ASMJIT_ASSERT(index < tiedCount._regs[rc]);
-    return getTiedArrayByRC(rc) + index;
+  //! Get TiedReg at the specified index for a given register `kind`.
+  ASMJIT_INLINE TiedReg* getTiedAtByRC(uint32_t kind, uint32_t index) const noexcept {
+    ASMJIT_ASSERT(index < tiedCount._regs[kind]);
+    return getTiedArrayByRC(kind) + index;
   }
 
   ASMJIT_INLINE void setTiedAt(uint32_t index, TiedReg& tied) noexcept {
@@ -87,7 +87,7 @@ struct X86RAData : public RAData {
   // --------------------------------------------------------------------------
 
   //! Find TiedReg.
-  ASMJIT_INLINE TiedReg* findTied(VirtReg* vreg) const {
+  ASMJIT_INLINE TiedReg* findTied(VirtReg* vreg) const noexcept {
     TiedReg* tiedArray = getTiedArray();
     uint32_t tiedCount = tiedTotal;
 
@@ -99,9 +99,9 @@ struct X86RAData : public RAData {
   }
 
   //! Find TiedReg (by class).
-  ASMJIT_INLINE TiedReg* findTiedByRC(uint32_t rc, VirtReg* vreg) const {
-    TiedReg* tiedArray = getTiedArrayByRC(rc);
-    uint32_t tiedCount = getTiedCountByRC(rc);
+  ASMJIT_INLINE TiedReg* findTiedByRC(uint32_t kind, VirtReg* vreg) const noexcept {
+    TiedReg* tiedArray = getTiedArrayByRC(kind);
+    uint32_t tiedCount = getTiedCountByRC(kind);
 
     for (uint32_t i = 0; i < tiedCount; i++)
       if (tiedArray[i].vreg == vreg)
@@ -133,9 +133,9 @@ struct X86RAData : public RAData {
   //! Clobbered registers (by a function call).
   X86RegMask clobberedRegs;
 
-  //! Start indexes of `TiedReg`s per register class.
+  //! Start indexes of `TiedReg`s per register kind.
   X86RegCount tiedIndex;
-  //! Count of variables per register class.
+  //! Count of variables per register kind.
   X86RegCount tiedCount;
 
   //! Linked registers.
@@ -152,13 +152,8 @@ union X86StateCell {
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE uint32_t getState() const {
-    return _state;
-  }
-
-  ASMJIT_INLINE void setState(uint32_t state) {
-    _state = static_cast<uint8_t>(state);
-  }
+  ASMJIT_INLINE uint32_t getState() const noexcept { return _state; }
+  ASMJIT_INLINE void setState(uint32_t state) noexcept { _state = static_cast<uint8_t>(state); }
 
   // --------------------------------------------------------------------------
   // [Reset]
@@ -212,11 +207,11 @@ struct X86RAState : RAState {
     return _list;
   }
 
-  ASMJIT_INLINE VirtReg** getListByRC(uint32_t rc) {
-    switch (rc) {
-      case X86Reg::kClassGp : return _listGp;
-      case X86Reg::kClassMm : return _listMm;
-      case X86Reg::kClassXyz: return _listXmm;
+  ASMJIT_INLINE VirtReg** getListByRC(uint32_t kind) {
+    switch (kind) {
+      case X86Reg::kKindGp : return _listGp;
+      case X86Reg::kKindMm : return _listMm;
+      case X86Reg::kKindXyz: return _listXmm;
 
       default:
         return nullptr;
@@ -281,6 +276,12 @@ public:
   ASMJIT_NONCOPYABLE(X86RAPass)
   typedef RAPass Base;
 
+  enum RegOp {
+    kRegOpMove,
+    kRegOpLoad,
+    kRegOpSave
+  };
+
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
@@ -299,7 +300,7 @@ public:
   // [Arch]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE bool isX64() const noexcept { return _zsp.getSize() == 16; }
+  ASMJIT_INLINE bool isX64() const noexcept { return _zsp.getSize() == 8; }
   ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _zsp.getSize(); }
 
   // --------------------------------------------------------------------------
@@ -311,7 +312,7 @@ public:
   //! Get function as `X86Func`.
   ASMJIT_INLINE X86Func* getFunc() const { return static_cast<X86Func*>(_func); }
   //! Get clobbered registers (global).
-  ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t rc) { return _clobberedRegs.get(rc); }
+  ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t kind) { return _clobberedRegs.get(kind); }
 
   // --------------------------------------------------------------------------
   // [Helpers]
@@ -325,19 +326,19 @@ public:
   // [Emit]
   // --------------------------------------------------------------------------
 
-  void emitLoad(VirtReg* vreg, uint32_t physId, const char* reason);
-  void emitSave(VirtReg* vreg, uint32_t physId, const char* reason);
-  void emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason);
-  void emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aId, uint32_t bId, const char* reason);
+  Error emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) noexcept;
+  Error emitSave(VirtReg* vreg, uint32_t physId, const char* reason) noexcept;
+  Error emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) noexcept;
+  Error emitRegOp(Operand_& dst, Operand_& src, uint32_t typeId) noexcept;
+  Error emitCvtOp(VirtReg* dst, uint32_t dstPhysId, VirtReg* src, uint32_t srcPhysId) noexcept;
+  Error emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aId, uint32_t bId, const char* reason) noexcept;
 
-  void emitPushSequence(uint32_t regMask);
-  void emitPopSequence(uint32_t regMask);
+  Error emitImmToReg(uint32_t dstTypeId, uint32_t dstPhysId, const Imm* src) noexcept;
+  Error emitImmToStack(uint32_t dstTypeId, const X86Mem* dst, const Imm* src) noexcept;
+  Error emitRegToStack(uint32_t dstTypeId, const X86Mem* dst, uint32_t srcTypeId, uint32_t srcPhysId) noexcept;
 
-  void emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uint32_t srcType, uint32_t srcIndex);
-  void emitMoveVarOnStack(uint32_t dstType, const X86Mem* dst, uint32_t srcType, uint32_t srcIndex);
-  void emitMoveImmOnStack(uint32_t dstType, const X86Mem* dst, const Imm* src);
-
-  void emitMoveImmToReg(uint32_t dstType, uint32_t dstIndex, const Imm* src);
+  Error emitPushSequence(uint32_t regMask) noexcept;
+  Error emitPopSequence(uint32_t regMask) noexcept;
 
   // --------------------------------------------------------------------------
   // [Register Management]
@@ -356,11 +357,11 @@ public:
   //! current 'X86RAState'.
   template<int C>
   ASMJIT_INLINE void attach(VirtReg* vreg, uint32_t physId, bool modified) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(physId != kInvalidReg);
 
     // Prevent Esp allocation if C==Gp.
-    ASMJIT_ASSERT(C != X86Reg::kClassGp || physId != X86Gp::kIdSp);
+    ASMJIT_ASSERT(C != X86Reg::kKindGp || physId != X86Gp::kIdSp);
 
     uint32_t regMask = Utils::mask(physId);
 
@@ -383,7 +384,7 @@ public:
   //! current 'X86RAState'.
   template<int C>
   ASMJIT_INLINE void detach(VirtReg* vreg, uint32_t physId, uint32_t vState) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(vreg->getPhysId() == physId);
     ASMJIT_ASSERT(vState != VirtReg::kStateReg);
 
@@ -411,7 +412,7 @@ public:
   //! change the `VirtReg`s modified flag.
   template<int C>
   ASMJIT_INLINE void rebase(VirtReg* vreg, uint32_t newPhysId, uint32_t oldPhysId) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
 
     uint32_t newRegMask = Utils::mask(newPhysId);
     uint32_t oldRegMask = Utils::mask(oldPhysId);
@@ -439,7 +440,7 @@ public:
   template<int C>
   ASMJIT_INLINE void load(VirtReg* vreg, uint32_t physId) {
     // Can be only called if variable is not allocated.
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(vreg->getState() != VirtReg::kStateReg);
     ASMJIT_ASSERT(vreg->getPhysId() == kInvalidReg);
 
@@ -454,7 +455,7 @@ public:
   //! Save the variable into its home location, but keep it as allocated.
   template<int C>
   ASMJIT_INLINE void save(VirtReg* vreg) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(vreg->getState() == VirtReg::kStateReg);
     ASMJIT_ASSERT(vreg->getPhysId() != kInvalidReg);
 
@@ -479,7 +480,7 @@ public:
   //! function does nothing if register is already at the given index.
   template<int C>
   ASMJIT_INLINE void move(VirtReg* vreg, uint32_t newPhysId) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(vreg->getState() == VirtReg::kStateReg);
     ASMJIT_ASSERT(vreg->getPhysId() != kInvalidReg);
 
@@ -498,11 +499,11 @@ public:
   ASMJIT_INLINE void swapGp(VirtReg* aVReg, VirtReg* bVReg) {
     ASMJIT_ASSERT(aVReg != bVReg);
 
-    ASMJIT_ASSERT(aVReg->getRegClass() == X86Reg::kClassGp);
+    ASMJIT_ASSERT(aVReg->getRegKind() == X86Reg::kKindGp);
     ASMJIT_ASSERT(aVReg->getState() == VirtReg::kStateReg);
     ASMJIT_ASSERT(aVReg->getPhysId() != kInvalidReg);
 
-    ASMJIT_ASSERT(bVReg->getRegClass() == X86Reg::kClassGp);
+    ASMJIT_ASSERT(bVReg->getRegKind() == X86Reg::kKindGp);
     ASMJIT_ASSERT(bVReg->getState() == VirtReg::kStateReg);
     ASMJIT_ASSERT(bVReg->getPhysId() != kInvalidReg);
 
@@ -514,11 +515,11 @@ public:
     aVReg->setPhysId(bIndex);
     bVReg->setPhysId(aIndex);
 
-    _x86State.getListByRC(X86Reg::kClassGp)[aIndex] = bVReg;
-    _x86State.getListByRC(X86Reg::kClassGp)[bIndex] = aVReg;
+    _x86State.getListByRC(X86Reg::kKindGp)[aIndex] = bVReg;
+    _x86State.getListByRC(X86Reg::kKindGp)[bIndex] = aVReg;
 
     uint32_t m = aVReg->isModified() ^ bVReg->isModified();
-    _x86State._modified.xor_(X86Reg::kClassGp, (m << aIndex) | (m << bIndex));
+    _x86State._modified.xor_(X86Reg::kKindGp, (m << aIndex) | (m << bIndex));
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -530,7 +531,7 @@ public:
   //! Alloc.
   template<int C>
   ASMJIT_INLINE void alloc(VirtReg* vreg, uint32_t physId) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(physId != kInvalidReg);
 
     uint32_t oldPhysId = vreg->getPhysId();
@@ -571,7 +572,7 @@ public:
   //! Spill variable/register, saves the content to the memory-home if modified.
   template<int C>
   ASMJIT_INLINE void spill(VirtReg* vreg) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
 
     if (vreg->getState() != VirtReg::kStateReg) {
       ASMJIT_X86_CHECK_STATE
@@ -595,7 +596,7 @@ public:
 
   template<int C>
   ASMJIT_INLINE void modify(VirtReg* vreg) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
 
     uint32_t physId = vreg->getPhysId();
     uint32_t regMask = Utils::mask(physId);
@@ -616,7 +617,7 @@ public:
   //! will be changed to VirtReg::kStateNone.
   template<int C>
   ASMJIT_INLINE void unuse(VirtReg* vreg, uint32_t vState = VirtReg::kStateNone) {
-    ASMJIT_ASSERT(vreg->getRegClass() == C);
+    ASMJIT_ASSERT(vreg->getRegKind() == C);
     ASMJIT_ASSERT(vState != VirtReg::kStateReg);
 
     uint32_t physId = vreg->getPhysId();
@@ -692,7 +693,9 @@ public:
   RACell* _stackFrameCell;
 
   //! Global allocable registers mask.
-  uint32_t _gaRegs[X86Reg::_kClassManagedCount];
+  uint32_t _gaRegs[X86Reg::_kKindRACount];
+
+  uint8_t _useAVX;
 
   //! Function arguments base pointer (register).
   uint8_t _argBaseReg;

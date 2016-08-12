@@ -60,10 +60,10 @@ public:
   //! code compatible and executable by this Runtime.
   ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
 
-  //! Get the Runtime's architecture id, see \ref Arch::Type.
+  //! Get the Runtime's architecture type, see \ref Arch::Type.
   ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo.getArchType(); }
-  //! Get the Runtime's architecture mode, see \ref Arch::Mode.
-  ASMJIT_INLINE uint32_t getArchMode() const noexcept { return _codeInfo.getArchMode(); }
+  //! Get the Runtime's architecture sub-type, see \ref Arch::SubType.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _codeInfo.getArchSubType(); }
 
   //! Get the runtime type, see \ref Type.
   ASMJIT_INLINE uint32_t getRuntimeType() const noexcept { return _runtimeType; }
@@ -139,7 +139,7 @@ public:
   //!
   //! This function can also be overridden to improve compatibility with tools
   //! such as Valgrind, however, it's not an official part of AsmJit.
-  ASMJIT_API virtual void flush(void* p, size_t size) noexcept;
+  ASMJIT_API virtual void flush(const void* p, size_t size) noexcept;
 };
 
 // ============================================================================

@@ -38,7 +38,7 @@ CodeEmitter::CodeEmitter(uint32_t type) noexcept
     _inlineComment(nullptr),
     _op4(),
     _op5(),
-    _opMask(),
+    _opExtra(),
     _none(),
     _nativeGpReg(),
     _nativeGpArray(nullptr) {}
@@ -77,7 +77,7 @@ Error CodeEmitter::onDetach(CodeHolder* code) noexcept {
   _inlineComment = nullptr;
   _op4.reset();
   _op5.reset();
-  _opMask.reset();
+  _opExtra.reset();
   _nativeGpReg.reset();
   _nativeGpArray = nullptr;
 

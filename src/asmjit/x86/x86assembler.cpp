@@ -531,7 +531,7 @@ static void X86Assembler_logInstruction(X86Assembler* self,
   if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
   if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
-  self->_formatter.formatInstruction(sb, logOptions, instId, options, self->_opMask, opArray, 6);
+  self->_formatter.formatInstruction(sb, logOptions, instId, options, self->_opExtra, opArray, 6);
 
   if ((logOptions & Logger::kOptionBinaryForm) != 0)
     LogUtil::formatLine(sb, self->_bufferPtr, emittedSize, dispSize, imLen, self->getInlineComment());
@@ -560,7 +560,7 @@ static Error X86Assembler_failedInstruction(
   if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
   if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
-  self->_formatter.formatInstruction(sb, 0, instId, options, self->_opMask, opArray, 6);
+  self->_formatter.formatInstruction(sb, 0, instId, options, self->_opExtra, opArray, 6);
 
   self->resetOptions();
   self->resetInlineComment();
@@ -595,7 +595,7 @@ static Error X86Assembler_validateInstruction(
   if (!(options & CodeEmitter::kOptionHasOp4)) opArray[4].reset();
   if (!(options & CodeEmitter::kOptionHasOp5)) opArray[5].reset();
 
-  Error err = X86Inst::validate(self->getArchType(), instId, options, self->getOpMask(), opArray, 6);
+  Error err = X86Inst::validate(self->getArchType(), instId, options, self->getOpExtra(), opArray, 6);
   if (err) return X86Assembler_failedInstruction(self, err, instId, options, o0, o1, o2, o3);
 
   return kErrorOk;
@@ -735,7 +735,7 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
     if (options & CodeEmitter::kOptionMaybeFailureCase) {
       // Unknown instruction.
       if (instId >= X86Inst::_kIdCount)
-        goto UnknownInstruction;
+        goto InvalidInstruction;
 
       // Grow request, happens rarely.
       if ((size_t)(_bufferEnd - cursor) < 16) {
@@ -3885,11 +3885,11 @@ EmitVexEvexR:
     opReg &= 0x7;
 
     // Handle {k} and {kz} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOptionKZ)) {
+    if (options & (CodeEmitter::kOptionHasOpExtra| X86Inst::kOptionKZ)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything should be zeroed. It's valid EVEX.
-      if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
+      if (options & CodeEmitter::kOptionHasOpExtra) x |= _opExtra.getId() << 16;
       x |= options & X86Inst::kOptionKZ;                 // [........|zLL..aaa|Vvvvv..R|RBBmmmmm].
     }
 
@@ -3983,11 +3983,11 @@ EmitVexEvexM:
     opReg &= 0x07U;
 
     // Handle {k}, {kz}, {1tox} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpMask | X86Inst::kOption1ToX | X86Inst::kOptionKZ)) {
+    if (options & (CodeEmitter::kOptionHasOpExtra| X86Inst::kOption1ToX | X86Inst::kOptionKZ)) {
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything would be zeroed. It's a valid EVEX.
-      if (options & CodeEmitter::kOptionHasOpMask) x |= _opMask.getId() << 16;
+      if (options & CodeEmitter::kOptionHasOpExtra) x |= _opExtra.getId() << 16;
 
       x |= options & (X86Inst::kOption1ToX |             // [........|.LLbXaaa|Vvvvv..R|RXBmmmmm].
                       X86Inst::kOptionKZ   );            // [........|zLLbXaaa|Vvvvv..R|RXBmmmmm].
@@ -4197,9 +4197,9 @@ EmitDone:
   // [Error Cases]
   // --------------------------------------------------------------------------
 
-UnknownInstruction:
+InvalidInstruction:
   return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorUnknownInstruction), instId, options, o0, o1, o2, o3);
+    DebugUtils::errored(kErrorInvalidInstruction), instId, options, o0, o1, o2, o3);
 
 IllegalInstruction:
   return X86Assembler_failedInstruction(this,

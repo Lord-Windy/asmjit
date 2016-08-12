@@ -840,9 +840,9 @@ typedef unsigned __int64 uint64_t;
 #endif // ASMJIT_BUILD_HOST
 
 #if defined(_MSC_VER) && _MSC_VER >= 1400
-# define ASMJIT_ENUM(name) enum name : uint32_t
+# define ASMJIT_ENUM(NAME) enum NAME : uint32_t
 #else
-# define ASMJIT_ENUM(name) enum name
+# define ASMJIT_ENUM(NAME) enum NAME
 #endif
 
 #if ASMJIT_ARCH_LE
@@ -852,9 +852,9 @@ typedef unsigned __int64 uint64_t;
 #endif
 
 #if !defined(ASMJIT_ALLOC) && !defined(ASMJIT_REALLOC) && !defined(ASMJIT_FREE)
-# define ASMJIT_ALLOC(size) ::malloc(size)
-# define ASMJIT_REALLOC(ptr, size) ::realloc(ptr, size)
-# define ASMJIT_FREE(ptr) ::free(ptr)
+# define ASMJIT_ALLOC(SIZE) ::malloc(SIZE)
+# define ASMJIT_REALLOC(PTR, SIZE) ::realloc(PTR, SIZE)
+# define ASMJIT_FREE(PTR) ::free(PTR)
 #else
 # if !defined(ASMJIT_ALLOC) || !defined(ASMJIT_REALLOC) || !defined(ASMJIT_FREE)
 #  error "[asmjit] You must provide ASMJIT_ALLOC, ASMJIT_REALLOC and ASMJIT_FREE."
@@ -893,16 +893,6 @@ public:
 
 namespace asmjit {
 namespace DebugUtils {
-
-// Workaround used to convert absolute file paths to relative ones at compile
-// time; used by asserts and tracing. This workaround is needed as some build
-// systems use absolute paths, which is reflected in __FILE__ expansion. This
-// workaround attempts to hide such absolute paths from messages produced by
-// asmjit, but won't remove them from the binary itself.
-enum {
-  kSourceRawPathOffset = int(sizeof(__FILE__)) - int(sizeof("asmjit/build.h")),
-  kSourceRelPathOffset = kSourceRawPathOffset >= 0 ? kSourceRawPathOffset : 0
-};
 
 // ASMJIT_TRACE is only used by sources and private headers. It's safe to make
 // it unavailable outside of AsmJit.

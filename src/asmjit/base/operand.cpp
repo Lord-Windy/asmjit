@@ -16,6 +16,83 @@
 namespace asmjit {
 
 // ============================================================================
+// [asmjit::TypeId]
+// ============================================================================
+
+template<uint32_t ID>
+struct TypeIdSizeOf_T {
+  enum {
+    kValue = (ID == TypeId::kI8    ) ?  1 :
+             (ID == TypeId::kU8    ) ?  1 :
+             (ID == TypeId::kI16   ) ?  2 :
+             (ID == TypeId::kU16   ) ?  2 :
+             (ID == TypeId::kI32   ) ?  4 :
+             (ID == TypeId::kU32   ) ?  4 :
+             (ID == TypeId::kI64   ) ?  8 :
+             (ID == TypeId::kU64   ) ?  8 :
+             (ID == TypeId::kF32   ) ?  4 :
+             (ID == TypeId::kF64   ) ?  8 :
+             (ID == TypeId::kF80   ) ? 10 :
+             (ID == TypeId::kMask8 ) ?  1 :
+             (ID == TypeId::kMask16) ?  2 :
+             (ID == TypeId::kMask32) ?  4 :
+             (ID == TypeId::kMask64) ?  8 :
+             (ID == TypeId::kMmx32 ) ?  4 :
+             (ID == TypeId::kMmx64 ) ?  8 :
+             (ID >= TypeId::_kVec32Start  && ID <= TypeId::_kVec32End ) ?  4 :
+             (ID >= TypeId::_kVec64Start  && ID <= TypeId::_kVec64End ) ?  8 :
+             (ID >= TypeId::_kVec128Start && ID <= TypeId::_kVec128End) ? 16 :
+             (ID >= TypeId::_kVec256Start && ID <= TypeId::_kVec256End) ? 32 :
+             (ID >= TypeId::_kVec512Start && ID <= TypeId::_kVec512End) ? 64 : 0
+  };
+};
+
+template<uint32_t ID>
+struct TypeIdElementOf_T {
+  enum {
+    kValue = (ID == TypeId::kMask8 ) ? TypeId::kU8  :
+             (ID == TypeId::kMask16) ? TypeId::kU16 :
+             (ID == TypeId::kMask32) ? TypeId::kU32 :
+             (ID == TypeId::kMask64) ? TypeId::kU64 :
+             (ID == TypeId::kMmx32 ) ? TypeId::kI32 :
+             (ID == TypeId::kMmx64 ) ? TypeId::kI64 :
+             (ID >= TypeId::kI8           && ID <= TypeId::kF80       ) ? ID   :
+             (ID >= TypeId::_kVec32Start  && ID <= TypeId::_kVec32End ) ? ID - TypeId::_kVec32Start  + TypeId::kI8 :
+             (ID >= TypeId::_kVec64Start  && ID <= TypeId::_kVec64End ) ? ID - TypeId::_kVec64Start  + TypeId::kI8 :
+             (ID >= TypeId::_kVec128Start && ID <= TypeId::_kVec128End) ? ID - TypeId::_kVec128Start + TypeId::kI8 :
+             (ID >= TypeId::_kVec256Start && ID <= TypeId::_kVec256End) ? ID - TypeId::_kVec256Start + TypeId::kI8 :
+             (ID >= TypeId::_kVec512Start && ID <= TypeId::_kVec512End) ? ID - TypeId::_kVec512Start + TypeId::kI8 : 0
+  };
+};
+
+#define R(TMPL, I) TMPL<I +  0>::kValue, TMPL<I +  1>::kValue, \
+                   TMPL<I +  2>::kValue, TMPL<I +  3>::kValue, \
+                   TMPL<I +  4>::kValue, TMPL<I +  5>::kValue, \
+                   TMPL<I +  6>::kValue, TMPL<I +  7>::kValue, \
+                   TMPL<I +  8>::kValue, TMPL<I +  9>::kValue, \
+                   TMPL<I + 10>::kValue, TMPL<I + 11>::kValue, \
+                   TMPL<I + 12>::kValue, TMPL<I + 13>::kValue, \
+                   TMPL<I + 14>::kValue, TMPL<I + 15>::kValue
+ASMJIT_API const TypeId::Info TypeId::_info = {
+  // SizeOd[128]
+  {
+    R(TypeIdSizeOf_T,  0), R(TypeIdSizeOf_T,  16),
+    R(TypeIdSizeOf_T, 32), R(TypeIdSizeOf_T,  48),
+    R(TypeIdSizeOf_T, 64), R(TypeIdSizeOf_T,  80),
+    R(TypeIdSizeOf_T, 96), R(TypeIdSizeOf_T, 112)
+  },
+
+  // ElementOf[128]
+  {
+    R(TypeIdElementOf_T,  0), R(TypeIdElementOf_T,  16),
+    R(TypeIdElementOf_T, 32), R(TypeIdElementOf_T,  48),
+    R(TypeIdElementOf_T, 64), R(TypeIdElementOf_T,  80),
+    R(TypeIdElementOf_T, 96), R(TypeIdElementOf_T, 112)
+  }
+};
+#undef R
+
+// ============================================================================
 // [asmjit::Operand - Test]
 // ============================================================================
 
@@ -71,7 +148,7 @@ UNIT(base_operand) {
   EXPECT(r1.isVirtReg()    == false);
   EXPECT(r1.getSignature() == rSig);
   EXPECT(r1.getRegType()   == 1);
-  EXPECT(r1.getRegClass()  == 2);
+  EXPECT(r1.getRegKind()   == 2);
   EXPECT(r1.getSize()      == 8);
   EXPECT(r1.getId()        == 5);
   EXPECT(r1.isReg(1, 5)    == true); // RegType and Id.
@@ -88,7 +165,7 @@ UNIT(base_operand) {
   EXPECT(r2.isVirtReg()    == false);
   EXPECT(r2.getSignature() == rSig);
   EXPECT(r2.getRegType()   == r1.getRegType());
-  EXPECT(r2.getRegClass()  == r1.getRegClass());
+  EXPECT(r2.getRegKind()   == r1.getRegKind());
   EXPECT(r2.getSize()      == r1.getSize());
   EXPECT(r2.getId()        == 6);
   EXPECT(r2.isReg(1, 6)    == true);

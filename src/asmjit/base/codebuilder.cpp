@@ -25,9 +25,11 @@ namespace asmjit {
 
 CodeBuilder::CodeBuilder(CodeHolder* code) noexcept
   : CodeEmitter(kTypeBuilder),
-    _nodeAllocator(32768 - Zone::kZoneOverhead),
-    _dataAllocator(8192  - Zone::kZoneOverhead),
-    _pipeAllocator(32768 - Zone::kZoneOverhead),
+    _cbBaseZone(32768 - Zone::kZoneOverhead),
+    _cbDataZone(16384 - Zone::kZoneOverhead),
+    _cbPassZone(32768 - Zone::kZoneOverhead),
+    _cbBaseAllocator(&_cbBaseZone),
+    _labelArray(&_cbBaseAllocator),
     _nodeFlowId(0),
     _nodeFlags(0),
     _firstNode(nullptr),
@@ -48,9 +50,12 @@ Error CodeBuilder::onAttach(CodeHolder* code) noexcept {
 }
 
 Error CodeBuilder::onDetach(CodeHolder* code) noexcept {
-  _nodeAllocator.reset(false);
-  _dataAllocator.reset(false);
-  _labelArray.reset(false);
+  _labelArray.reset(&_cbBaseAllocator);
+  _cbBaseAllocator.reset(&_cbBaseZone);
+
+  _cbBaseZone.reset(false);
+  _cbDataZone.reset(false);
+  _cbPassZone.reset(false);
 
   _nodeFlowId = 0;
   _nodeFlags = 0;
@@ -121,7 +126,7 @@ CBAlign* CodeBuilder::newAlignNode(uint32_t mode, uint32_t alignment) noexcept {
 
 CBData* CodeBuilder::newDataNode(const void* data, uint32_t size) noexcept {
   if (size > CBData::kInlineBufferSize) {
-    void* cloned = _dataAllocator.alloc(size);
+    void* cloned = _cbDataZone.alloc(size);
     if (!cloned) return nullptr;
 
     if (data) ::memcpy(cloned, data, size);
@@ -142,7 +147,7 @@ CBComment* CodeBuilder::newCommentNode(const char* s, size_t len) noexcept {
   if (s) {
     if (len == kInvalidIndex) len = ::strlen(s);
     if (len > 0) {
-      s = static_cast<char*>(_dataAllocator.dup(s, len));
+      s = static_cast<char*>(_cbDataZone.dup(s, len, true));
       if (!s) return nullptr;
     }
   }

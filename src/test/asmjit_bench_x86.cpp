@@ -117,7 +117,7 @@ static void benchX86(uint32_t archType) {
       // function calling conventions, which is required by generateAlphaBlend.
       // So we must setup this manually.
       CodeInfo ci(archType);
-      ci.setCdeclCallConv(archType == Arch::kTypeX86 ? kCallConvX86CDecl : kCallConvX64Unix);
+      ci.setCdeclCallConv(archType == Arch::kTypeX86 ? CallConv::kIdX86CDecl : CallConv::kIdX86Unix64);
 
       code.init(ci);
       code.attach(&cc);

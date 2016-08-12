@@ -24,473 +24,219 @@ namespace asmjit {
 // [asmjit::X86FuncDecl - Helpers]
 // ============================================================================
 
-static ASMJIT_INLINE uint32_t x86ArgTypeToXmmType(uint32_t aType) {
-  if (aType == VirtType::kIdF32) return VirtType::kIdX86XmmSs;
-  if (aType == VirtType::kIdF64) return VirtType::kIdX86XmmSd;
-  return aType;
-}
-
 //! Get an architecture depending on the calling convention `callConv`.
-//!
-//! Returns `ArchId`.
-static ASMJIT_INLINE uint32_t x86GetArchFromCConv(uint32_t callConv) {
-  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX86Start, _kCallConvX86End)) return Arch::kTypeX86;
-  if (Utils::inInterval<uint32_t>(callConv, _kCallConvX64Start, _kCallConvX64End)) return Arch::kTypeX64;
+static ASMJIT_INLINE uint32_t x86GetArchFromCConv(uint32_t ccId) noexcept {
+  if (Utils::inInterval<uint32_t>(ccId, CallConv::_kIdX86Start, CallConv::_kIdX86End)) return Arch::kTypeX86;
+  if (Utils::inInterval<uint32_t>(ccId, CallConv::_kIdX64Start, CallConv::_kIdX64End)) return Arch::kTypeX64;
 
   return Arch::kTypeNone;
 }
 
-// ============================================================================
-// [asmjit::X86FuncDecl - SetPrototype]
-// ============================================================================
-
-static uint32_t X86FuncDecl_initConv(X86FuncDecl* self, uint32_t arch, uint32_t callConv) {
-  // Setup defaults.
-  self->_argStackSize = 0;
-  self->_redZoneSize = 0;
-  self->_spillZoneSize = 0;
-
-  self->_callConv = static_cast<uint8_t>(callConv);
-  self->_calleePopsStack = false;
-  self->_argsDirection = kFuncDirRTL;
-
-  self->_passed.reset();
-  self->_preserved.reset();
-
-  ::memset(self->_passedOrderGp, kInvalidReg, ASMJIT_ARRAY_SIZE(self->_passedOrderGp));
-  ::memset(self->_passedOrderXyz, kInvalidReg, ASMJIT_ARRAY_SIZE(self->_passedOrderXyz));
-
-  const int32_t kAx = X86Gp::kIdAx;
-  const int32_t kBx = X86Gp::kIdBx;
-  const int32_t kCx = X86Gp::kIdCx;
-  const int32_t kDx = X86Gp::kIdDx;
-  const int32_t kSp = X86Gp::kIdSp;
-  const int32_t kBp = X86Gp::kIdBp;
-  const int32_t kSi = X86Gp::kIdSi;
-  const int32_t kDi = X86Gp::kIdDi;
-
-  // --------------------------------------------------------------------------
-  // [X86 Support]
-  // --------------------------------------------------------------------------
-
-  if (arch == Arch::kTypeX86) {
-    self->_preserved.set(X86Reg::kClassGp, Utils::mask(kBx, kSp, kBp, kSi, kDi));
-
-    switch (callConv) {
-      case kCallConvX86CDecl:
-        return kErrorOk;
-
-      case kCallConvX86StdCall:
-        self->_calleePopsStack = true;
-        return kErrorOk;
-
-      case kCallConvX86MsThisCall:
-        self->_calleePopsStack = true;
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kCx));
-        self->_passedOrderGp[0] = kCx;
-        return kErrorOk;
-
-      case kCallConvX86MsFastCall:
-        self->_calleePopsStack = true;
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kCx, kCx));
-        self->_passedOrderGp[0] = kCx;
-        self->_passedOrderGp[1] = kDx;
-        return kErrorOk;
-
-      case kCallConvX86BorlandFastCall:
-        self->_calleePopsStack = true;
-        self->_argsDirection = kFuncDirLTR;
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kAx, kDx, kCx));
-        self->_passedOrderGp[0] = kAx;
-        self->_passedOrderGp[1] = kDx;
-        self->_passedOrderGp[2] = kCx;
-        return kErrorOk;
-
-      case kCallConvX86GccFastCall:
-        self->_calleePopsStack = true;
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kCx, kDx));
-        self->_passedOrderGp[0] = kCx;
-        self->_passedOrderGp[1] = kDx;
-        return kErrorOk;
-
-      case kCallConvX86GccRegParm1:
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kAx));
-        self->_passedOrderGp[0] = kAx;
-        return kErrorOk;
-
-      case kCallConvX86GccRegParm2:
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kAx, kDx));
-        self->_passedOrderGp[0] = kAx;
-        self->_passedOrderGp[1] = kDx;
-        return kErrorOk;
-
-      case kCallConvX86GccRegParm3:
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kAx, kDx, kCx));
-        self->_passedOrderGp[0] = kAx;
-        self->_passedOrderGp[1] = kDx;
-        self->_passedOrderGp[2] = kCx;
-        return kErrorOk;
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // [X64 Support]
-  // --------------------------------------------------------------------------
-
-  if (arch == Arch::kTypeX64) {
-    switch (callConv) {
-      case kCallConvX64Win:
-        self->_spillZoneSize = 32;
-
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kCx, kDx, 8, 9));
-        self->_passedOrderGp[0] = kCx;
-        self->_passedOrderGp[1] = kDx;
-        self->_passedOrderGp[2] = 8;
-        self->_passedOrderGp[3] = 9;
-
-        self->_passed.set(X86Reg::kClassXyz, Utils::mask(0, 1, 2, 3));
-        self->_passedOrderXyz[0] = 0;
-        self->_passedOrderXyz[1] = 1;
-        self->_passedOrderXyz[2] = 2;
-        self->_passedOrderXyz[3] = 3;
-
-        self->_preserved.set(X86Reg::kClassGp , Utils::mask(kBx, kSp, kBp, kSi, kDi, 12, 13, 14, 15));
-        self->_preserved.set(X86Reg::kClassXyz, Utils::mask(6  , 7  , 8  , 9  , 10 , 11, 12, 13, 14, 15));
-        return kErrorOk;
-
-      case kCallConvX64Unix:
-        self->_redZoneSize = 128;
-
-        self->_passed.set(X86Reg::kClassGp, Utils::mask(kDi, kSi, kDx, kCx, 8, 9));
-        self->_passedOrderGp[0] = kDi;
-        self->_passedOrderGp[1] = kSi;
-        self->_passedOrderGp[2] = kDx;
-        self->_passedOrderGp[3] = kCx;
-        self->_passedOrderGp[4] = 8;
-        self->_passedOrderGp[5] = 9;
-
-        self->_passed.set(X86Reg::kClassXyz, Utils::mask(0, 1, 2, 3, 4, 5, 6, 7));
-        self->_passedOrderXyz[0] = 0;
-        self->_passedOrderXyz[1] = 1;
-        self->_passedOrderXyz[2] = 2;
-        self->_passedOrderXyz[3] = 3;
-        self->_passedOrderXyz[4] = 4;
-        self->_passedOrderXyz[5] = 5;
-        self->_passedOrderXyz[6] = 6;
-        self->_passedOrderXyz[7] = 7;
-
-        self->_preserved.set(X86Reg::kClassGp, Utils::mask(kBx, kSp, kBp, 12, 13, 14, 15));
-        return kErrorOk;
-    }
-  }
-
-  return DebugUtils::errored(kErrorInvalidArch);
+static ASMJIT_INLINE uint32_t x86VecTypeIdToRegType(uint32_t typeId) noexcept {
+  return typeId <= TypeId::_kVec128End ? X86Reg::kRegXmm :
+         typeId <= TypeId::_kVec256End ? X86Reg::kRegYmm : X86Reg::kRegZmm;
 }
 
+// ============================================================================
+// [asmjit::X86FuncDecl - SetSignature]
+// ============================================================================
+
 static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
-  uint32_t ret, const uint32_t* args, uint32_t numArgs) {
+  uint32_t ret, const uint8_t* args, uint32_t argCount) noexcept {
 
-  ASMJIT_ASSERT(numArgs <= kFuncArgCount);
+  ASMJIT_ASSERT(argCount <= kFuncArgCount);
 
-  uint32_t callConv = self->_callConv;
-  uint32_t regSize = (arch == Arch::kTypeX86) ? 4 : 8;
+  const CallConv& cc = self->_callConv;
+  uint32_t ccId = cc.getId();
 
-  int32_t i = 0;
-  int32_t gpPos = 0;
-  int32_t xmmPos = 0;
-  int32_t stackOffset = 0;
-  const uint32_t* idMap = nullptr;
+  uint32_t i = 0;
+  uint32_t gpSize = (arch == Arch::kTypeX86) ? 4 : 8;
+  uint32_t deabstractDelta = TypeId::deabstractDeltaOfSize(gpSize);
 
-  if (arch == Arch::kTypeX86) idMap = _x86TypeData.idMapX86;
-  if (arch == Arch::kTypeX64) idMap = _x86TypeData.idMapX64;
-
-  ASMJIT_ASSERT(idMap != nullptr);
-  self->_numArgs = static_cast<uint8_t>(numArgs);
-  self->_retCount = 0;
-
-  for (i = 0; i < static_cast<int32_t>(numArgs); i++) {
+  self->_argCount = static_cast<uint8_t>(argCount);
+  for (i = 0; i < static_cast<int32_t>(argCount); i++) {
     FuncInOut& arg = self->getArg(i);
-    arg._typeId = static_cast<uint8_t>(idMap[args[i]]);
-    arg._regId = kInvalidReg;
-    arg._stackOffset = kFuncStackInvalid;
+    arg.initTypeId(TypeId::deabstract(args[i], deabstractDelta));
   }
 
-  for (; i < kFuncArgCount; i++) {
-    self->_args[i].reset();
-  }
-
-  self->_rets[0].reset();
-  self->_rets[1].reset();
-  self->_argStackSize = 0;
-  self->_used.reset();
-
-  if (VirtType::isValidTypeId(ret)) {
-    ret = idMap[ret];
+  if (TypeId::isValid(ret)) {
+    ret = TypeId::deabstract(ret, deabstractDelta);
     switch (ret) {
-      case VirtType::kIdI64:
-      case VirtType::kIdU64:
-        // 64-bit value is returned in EDX:EAX on x86.
+      case TypeId::kI64:
+      case TypeId::kU64: {
         if (arch == Arch::kTypeX86) {
+          // 64-bit value is returned in EDX:EAX on X86.
+          uint32_t typeId = ret - 2;
           self->_retCount = 2;
-          self->_rets[0]._typeId = VirtType::kIdU32;
-          self->_rets[0]._regId = X86Gp::kIdAx;
-          self->_rets[1]._typeId = static_cast<uint8_t>(ret - 2);
-          self->_rets[1]._regId = X86Gp::kIdDx;
-        }
-        ASMJIT_FALLTHROUGH;
-
-      case VirtType::kIdI8:
-      case VirtType::kIdU8:
-      case VirtType::kIdI16:
-      case VirtType::kIdU16:
-      case VirtType::kIdI32:
-      case VirtType::kIdU32:
-        self->_retCount = 1;
-        self->_rets[0]._typeId = static_cast<uint8_t>(ret);
-        self->_rets[0]._regId = X86Gp::kIdAx;
-        break;
-
-      case VirtType::kIdF32:
-        self->_retCount = 1;
-        if (arch == Arch::kTypeX86) {
-          self->_rets[0]._typeId = VirtType::kIdF32;
-          self->_rets[0]._regId = 0;
-        }
-        else {
-          self->_rets[0]._typeId = VirtType::kIdX86XmmSs;
-          self->_rets[0]._regId = 0;
-        }
-        break;
-
-      case VirtType::kIdF64:
-        self->_retCount = 1;
-        if (arch == Arch::kTypeX86) {
-          self->_rets[0]._typeId = VirtType::kIdF64;
-          self->_rets[0]._regId = 0;
-        }
-        else {
-          self->_rets[0]._typeId = VirtType::kIdX86XmmSd;
-          self->_rets[0]._regId = 0;
+          self->_rets[0].initReg(typeId, X86Gp::kRegGpd, X86Gp::kIdAx);
+          self->_rets[1].initReg(typeId, X86Gp::kRegGpd, X86Gp::kIdDx);
           break;
         }
+        else {
+          self->_retCount = 1;
+          self->_rets[0].initReg(ret, X86Gp::kRegGpq, X86Gp::kIdAx);
+        }
         break;
+      }
 
-      case VirtType::kIdX86Mm:
+      case TypeId::kI8:
+      case TypeId::kU8:
+      case TypeId::kI16:
+      case TypeId::kU16:
+      case TypeId::kI32:
+      case TypeId::kU32: {
         self->_retCount = 1;
-        self->_rets[0]._typeId = static_cast<uint8_t>(ret);
-        self->_rets[0]._regId = 0;
+        self->_rets[0].initReg(ret, X86Gp::kRegGpd, X86Gp::kIdAx);
         break;
+      }
 
-      case VirtType::kIdX86Xmm:
-      case VirtType::kIdX86XmmSs:
-      case VirtType::kIdX86XmmSd:
-      case VirtType::kIdX86XmmPs:
-      case VirtType::kIdX86XmmPd:
+      case TypeId::kF32:
+      case TypeId::kF64: {
+        uint32_t regType = (arch == Arch::kTypeX86) ? X86Reg::kRegFp : X86Reg::kRegXmm;
         self->_retCount = 1;
-        self->_rets[0]._typeId = static_cast<uint8_t>(ret);
-        self->_rets[0]._regId = 0;
+        self->_rets[0].initReg(ret, regType, 0);
         break;
+      }
+
+      case TypeId::kF80: {
+        // 80-bit floats are always returned by FP0.
+        self->_retCount = 1;
+        self->_rets[0].initReg(ret, X86Reg::kRegFp, 0);
+        break;
+      }
+
+      case TypeId::kMmx32:
+      case TypeId::kMmx64: {
+        // On X64 MM register(s) are returned through XMM or GPQ (Win64).
+        uint32_t regType = X86Reg::kRegMm;
+        if (arch != Arch::kTypeX86)
+          regType = cc.getAlgorithm() == CallConv::kAlgorithmDefault ? X86Reg::kRegXmm : X86Reg::kRegGpq;
+
+        self->_retCount = 1;
+        self->_rets[0].initReg(ret, regType, 0);
+        break;
+      }
+
+      default: {
+        uint32_t regType = x86VecTypeIdToRegType(ret);
+        self->_retCount = 1;
+        self->_rets[0].initReg(ret, regType, 0);
+        break;
+      }
     }
   }
 
-  if (self->_numArgs == 0)
+  if (!argCount)
     return kErrorOk;
 
-  if (arch == Arch::kTypeX86) {
-    // Register arguments (Integer), always left-to-right.
-    for (i = 0; i != static_cast<int32_t>(numArgs); i++) {
+  uint32_t stackBase = gpSize + cc._spillZoneSize;
+  uint32_t stackOffset = stackBase;
+
+  if (cc.getAlgorithm() == CallConv::kAlgorithmDefault) {
+    uint32_t gpzPos = 0;
+    uint32_t xyzPos = 0;
+
+    for (i = 0; i < argCount; i++) {
       FuncInOut& arg = self->getArg(i);
-      uint32_t varType = idMap[arg.getTypeId()];
+      uint32_t typeId = arg.getTypeId();
 
-      if (!VirtType::isIntTypeId(varType) || gpPos >= ASMJIT_ARRAY_SIZE(self->_passedOrderGp))
+      if (TypeId::isInt(typeId)) {
+        uint32_t regId = gpzPos < CallConv::kMaxRegArgsPerKind ? cc._group[X86Reg::kKindGp].passed[gpzPos] : kInvalidReg;
+        if (regId != kInvalidReg) {
+          uint32_t regType = (typeId <= TypeId::kU32)
+            ? X86Reg::kRegGpd
+            : X86Reg::kRegGpq;
+          arg.assignToReg(regType, regId);
+          self->_usedMask[X86Reg::kKindGp] |= Utils::mask(regId);
+          gpzPos++;
+        }
+        else {
+          uint32_t size = Utils::iMax<uint32_t>(TypeId::sizeOf(typeId), gpSize);
+          arg.assignToStack(stackOffset);
+          stackOffset += size;
+        }
         continue;
+      }
 
-      if (self->_passedOrderGp[gpPos] == kInvalidReg)
+      if (TypeId::isFloat(typeId) || TypeId::isVec(typeId)) {
+        uint32_t regId = xyzPos < CallConv::kMaxRegArgsPerKind ? cc._group[X86Reg::kKindXyz].passed[xyzPos] : kInvalidReg;
+
+        // If this is a float, but `floatByVec` is false, we have to pass by stack.
+        if (TypeId::isFloat(typeId) && !cc.floatByVec()) regId = kInvalidReg;
+
+        if (regId != kInvalidReg) {
+          arg.initReg(typeId, x86VecTypeIdToRegType(typeId), regId);
+          self->_usedMask[X86Reg::kKindXyz] |= Utils::mask(regId);
+          xyzPos++;
+        }
+        else {
+          int32_t size = TypeId::sizeOf(typeId);
+          arg.assignToStack(stackOffset);
+          stackOffset += size;
+        }
         continue;
-
-      arg._regId = self->_passedOrderGp[gpPos++];
-      self->_used.or_(X86Reg::kClassGp, Utils::mask(arg.getRegId()));
+      }
     }
+  }
 
-    // Stack arguments.
-    int32_t iStart = static_cast<int32_t>(numArgs - 1);
-    int32_t iEnd   = -1;
-    int32_t iStep  = -1;
-
-    if (self->_argsDirection == kFuncDirLTR) {
-      iStart = 0;
-      iEnd   = static_cast<int32_t>(numArgs);
-      iStep  = 1;
-    }
-
-    for (i = iStart; i != iEnd; i += iStep) {
+  if (cc.getAlgorithm() == CallConv::kAlgorithmWin64) {
+    for (i = 0; i < argCount; i++) {
       FuncInOut& arg = self->getArg(i);
-      if (arg.hasRegId()) continue;
 
-      uint32_t varType = idMap[arg.getTypeId()];
-      if (VirtType::isIntTypeId(varType)) {
-        stackOffset -= 4;
-        arg._stackOffset = static_cast<int16_t>(stackOffset);
-      }
-      else if (VirtType::isFloatTypeId(varType)) {
-        int32_t size = static_cast<int32_t>(_x86TypeData.typeInfo[varType].getTypeSize());
-        stackOffset -= size;
-        arg._stackOffset = static_cast<int16_t>(stackOffset);
-      }
-    }
-  }
+      uint32_t typeId = arg.getTypeId();
+      uint32_t size = TypeId::sizeOf(typeId);
 
-  if (arch == Arch::kTypeX64) {
-    if (callConv == kCallConvX64Win) {
-      int32_t argMax = Utils::iMin<int32_t>(numArgs, 4);
-
-      // Register arguments (GP/XMM), always left-to-right.
-      for (i = 0; i != argMax; i++) {
-        FuncInOut& arg = self->getArg(i);
-        uint32_t varType = idMap[arg.getTypeId()];
-
-        if (VirtType::isIntTypeId(varType) && i < ASMJIT_ARRAY_SIZE(self->_passedOrderGp)) {
-          arg._regId = self->_passedOrderGp[i];
-          self->_used.or_(X86Reg::kClassGp, Utils::mask(arg.getRegId()));
-          continue;
+      if (TypeId::isInt(typeId) || TypeId::isMmx(typeId)) {
+        uint32_t regId = i < CallConv::kMaxRegArgsPerKind ? cc._group[X86Reg::kKindGp].passed[i] : kInvalidReg;
+        if (regId != kInvalidReg) {
+          uint32_t regType = (size <= 4 && !TypeId::isMmx(typeId))
+            ? X86Reg::kRegGpd
+            : X86Reg::kRegGpq;
+          arg.assignToReg(regType, regId);
+          self->_usedMask[X86Reg::kKindGp] |= Utils::mask(regId);
         }
-
-        if (VirtType::isFloatTypeId(varType) && i < ASMJIT_ARRAY_SIZE(self->_passedOrderXyz)) {
-          arg._typeId = static_cast<uint8_t>(x86ArgTypeToXmmType(varType));
-          arg._regId = self->_passedOrderXyz[i];
-          self->_used.or_(X86Reg::kClassXyz, Utils::mask(arg.getRegId()));
+        else {
+          arg.assignToStack(stackOffset);
+          stackOffset += gpSize;
         }
+        continue;
       }
 
-      // Stack arguments (always right-to-left).
-      for (i = numArgs - 1; i != -1; i--) {
-        FuncInOut& arg = self->getArg(i);
-        uint32_t varType = idMap[arg.getTypeId()];
-
-        if (arg.hasRegId())
-          continue;
-
-        if (VirtType::isIntTypeId(varType)) {
-          stackOffset -= 8; // Always 8 bytes.
-          arg._stackOffset = stackOffset;
+      if (TypeId::isFloat(typeId) || TypeId::isVec(typeId)) {
+        uint32_t regId = i < CallConv::kMaxRegArgsPerKind ? cc._group[X86Reg::kKindXyz].passed[i] : kInvalidReg;
+        if (regId != kInvalidReg && (TypeId::isFloat(typeId) || cc.isVectorCall())) {
+          uint32_t regType = x86VecTypeIdToRegType(typeId);
+          uint32_t regId = cc._group[X86Reg::kKindXyz].passed[i];
+          arg.assignToReg(regType, regId);
+          self->_usedMask[X86Reg::kKindXyz] |= Utils::mask(regId);
         }
-        else if (VirtType::isFloatTypeId(varType)) {
-          stackOffset -= 8; // Always 8 bytes (float/double).
-          arg._stackOffset = stackOffset;
+        else {
+          arg.assignToStack(stackOffset);
+          stackOffset += 8; // Always 8 bytes (float/double).
         }
-      }
-
-      // 32 bytes shadow space (X64W calling convention specific).
-      stackOffset -= 4 * 8;
-    }
-    else {
-      // Register arguments (Gp), always left-to-right.
-      for (i = 0; i != static_cast<int32_t>(numArgs); i++) {
-        FuncInOut& arg = self->getArg(i);
-        uint32_t varType = idMap[arg.getTypeId()];
-
-        if (!VirtType::isIntTypeId(varType) || gpPos >= ASMJIT_ARRAY_SIZE(self->_passedOrderGp))
-          continue;
-
-        if (self->_passedOrderGp[gpPos] == kInvalidReg)
-          continue;
-
-        arg._regId = self->_passedOrderGp[gpPos++];
-        self->_used.or_(X86Reg::kClassGp, Utils::mask(arg.getRegId()));
-      }
-
-      // Register arguments (XMM), always left-to-right.
-      for (i = 0; i != static_cast<int32_t>(numArgs); i++) {
-        FuncInOut& arg = self->getArg(i);
-        uint32_t varType = idMap[arg.getTypeId()];
-
-        if (VirtType::isFloatTypeId(varType)) {
-          arg._typeId = static_cast<uint8_t>(x86ArgTypeToXmmType(varType));
-          arg._regId = self->_passedOrderXyz[xmmPos++];
-          self->_used.or_(X86Reg::kClassXyz, Utils::mask(arg.getRegId()));
-        }
-      }
-
-      // Stack arguments.
-      for (i = numArgs - 1; i != -1; i--) {
-        FuncInOut& arg = self->getArg(i);
-        if (arg.hasRegId()) continue;
-
-        uint32_t varType = idMap[arg.getTypeId()];
-        if (VirtType::isIntTypeId(varType)) {
-          stackOffset -= 8;
-          arg._stackOffset = static_cast<int16_t>(stackOffset);
-        }
-        else if (VirtType::isFloatTypeId(varType)) {
-          int32_t size = static_cast<int32_t>(_x86TypeData.typeInfo[varType].getTypeSize());
-
-          stackOffset -= size;
-          arg._stackOffset = static_cast<int16_t>(stackOffset);
-        }
+        continue;
       }
     }
   }
 
-  // Modify the stack offset, thus in result all parameters would have positive
-  // non-zero stack offset.
-  for (i = 0; i < static_cast<int32_t>(numArgs); i++) {
-    FuncInOut& arg = self->getArg(i);
-    if (!arg.hasRegId()) {
-      arg._stackOffset += static_cast<uint16_t>(static_cast<int32_t>(regSize) - stackOffset);
-    }
-  }
-
-  self->_argStackSize = static_cast<uint32_t>(-stackOffset);
+  self->_argStackSize = stackOffset - stackBase;
   return kErrorOk;
 }
 
 Error X86FuncDecl::setSignature(const FuncSignature& p) {
-  uint32_t callConv = p.getCallConv();
-  uint32_t arch = x86GetArchFromCConv(callConv);
+  uint32_t ccId = p.getCallConv();
+  uint32_t arch = x86GetArchFromCConv(ccId);
 
   if (arch != Arch::kTypeX86 && arch != Arch::kTypeX64)
     return DebugUtils::errored(kErrorInvalidArch);
 
-  if (p.getNumArgs() > kFuncArgCount)
+  if (p.getArgCount() > kFuncArgCount)
     return DebugUtils::errored(kErrorInvalidArgument);
 
-  ASMJIT_PROPAGATE(X86FuncDecl_initConv(this, arch, callConv));
-  ASMJIT_PROPAGATE(X86FuncDecl_initFunc(this, arch, p.getRet(), p.getArgs(), p.getNumArgs()));
+  ASMJIT_PROPAGATE(this->_callConv.init(ccId));
+  ASMJIT_PROPAGATE(X86FuncDecl_initFunc(this, arch, p.getRet(), p.getArgs(), p.getArgCount()));
 
   return kErrorOk;
-}
-
-// ============================================================================
-// [asmjit::X86FuncDecl - Reset]
-// ============================================================================
-
-void X86FuncDecl::reset() {
-  uint32_t i;
-
-  _callConv = kCallConvNone;
-  _calleePopsStack = false;
-  _argsDirection = kFuncDirRTL;
-  _reserved0 = 0;
-
-  _numArgs = 0;
-  _retCount = 0;
-
-  _argStackSize = 0;
-  _redZoneSize = 0;
-  _spillZoneSize = 0;
-
-  for (i = 0; i < ASMJIT_ARRAY_SIZE(_args); i++)
-    _args[i].reset();
-
-  _rets[0].reset();
-  _rets[1].reset();
-
-  _used.reset();
-  _passed.reset();
-  _preserved.reset();
-
-  ::memset(_passedOrderGp, kInvalidReg, ASMJIT_ARRAY_SIZE(_passedOrderGp));
-  ::memset(_passedOrderXyz, kInvalidReg, ASMJIT_ARRAY_SIZE(_passedOrderXyz));
 }
 
 } // asmjit namespace

@@ -23,12 +23,16 @@ namespace asmjit {
 // [asmjit::Zone]
 // ============================================================================
 
-//! Zone memory allocator.
+//! Memory zone.
 //!
 //! Zone is an incremental memory allocator that allocates memory by simply
 //! incrementing a pointer. It allocates blocks of memory by using standard
-//! C library `malloc/free`, but divides these blocks into smaller segments
-//! requirested by calling `Zone::alloc()` and friends.
+//! C `malloc`, but divides these blocks into smaller segments requested by
+//! calling `Zone::alloc()` and friends.
+//!
+//! Zone has no function to release the allocated memory. It has to be released
+//! all at once by calling `reset()`. If you need a more friendly allocator that
+//! also supports `release()`, consider using Zone with \ref ZoneAllocator.
 class Zone {
 public:
   //! \internal
@@ -194,10 +198,7 @@ public:
   ASMJIT_API void* _alloc(size_t size) noexcept;
 
   //! Helper to duplicate data.
-  ASMJIT_API void* dup(const void* data, size_t size) noexcept;
-
-  //! Helper to duplicate string.
-  ASMJIT_API char* sdup(const char* str) noexcept;
+  ASMJIT_API void* dup(const void* data, size_t size, bool nullTerminate = false) noexcept;
 
   //! Helper to duplicate formatted string, maximum length is 256 bytes.
   ASMJIT_API char* sformat(const char* str, ...) noexcept;
@@ -210,7 +211,6 @@ public:
   uint8_t* _end;                         //!< End of the current block's buffer.
   Block* _block;                         //!< Current block.
 
-  //! Default block size.
 #if ASMJIT_ARCH_64BIT
   uint32_t _blockSize;                   //!< Default size of a newly allocated block.
   uint32_t _blockAlignmentShift;         //!< Minimum alignment of each block.

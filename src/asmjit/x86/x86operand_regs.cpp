@@ -27,7 +27,7 @@ namespace asmjit {
 // Register Signature {
 //   uint8_t opType;
 //   uint8_t regType;
-//   uint8_t regClass;
+//   uint8_t regKind;
 //   uint8_t regSize;
 // }
 #define ASMJIT_X86_INV_SIGNATURE() {{      \
@@ -40,27 +40,27 @@ namespace asmjit {
 #define ASMJIT_X86_REG_SIGNATURE(TYPE) {{  \
   uint8_t(Operand::kOpReg),                \
   uint8_t(TYPE),                           \
-  uint8_t(X86RegTraits<TYPE>::kClass),     \
-  uint8_t(X86RegTraits<TYPE>::kSize )      \
+  uint8_t(X86RegTraits<TYPE>::kKind),      \
+  uint8_t(X86RegTraits<TYPE>::kSize)       \
 }}
 
 // Register Operand {
 //   uint8_t opType;
 //   uint8_t regType;
-//   uint8_t regClass;
+//   uint8_t regKind;
 //   uint8_t regSize;
 //   uint32_t id;
 //   uint32_t reserved8_4;
 //   uint32_t reserved12_4;
 // }
-#define ASMJIT_X86_REG_01(TYPE, ID) {{{ \
-  uint8_t(Operand::kOpReg),             \
-  uint8_t(TYPE),                        \
-  uint8_t(X86RegTraits<TYPE>::kClass),  \
-  uint8_t(X86RegTraits<TYPE>::kSize ),  \
-  uint32_t(ID),                         \
-  uint32_t(0),                          \
-  uint32_t(0)                           \
+#define ASMJIT_X86_REG_01(TYPE, ID) {{{    \
+  uint8_t(Operand::kOpReg),                \
+  uint8_t(TYPE),                           \
+  uint8_t(X86RegTraits<TYPE>::kKind),      \
+  uint8_t(X86RegTraits<TYPE>::kSize),      \
+  uint32_t(ID),                            \
+  uint32_t(0),                             \
+  uint32_t(0)                              \
 }}}
 
 #define ASMJIT_X86_REG_04(TYPE, ID) \
@@ -94,7 +94,7 @@ namespace asmjit {
 
 const X86OpData x86OpData = {
   // --------------------------------------------------------------------------
-  // [Signatures]
+  // [RegInfo]
   // --------------------------------------------------------------------------
 
   {
@@ -121,7 +121,34 @@ const X86OpData x86OpData = {
   },
 
   // --------------------------------------------------------------------------
-  // [Operands]
+  // [RegTypeToTypeId]
+  // --------------------------------------------------------------------------
+
+  {
+    X86RegTraits< 0>::kTypeId,
+    X86RegTraits< 1>::kTypeId,
+    X86RegTraits< 2>::kTypeId,
+    X86RegTraits< 3>::kTypeId,
+    X86RegTraits< 4>::kTypeId,
+    X86RegTraits< 5>::kTypeId,
+    X86RegTraits< 6>::kTypeId,
+    X86RegTraits< 7>::kTypeId,
+    X86RegTraits< 8>::kTypeId,
+    X86RegTraits< 9>::kTypeId,
+    X86RegTraits<10>::kTypeId,
+    X86RegTraits<11>::kTypeId,
+    X86RegTraits<12>::kTypeId,
+    X86RegTraits<13>::kTypeId,
+    X86RegTraits<14>::kTypeId,
+    X86RegTraits<15>::kTypeId,
+    X86RegTraits<16>::kTypeId,
+    X86RegTraits<17>::kTypeId,
+    X86RegTraits<18>::kTypeId,
+    X86RegTraits<19>::kTypeId
+  },
+
+  // --------------------------------------------------------------------------
+  // [Registers]
   // --------------------------------------------------------------------------
 
   { ASMJIT_X86_REG_01(X86Reg::kRegRip  , 0) },

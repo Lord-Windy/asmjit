@@ -40,7 +40,7 @@ static void CodeHolder_setGlobalOption(CodeHolder* self, uint32_t clear, uint32_
   }
 }
 
-static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
+static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) noexcept {
   // Detach all `CodeEmitter`s.
   while (self->_emitters)
     self->detach(self->_emitters);
@@ -51,50 +51,28 @@ static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) {
   self->_globalOptions = 0;
   self->_logger = nullptr;
   self->_errorHandler = nullptr;
-
   self->_trampolinesSize = 0;
 
-  self->_baseAllocator.reset(releaseMemory);
-  self->_nameAllocator.reset(releaseMemory);
-
-  // Skip '.text' section if `releaseMemory` is false and it's not external.
-  size_t i = (releaseMemory || self->_defaultSection.buffer.isExternal) ? 0 : 1;
+  // Reset all sections.
   size_t numSections = self->_sections.getLength();
-
-  while (i < numSections) {
+  for (size_t i = 0; i < numSections; i++) {
     CodeHolder::SectionEntry* section = self->_sections[i];
     if (section->buffer.data && !section->buffer.isExternal)
       ASMJIT_FREE(section->buffer.data);
     section->buffer.data = nullptr;
     section->buffer.capacity = 0;
-
-    i++;
   }
 
-  self->_sections.reset(releaseMemory);
-  self->_labels.reset(releaseMemory);
-  self->_labelsHash.reset(releaseMemory);
-  self->_unusedLinks = nullptr;
-  self->_relocations.reset(releaseMemory);
-}
+  // Reset zone allocator and all containers using it.
+  ZoneAllocator* allocator = &self->_baseAllocator;
 
-static void CodeHolder_initDefaultSection(CodeHolder* self) noexcept {
-  CodeHolder::SectionEntry* section = &self->_defaultSection;
-  ::memset(&section->info, 0, sizeof(CodeSection));
+  self->_namedLabels.reset(allocator);
+  self->_relocations.reset(allocator);
+  self->_labels.reset(allocator);
+  self->_sections.reset(allocator);
 
-  section->info.flags = CodeSection::kFlagExec |
-                        CodeSection::kFlagConst;
-  reinterpret_cast<uint32_t*>(section->info.name)[0] = Utils::pack32_4x8('.', 't' , 'e' , 'x' );
-  reinterpret_cast<uint32_t*>(section->info.name)[1] = Utils::pack32_4x8('t', '\0', '\0', '\0');
-
-  section->buffer.length = 0;
-  section->buffer.isExternal = false;
-  section->buffer.isFixedSize = false;
-
-  // There is always room for at least 4 sections, this can't fail.
-  Error err = self->_sections.append(section);
-  ASMJIT_ASSERT(err == kErrorOk);
-  ASMJIT_UNUSED(err); // Be quiet in release builds.
+  allocator->reset(&self->_baseZone);
+  self->_baseZone.reset(releaseMemory);
 }
 
 // ============================================================================
@@ -103,7 +81,6 @@ static void CodeHolder_initDefaultSection(CodeHolder* self) noexcept {
 
 CodeHolder::CodeHolder() noexcept
   : _codeInfo(),
-    _isLocked(false),
     _globalHints(0),
     _globalOptions(0),
     _emitters(nullptr),
@@ -111,17 +88,12 @@ CodeHolder::CodeHolder() noexcept
     _logger(nullptr),
     _errorHandler(nullptr),
     _trampolinesSize(0),
-    _baseAllocator(8192 - Zone::kZoneOverhead),
-    _nameAllocator(8192 - Zone::kZoneOverhead),
-    _unusedLinks(nullptr),
-    _labels(),
-    _sections(),
-    _relocations() {
-
-  _defaultSection.buffer.data = nullptr;
-  _defaultSection.buffer.length = 0;
-  _defaultSection.buffer.capacity = 0;
-  CodeHolder_initDefaultSection(this);
+    _baseZone(16384 - Zone::kZoneOverhead),
+    _dataZone(16384 - Zone::kZoneOverhead),
+    _baseAllocator(&_baseZone),
+    _labels(&_baseAllocator),
+    _sections(&_baseAllocator),
+    _relocations(&_baseAllocator) {
 }
 
 CodeHolder::~CodeHolder() noexcept {
@@ -135,16 +107,33 @@ CodeHolder::~CodeHolder() noexcept {
 Error CodeHolder::init(const CodeInfo& info) noexcept {
   // Cannot reinitialize if it's locked or there one or more CodeEmitter
   // attached.
-  if (_isLocked || _emitters)
-    return DebugUtils::errored(kErrorInvalidState);
+  if (isInitialized())
+    return DebugUtils::errored(kErrorAlreadyInitialized);
 
-  _codeInfo = info;
-  return kErrorOk;
+  // If we are just initializing there should be no emitters attached).
+  ASMJIT_ASSERT(_emitters == nullptr);
+
+  // Create the default section and insert it to the `_sections` array.
+  SectionEntry* text = _baseZone.allocZeroedT<SectionEntry>();
+  if (ASMJIT_UNLIKELY(!text)) return DebugUtils::errored(kErrorNoHeapMemory);
+
+  text->info.flags = CodeSection::kFlagExec | CodeSection::kFlagConst;
+  reinterpret_cast<uint32_t*>(text->info.name)[0] = Utils::pack32_4x8('.', 't' , 'e' , 'x' );
+  reinterpret_cast<uint32_t*>(text->info.name)[1] = Utils::pack32_4x8('t', '\0', '\0', '\0');
+
+  Error err = _sections.append(text);
+  if (ASMJIT_UNLIKELY(err)) {
+    _baseZone.reset(false);
+    return err;
+  }
+  else {
+    _codeInfo = info;
+    return kErrorOk;
+  }
 }
 
 void CodeHolder::reset(bool releaseMemory) noexcept {
   CodeHolder_resetInternal(this, releaseMemory);
-  CodeHolder_initDefaultSection(this);
 }
 
 // ============================================================================
@@ -367,7 +356,7 @@ namespace {
 
 //! \internal
 //!
-//! Only used to lookup a label from `_labelsHash`.
+//! Only used to lookup a label from `_namedLabels`.
 class LabelByName {
 public:
   ASMJIT_INLINE LabelByName(const char* name, size_t nameLength, uint32_t hVal) noexcept
@@ -410,15 +399,8 @@ static uint32_t CodeHolder_hashNameAndFixLen(const char* name, size_t& nameLengt
 } // anonymous namespace
 
 CodeHolder::LabelLink* CodeHolder::newLabelLink() noexcept {
-  LabelLink* link = _unusedLinks;
-
-  if (link) {
-    _unusedLinks = link->prev;
-  }
-  else {
-    link = _baseAllocator.allocT<LabelLink>();
-    if (!link) return nullptr;
-  }
+  LabelLink* link = _baseAllocator.allocT<LabelLink>();
+  if (ASMJIT_UNLIKELY(!link)) return nullptr;
 
   link->prev = nullptr;
   link->offset = 0;
@@ -482,7 +464,7 @@ Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t name
   // Don't allow to insert duplicates. Local labels allow duplicates that have
   // different id, this is already accomplished by having a different hashes
   // between the same label names having different parent labels.
-  LabelEntry* le = _labelsHash.get(LabelByName(name, nameLength, hVal));
+  LabelEntry* le = _namedLabels.get(LabelByName(name, nameLength, hVal));
   if (ASMJIT_UNLIKELY(le))
     return DebugUtils::errored(kErrorLabelAlreadyDefined);
 
@@ -507,7 +489,7 @@ Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t name
   le->_offset = -1;
 
   if (nameLength >= LabelEntry::kEmbeddedSize) {
-    char* nameExternal = static_cast<char*>(_nameAllocator.alloc(nameLength + 1));
+    char* nameExternal = static_cast<char*>(_dataZone.alloc(nameLength + 1));
     if (ASMJIT_UNLIKELY(!nameExternal))
       return DebugUtils::errored(kErrorNoHeapMemory);
 
@@ -521,7 +503,7 @@ Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t name
   }
 
   _labels.appendUnsafe(le);
-  _labelsHash.put(le);
+  _namedLabels.put(le);
 
   idOut = id;
   return err;
@@ -531,7 +513,7 @@ uint32_t CodeHolder::getLabelIdByName(const char* name, size_t nameLength, uint3
   uint32_t hVal = CodeHolder_hashNameAndFixLen(name, nameLength);
   if (ASMJIT_UNLIKELY(!nameLength)) return kInvalidValue;
 
-  LabelEntry* le = _labelsHash.get(LabelByName(name, nameLength, hVal));
+  LabelEntry* le = _namedLabels.get(LabelByName(name, nameLength, hVal));
   return le ? le->getId() : static_cast<uint32_t>(kInvalidValue);
 }
 

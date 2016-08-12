@@ -53,6 +53,10 @@ struct Operand_ {
     kPackedIdCount  = kPackedIdMax - kPackedIdMin //!< Count of valid packed-ids.
   };
 
+  // --------------------------------------------------------------------------
+  // [Operand Utilities]
+  // --------------------------------------------------------------------------
+
   //! Get if the given `id` is a valid packed-id that can be used by Operand.
   //! Packed ids are those equal or greater than `kPackedIdMin` and lesser or
   //! equal to `kPackedIdMax`. This concept was created to support virtual
@@ -66,16 +70,12 @@ struct Operand_ {
   //! Convert a packed-id back to real-id.
   static ASMJIT_INLINE uint32_t unpackId(uint32_t id) noexcept { return id - kPackedIdMin; }
 
-  // --------------------------------------------------------------------------
-  // [Operand Utils]
-  // --------------------------------------------------------------------------
-
   static ASMJIT_INLINE uint32_t makeSignature(uint32_t opType, uint32_t subType, uint32_t payload, uint32_t size) noexcept {
     return Utils::pack32_4x8(opType, subType, payload, size);
   }
 
-  static ASMJIT_INLINE uint32_t makeRegSignature(uint32_t regType, uint32_t regClass, uint32_t regSize) noexcept {
-    return Utils::pack32_4x8(kOpReg, regType, regClass, regSize);
+  static ASMJIT_INLINE uint32_t makeRegSignature(uint32_t regType, uint32_t regKind, uint32_t size) noexcept {
+    return Utils::pack32_4x8(kOpReg, regType, regKind, size);
   }
 
   // --------------------------------------------------------------------------
@@ -96,23 +96,12 @@ struct Operand_ {
   //! Register operand data.
   struct RegData {
     uint8_t op;                          //!< Type of the operand (always \ref kOpReg).
-    uint8_t regType;                     //!< Register type.
-    uint8_t regClass;                    //!< Register class.
+    uint8_t regType;                     //!< Register type (also operand sub-type).
+    uint8_t regKind;                     //!< Register kind.
     uint8_t size;                        //!< Size of the register.
     uint32_t id;                         //!< Physical or virtual register id.
-    uint32_t typeId;                     //!< Virtual type (optional).
+    uint32_t reserved8_4;                //!< \internal
     uint32_t reserved12_4;               //!< \internal
-  };
-
-  //! Structure that contains register signature only, used internally.
-  union RegInfo {
-    struct {
-      uint8_t op;                        //!< Type of the operand (always \ref kOpReg).
-      uint8_t regType;                   //!< Register type.
-      uint8_t regClass;                  //!< Register class.
-      uint8_t size;                      //!< Size of the register.
-    };
-    uint32_t signature;
   };
 
   //! Memory operand data.
@@ -283,8 +272,8 @@ struct Operand_ {
   //! Get if the operand is a register matching `regType`.
   ASMJIT_INLINE bool isReg(uint32_t regType) const noexcept {
     const uint32_t kMsk = makeSignature(0xFF  , 0xFF   , 0, 0);
-    const uint32_t kTag = makeSignature(kOpReg, regType, 0, 0);
-    return (_signature & kMsk) == kTag;
+    const uint32_t kSgn = makeSignature(kOpReg, regType, 0, 0);
+    return (_signature & kMsk) == kSgn;
   }
 
   //! Get whether the operand is register and of `type` and `id`.
@@ -420,13 +409,14 @@ public:
 class Label : public Operand {
 public:
   enum {
-    kMaxNameLength = 2048                //!< Maximum length of a label / symbol.
+    kMaxNameLength = 2048                //!< Maximum length of label/symbol name.
   };
 
+  //! Type of the Label.
   enum Type {
     kTypeAnonymous = 0,                  //!< Anonymous (unnamed) label.
     kTypeLocal     = 1,                  //!< Local label (always has parentId).
-    kTypeGlobal    = 2,                  //!< Global label.
+    kTypeGlobal    = 2,                  //!< Global label (never has parentId).
     kTypeCount     = 3                   //!< Number of label types.
   };
 
@@ -487,12 +477,35 @@ public:
 // [asmjit::RegTraits]
 // ============================================================================
 
-//! Allows to resolve a signature of a register class `RegT` at compile-time.
+//! Allows to resolve a signature of a register `RegT` at compile-time.
 //!
 //! Must be provided by an architecture-specific implementation, ambiguous
 //! registers like `Reg`, `X86Gp` and `X86Xyz` are not resolved by design.
 template<typename RegT>
 struct RegTraits {};
+
+// ============================================================================
+// [asmjit::RegInfo]
+// ============================================================================
+
+//! Structure that contains information about a physical register.
+//!
+//! This information is stored in first 4 bytes of `Reg` operand. It consists
+//! of:
+//!   * `op`      - Operand type, always \ref Operand::kOpReg.
+//!   * `regType` - Register type - platform specific, see \ref X86Reg::Type.
+//!   * `regKind` - Register kind - platform specific, see \ref X86Reg::Kind.
+//!   * `size`    - Size of the register.
+union RegInfo {
+  struct {
+    uint8_t op;                        //!< Type of the operand (always \ref kOpReg).
+    uint8_t regType;                   //!< Register type.
+    uint8_t regKind;                   //!< Register kind.
+    uint8_t size;                      //!< Size of the register.
+  };
+  uint32_t signature;
+};
+
 
 // ============================================================================
 // [asmjit::Reg]
@@ -507,9 +520,9 @@ public:
     kRegRip     = _kRegStart             //!< Universal id of RIP register (if supported).
   };
 
-  //! Register class.
-  ASMJIT_ENUM(Class) {
-    kClassGp = 0                         //!< GP register class, compatible with all architectures.
+  //! Register kind.
+  ASMJIT_ENUM(Kind) {
+    kKindGp = 0                         //!< GP register kind, compatible with all architectures.
   };
 
   // --------------------------------------------------------------------------
@@ -564,11 +577,8 @@ public:
 
   //! Get the register type.
   ASMJIT_INLINE uint32_t getRegType() const noexcept { return _reg.regType; }
-  //! Get the register class.
-  ASMJIT_INLINE uint32_t getRegClass() const noexcept { return _reg.regClass; }
-
-  //! Get a virtual-type of the register.
-  ASMJIT_INLINE uint32_t getTypeId() const noexcept { return _reg.typeId; }
+  //! Get the register kind.
+  ASMJIT_INLINE uint32_t getRegKind() const noexcept { return _reg.regKind; }
 
   //! Cast this register to a non-ambiguous register type `T` keeping this register id and optional virtual type-id.
   //!
@@ -587,8 +597,6 @@ public:
 
   //! Set the register id to `id`.
   ASMJIT_INLINE void setId(uint32_t id) noexcept { _reg.id = id; }
-  //! Set the register type to `regType`.
-  ASMJIT_INLINE void setTypeId(uint32_t typeId) noexcept { _reg.typeId = typeId; }
 
 #define ASMJIT_DEFINE_ABSTRACT_REG(REG, BASE_REG)                              \
 public:                                                                        \
@@ -628,7 +636,7 @@ public:                                                                        \
                                                                                \
   enum {                                                                       \
     kThisType  = TRAITS::kType,                                                \
-    kThisClass = TRAITS::kClass,                                               \
+    kThisKind  = TRAITS::kKind,                                                \
     kThisSize  = TRAITS::kSize,                                                \
     kSignature = TRAITS::kSignature                                            \
   };
@@ -1063,6 +1071,290 @@ static ASMJIT_INLINE Imm imm_u(uint64_t val) noexcept { return Imm(static_cast<i
 //! Create an immediate operand from `p`.
 template<typename T>
 static ASMJIT_INLINE Imm imm_ptr(T p) noexcept { return Imm(static_cast<int64_t>((intptr_t)p)); }
+
+// ============================================================================
+// [asmjit::TypeId]
+// ============================================================================
+
+//! Type-id.
+//!
+//! This is an additional information that can be used to describe a physical
+//! or virtual register. it's used mostly by CodeCompiler to describe register
+//! representation (the kind of data stored in the register and the width used)
+//! and it's also used by APIs that allow to describe and work with function
+//! signatures.
+struct TypeId {
+  // --------------------------------------------------------------------------
+  // [Id]
+  // --------------------------------------------------------------------------
+
+  enum Id {
+    kVoid         = 0,
+
+    _kIntStart    = 32,
+    _kIntEnd      = 41,
+
+    kIntPtr       = 32,
+    kUIntPtr      = 33,
+
+    kI8           = 34,
+    kU8           = 35,
+    kI16          = 36,
+    kU16          = 37,
+    kI32          = 38,
+    kU32          = 39,
+    kI64          = 40,
+    kU64          = 41,
+
+    _kFloatStart  = 42,
+    _kFloatEnd    = 44,
+
+    kF32          = 42,
+    kF64          = 43,
+    kF80          = 44,
+
+    _kMaskStart   = 45,
+    _kMaskEnd     = 48,
+
+    kMask8        = 45,
+    kMask16       = 46,
+    kMask32       = 47,
+    kMask64       = 48,
+
+    _kMmxStart    = 49,
+    _kMmxEnd      = 50,
+
+    kMmx32        = 49,
+    kMmx64        = 50,
+
+    _kVec32Start  = 51,
+    _kVec32End    = 60,
+
+    kI8x4         = 51,
+    kU8x4         = 52,
+    kI16x2        = 53,
+    kU16x2        = 54,
+    kI32x1        = 55,
+    kU32x1        = 56,
+    kF32x1        = 59,
+
+    _kVec64Start  = 61,
+    _kVec64End    = 70,
+
+    kI8x8         = 61,
+    kU8x8         = 62,
+    kI16x4        = 63,
+    kU16x4        = 64,
+    kI32x2        = 65,
+    kU32x2        = 66,
+    kF32x2        = 67,
+    kI64x1        = 68,
+    kU64x1        = 69,
+    kF64x1        = 70,
+
+    _kVec128Start = 71,
+    _kVec128End   = 80,
+
+    kI8x16        = 71,
+    kU8x16        = 72,
+    kI16x8        = 73,
+    kU16x8        = 74,
+    kI32x4        = 75,
+    kU32x4        = 76,
+    kF32x4        = 77,
+    kI64x2        = 78,
+    kU64x2        = 79,
+    kF64x2        = 80,
+
+    _kVec256Start = 81,
+    _kVec256End   = 90,
+
+    kI8x32        = 81,
+    kU8x32        = 82,
+    kI16x16       = 83,
+    kU16x16       = 84,
+    kI32x8        = 85,
+    kU32x8        = 86,
+    kF32x8        = 87,
+    kI64x4        = 88,
+    kU64x4        = 89,
+    kF64x4        = 90,
+
+    _kVec512Start = 91,
+    _kVec512End   = 100,
+
+    kI8x64        = 91,
+    kU8x64        = 92,
+    kI16x32       = 93,
+    kU16x32       = 94,
+    kI32x16       = 95,
+    kU32x16       = 96,
+    kF32x16       = 97,
+    kI64x8        = 98,
+    kU64x8        = 99,
+    kF64x8        = 100,
+
+    kCount        = 101
+  };
+
+  // --------------------------------------------------------------------------
+  // [TypeName - Used by Templates]
+  // --------------------------------------------------------------------------
+
+  struct Int8    {};                     //!< int8_t as C++ type-name.
+  struct UInt8   {};                     //!< uint8_t as C++ type-name.
+  struct Int16   {};                     //!< int16_t as C++ type-name.
+  struct UInt16  {};                     //!< uint16_t as C++ type-name.
+  struct Int32   {};                     //!< int32_t as C++ type-name.
+  struct UInt32  {};                     //!< uint32_t as C++ type-name.
+  struct Int64   {};                     //!< int64_t as C++ type-name.
+  struct UInt64  {};                     //!< uint64_t as C++ type-name.
+  struct IntPtr  {};                     //!< intptr_t as C++ type-name.
+  struct UIntPtr {};                     //!< uintptr_t as C++ type-name.
+  struct Float   {};                     //!< float as C++ type-name.
+  struct Double  {};                     //!< double as C++ type-name.
+  struct MmxReg  {};                     //!< MMX register as C++ type-name.
+  struct Vec128  {};                     //!< SIMD128/XMM register as C++ type-name.
+  struct Vec256  {};                     //!< SIMD256/YMM register as C++ type-name.
+  struct Vec512  {};                     //!< SIMD512/ZMM register as C++ type-name.
+
+  // --------------------------------------------------------------------------
+  // [Utilities]
+  // --------------------------------------------------------------------------
+
+  struct Info {
+    uint8_t sizeOf[128];
+    uint8_t elementOf[128];
+  };
+
+  ASMJIT_API static const Info _info;
+
+  static ASMJIT_INLINE bool isVoid(uint32_t typeId) noexcept { return typeId == 0; }
+  static ASMJIT_INLINE bool isValid(uint32_t typeId) noexcept { return typeId >= _kIntStart && typeId <= _kVec512End; }
+  static ASMJIT_INLINE bool isAbstract(uint32_t typeId) noexcept { return typeId >= kIntPtr && typeId <= kUIntPtr; }
+  static ASMJIT_INLINE bool isInt(uint32_t typeId) noexcept { return typeId >= _kIntStart && typeId <= _kIntEnd; }
+  static ASMJIT_INLINE bool isGpb(uint32_t typeId) noexcept { return typeId >= kI8 && typeId <= kU8; }
+  static ASMJIT_INLINE bool isGpw(uint32_t typeId) noexcept { return typeId >= kI16 && typeId <= kU16; }
+  static ASMJIT_INLINE bool isGpd(uint32_t typeId) noexcept { return typeId >= kI32 && typeId <= kU32; }
+  static ASMJIT_INLINE bool isGpq(uint32_t typeId) noexcept { return typeId >= kI64 && typeId <= kU64; }
+  static ASMJIT_INLINE bool isFloat(uint32_t typeId) noexcept { return typeId >= _kFloatStart && typeId <= _kFloatEnd; }
+  static ASMJIT_INLINE bool isMask(uint32_t typeId) noexcept { return typeId >= _kMaskStart && typeId <= _kMaskEnd; }
+  static ASMJIT_INLINE bool isMmx(uint32_t typeId) noexcept { return typeId >= _kMmxStart && typeId <= _kMmxEnd; }
+
+  static ASMJIT_INLINE bool isVec(uint32_t typeId) noexcept { return typeId >= _kVec32Start && typeId <= _kVec512End; }
+  static ASMJIT_INLINE bool isVec32(uint32_t typeId) noexcept { return typeId >= _kVec32Start && typeId <= _kVec32End; }
+  static ASMJIT_INLINE bool isVec64(uint32_t typeId) noexcept { return typeId >= _kVec64Start && typeId <= _kVec64End; }
+  static ASMJIT_INLINE bool isVec128(uint32_t typeId) noexcept { return typeId >= _kVec128Start && typeId <= _kVec128End; }
+  static ASMJIT_INLINE bool isVec256(uint32_t typeId) noexcept { return typeId >= _kVec256Start && typeId <= _kVec256End; }
+  static ASMJIT_INLINE bool isVec512(uint32_t typeId) noexcept { return typeId >= _kVec512Start && typeId <= _kVec512End; }
+
+  static ASMJIT_INLINE uint32_t sizeOf(uint32_t typeId) noexcept {
+    ASMJIT_ASSERT(typeId < ASMJIT_ARRAY_SIZE(_info.sizeOf));
+    return _info.sizeOf[typeId];
+  }
+
+  static ASMJIT_INLINE uint32_t elementOf(uint32_t typeId) noexcept {
+    ASMJIT_ASSERT(typeId < ASMJIT_ARRAY_SIZE(_info.elementOf));
+    return _info.elementOf[typeId];
+  }
+
+  //! Get an offset to convert a `kIntPtr` and `kUIntPtr` TypeId into a
+  //! type that matches `gpSize` (general-purpose register size). If you
+  //! find such TypeId it's then only about adding the offset to it.
+  //!
+  //! For example:
+  //! ~~~
+  //! uint32_t gpSize = '4' or '8';
+  //! uint32_t deabstractDelta = TypeId::deabstractDeltaOfSize(gpSize);
+  //!
+  //! uint32_t typeId = 'some type-id';
+  //!
+  //! // Normalize some typeId into a non-abstract typeId.
+  //! if (TypeId::isAbstract(typeId)) typeId += deabstractDelta;
+  //!
+  //! // The same, but by using TypeId::deabstract() function.
+  //! typeId = TypeId::deabstract(typeId, deabstractDelta);
+  //!
+  //! ~~~
+  static ASMJIT_INLINE uint32_t deabstractDeltaOfSize(uint32_t gpSize) noexcept {
+    return gpSize >= 8 ? kI64 - kIntPtr : kI32 - kIntPtr;
+  }
+
+  static ASMJIT_INLINE uint32_t deabstract(uint32_t typeId, uint32_t deabstractDelta) noexcept {
+    return TypeId::isAbstract(typeId) ? typeId += deabstractDelta : typeId;
+  }
+};
+
+//! TypeIdOf<> template allows to get a TypeId of a C++ type.
+template<typename T> struct TypeIdOf {
+  // Don't provide anything if not specialized.
+};
+template<typename T> struct TypeIdOf<T*> {
+  enum { kTypeId = TypeId::kUIntPtr };
+};
+
+template<typename T>
+struct TypeIdOfInt {
+  enum {
+    kSigned = int(~static_cast<T>(0) < static_cast<T>(0)),
+    kTypeId = (sizeof(T) == 1) ? (int)(kSigned ? TypeId::kI8  : TypeId::kU8 ) :
+              (sizeof(T) == 2) ? (int)(kSigned ? TypeId::kI16 : TypeId::kU16) :
+              (sizeof(T) == 4) ? (int)(kSigned ? TypeId::kI32 : TypeId::kU32) :
+              (sizeof(T) == 8) ? (int)(kSigned ? TypeId::kI64 : TypeId::kU64) : (int)TypeId::kVoid
+  };
+};
+
+#define ASMJIT_DEFINE_TYPE_ID(T, TYPE_INFO) \
+  template<> struct TypeIdOf<T> { enum { kTypeId = TYPE_INFO }; }
+
+ASMJIT_DEFINE_TYPE_ID(signed char       , TypeIdOfInt<signed char>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned char     , TypeIdOfInt<unsigned char>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(short             , TypeIdOfInt<short>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned short    , TypeIdOfInt<unsigned short>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(int               , TypeIdOfInt<int>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned int      , TypeIdOfInt<unsigned int>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(long              , TypeIdOfInt<long>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned long     , TypeIdOfInt<unsigned long>::kTypeId);
+#if ASMJIT_CC_MSC && !ASMJIT_CC_MSC_GE(16, 0, 0)
+ASMJIT_DEFINE_TYPE_ID(__int64           , TypeIdOfInt<__int64>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned __int64  , TypeIdOfInt<unsigned __int64>::kTypeId);
+#else
+ASMJIT_DEFINE_TYPE_ID(long long         , TypeIdOfInt<long long>::kTypeId);
+ASMJIT_DEFINE_TYPE_ID(unsigned long long, TypeIdOfInt<unsigned long long>::kTypeId);
+#endif
+#if ASMJIT_CC_HAS_NATIVE_CHAR
+ASMJIT_DEFINE_TYPE_ID(char              , TypeIdOfInt<char>::kTypeId);
+#endif
+#if ASMJIT_CC_HAS_NATIVE_CHAR16_T
+ASMJIT_DEFINE_TYPE_ID(char16_t          , TypeIdOfInt<char16_t>::kTypeId);
+#endif
+#if ASMJIT_CC_HAS_NATIVE_CHAR32_T
+ASMJIT_DEFINE_TYPE_ID(char32_t          , TypeIdOfInt<char32_t>::kTypeId);
+#endif
+#if ASMJIT_CC_HAS_NATIVE_WCHAR_T
+ASMJIT_DEFINE_TYPE_ID(wchar_t           , TypeIdOfInt<wchar_t>::kTypeId);
+#endif
+
+ASMJIT_DEFINE_TYPE_ID(void              , TypeId::kVoid);
+ASMJIT_DEFINE_TYPE_ID(float             , TypeId::kF32);
+ASMJIT_DEFINE_TYPE_ID(double            , TypeId::kF64);
+
+ASMJIT_DEFINE_TYPE_ID(TypeId::Int8      , TypeId::kI8);
+ASMJIT_DEFINE_TYPE_ID(TypeId::UInt8     , TypeId::kU8);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Int16     , TypeId::kI16);
+ASMJIT_DEFINE_TYPE_ID(TypeId::UInt16    , TypeId::kU16);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Int32     , TypeId::kI32);
+ASMJIT_DEFINE_TYPE_ID(TypeId::UInt32    , TypeId::kU32);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Int64     , TypeId::kI64);
+ASMJIT_DEFINE_TYPE_ID(TypeId::UInt64    , TypeId::kU64);
+ASMJIT_DEFINE_TYPE_ID(TypeId::IntPtr    , TypeId::kIntPtr);
+ASMJIT_DEFINE_TYPE_ID(TypeId::UIntPtr   , TypeId::kUIntPtr);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Float     , TypeId::kF32);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Double    , TypeId::kF64);
+ASMJIT_DEFINE_TYPE_ID(TypeId::MmxReg    , TypeId::kMmx64);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Vec128    , TypeId::kI32x4);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Vec256    , TypeId::kI32x8);
+ASMJIT_DEFINE_TYPE_ID(TypeId::Vec512    , TypeId::kI32x16);
 
 //! \}
 

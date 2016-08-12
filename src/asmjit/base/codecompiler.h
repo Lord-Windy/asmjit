@@ -15,11 +15,12 @@
 #include "../base/assembler.h"
 #include "../base/codebuilder.h"
 #include "../base/constpool.h"
-#include "../base/containers.h"
 #include "../base/func.h"
 #include "../base/operand.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
+#include "../base/zoneallocator.h"
+#include "../base/zonecontainers.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -69,27 +70,30 @@ struct VirtReg {
 
   //! Get the virtual-register id.
   ASMJIT_INLINE uint32_t getId() const noexcept { return _id; }
-  //! Get a register signature of this virtual register.
-  ASMJIT_INLINE uint32_t getSignature() const { return _regInfo.signature; }
-  //! Get a physical register type.
-  ASMJIT_INLINE uint32_t getRegType() const { return _regInfo.regType; }
-  //! Get a physical register class.
-  ASMJIT_INLINE uint32_t getRegClass() const { return _regInfo.regClass; }
-
   //! Get virtual-register's name.
   ASMJIT_INLINE const char* getName() const noexcept { return _name; }
-  //! Get virtual-register's size.
-  ASMJIT_INLINE uint32_t getSize() const { return _size; }
-  //! Get virtual-register's alignment.
-  ASMJIT_INLINE uint32_t getAlignment() const { return _alignment; }
 
-  //! Get a virtual type.
-  ASMJIT_INLINE uint32_t getTypeId() const { return _typeId; }
+  //! Get a physical register type.
+  ASMJIT_INLINE uint32_t getRegType() const noexcept { return _regInfo.regType; }
+  //! Get a physical register kind.
+  ASMJIT_INLINE uint32_t getRegKind() const noexcept { return _regInfo.regKind; }
+  //! Get a physical register size.
+  ASMJIT_INLINE uint32_t getRegSize() const noexcept { return _regInfo.size; }
+  //! Get a register signature of this virtual register.
+  ASMJIT_INLINE uint32_t getSignature() const noexcept { return _regInfo.signature; }
+
+  //! Get a register's type-id, see \ref TypeId.
+  ASMJIT_INLINE uint32_t getTypeId() const noexcept { return _typeId; }
+
+  //! Get virtual-register's size.
+  ASMJIT_INLINE uint32_t getSize() const noexcept { return _size; }
+  //! Get virtual-register's alignment.
+  ASMJIT_INLINE uint32_t getAlignment() const noexcept { return _alignment; }
 
   //! Get the virtual-register  priority, used by compiler to decide which variable to spill.
-  ASMJIT_INLINE uint32_t getPriority() const { return _priority; }
+  ASMJIT_INLINE uint32_t getPriority() const noexcept { return _priority; }
   //! Set the virtual-register  priority.
-  ASMJIT_INLINE void setPriority(uint32_t priority) {
+  ASMJIT_INLINE void setPriority(uint32_t priority) noexcept {
     ASMJIT_ASSERT(priority <= 0xFF);
     _priority = static_cast<uint8_t>(priority);
   }
@@ -147,11 +151,11 @@ struct VirtReg {
   // --------------------------------------------------------------------------
 
   uint32_t _id;                          //!< Virtual register id.
-  Operand::RegInfo _regInfo;             //!< Virtual register info & signature.
-  const char* _name;                     //!< Virtual register name (user provided).
-  uint32_t _typeId;                      //!< Virtual type-id.
-  uint32_t _size;                        //!< Number of bytes the register or memory uses.
-  uint8_t _alignment;                    //!< Variable's natural alignment.
+  RegInfo _regInfo;                      //!< Physical register info & signature.
+  const char* _name;                     //!< Virtual name (user provided).
+  uint32_t _size;                        //!< Virtual size (can be smaller than `regInfo._size`).
+  uint8_t _typeId;                       //!< Type-id.
+  uint8_t _alignment;                    //!< Register's natural alignment (for spilling).
   uint8_t _priority;                     //!< Allocation priority (hint for RAPass that can be ignored).
   uint8_t _isStack : 1;                  //!< True if the virtual register is only used as a stack.
   uint8_t _isMemArg : 1;                 //!< If the variable is a function argument passed through memory.
@@ -302,25 +306,25 @@ public:
   ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
 
   //! Get arguments count.
-  ASMJIT_INLINE uint32_t getNumArgs() const noexcept { return _decl->getNumArgs(); }
+  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl->getArgCount(); }
   //! Get arguments list.
   ASMJIT_INLINE VirtReg** getArgs() const noexcept { return _args; }
 
   //! Get argument at `i`.
   ASMJIT_INLINE VirtReg* getArg(uint32_t i) const noexcept {
-    ASMJIT_ASSERT(i < getNumArgs());
+    ASMJIT_ASSERT(i < getArgCount());
     return _args[i];
   }
 
   //! Set argument at `i`.
   ASMJIT_INLINE void setArg(uint32_t i, VirtReg* vreg) noexcept {
-    ASMJIT_ASSERT(i < getNumArgs());
+    ASMJIT_ASSERT(i < getArgCount());
     _args[i] = vreg;
   }
 
   //! Reset argument at `i`.
   ASMJIT_INLINE void resetArg(uint32_t i) noexcept {
-    ASMJIT_ASSERT(i < getNumArgs());
+    ASMJIT_ASSERT(i < getArgCount());
     _args[i] = nullptr;
   }
 
@@ -638,19 +642,6 @@ public:
   ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
-  // [Compiler Features]
-  // --------------------------------------------------------------------------
-
-  //! Get maximum look ahead.
-  ASMJIT_INLINE uint32_t getMaxLookAhead() const noexcept {
-    return _maxLookAhead;
-  }
-  //! Set maximum look ahead to `val`.
-  ASMJIT_INLINE void setMaxLookAhead(uint32_t val) noexcept {
-    _maxLookAhead = val;
-  }
-
-  // --------------------------------------------------------------------------
   // [Node-Factory]
   // --------------------------------------------------------------------------
 
@@ -676,11 +667,31 @@ public:
   ASMJIT_API Error _hint(Reg& reg, uint32_t hint, uint32_t value);
 
   // --------------------------------------------------------------------------
-  // [Vars]
+  // [VirtReg / Stack]
   // --------------------------------------------------------------------------
 
-  //! Create a new virtual register.
-  ASMJIT_API VirtReg* newVirtReg(const VirtType& typeInfo, const char* name) noexcept;
+  virtual Error _prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept = 0;
+
+  //! Create a new virtual register representing the given `vti` and `signature`.
+  //!
+  //! This function accepts either register type representing a machine-specific
+  //! register, like `X86Reg`, or RegTag representation, which represents
+  //! machine independent register, and from the machine-specific register
+  //! is deduced.
+  ASMJIT_API VirtReg* newVirtReg(uint32_t typeId, uint32_t signature, const char* name) noexcept;
+
+  ASMJIT_API Error _newReg(Reg& out, uint32_t typeId, const char* name);
+  ASMJIT_API Error _newReg(Reg& out, uint32_t typeId, const char* nameFmt, va_list ap);
+
+  ASMJIT_API Error _newReg(Reg& out, const Reg& ref, const char* name);
+  ASMJIT_API Error _newReg(Reg& out, const Reg& ref, const char* nameFmt, va_list ap);
+
+  ASMJIT_API Error _newStack(Mem& out, uint32_t size, uint32_t alignment, const char* name);
+  ASMJIT_API Error _newConst(Mem& out, uint32_t scope, const void* data, size_t size);
+
+  // --------------------------------------------------------------------------
+  // [VirtReg]
+  // --------------------------------------------------------------------------
 
   //! Get whether the virtual register `r` is valid.
   ASMJIT_INLINE bool isVirtRegValid(const Reg& reg) const noexcept {
@@ -693,7 +704,9 @@ public:
   }
 
   //! Get \ref VirtReg associated with the given `r`.
-  ASMJIT_INLINE VirtReg* getVirtReg(const Reg& reg) const noexcept { return getVirtRegById(reg.getId()); }
+  ASMJIT_INLINE VirtReg* getVirtReg(const Reg& reg) const noexcept {
+    return getVirtRegById(reg.getId());
+  }
   //! Get \ref VirtReg associated with the given `id`.
   ASMJIT_INLINE VirtReg* getVirtRegById(uint32_t id) const noexcept {
     ASMJIT_ASSERT(id != kInvalidValue);
@@ -704,7 +717,7 @@ public:
   }
 
   //! Get an array of all virtual registers managed by CodeCompiler.
-  ASMJIT_INLINE const PodVector<VirtReg*>& getVirtRegArray() const noexcept { return _vRegArray; }
+  ASMJIT_INLINE const ZoneVector<VirtReg*>& getVirtRegArray() const noexcept { return _vRegArray; }
 
   //! Alloc a virtual register `reg`.
   ASMJIT_API Error alloc(Reg& reg);
@@ -735,34 +748,14 @@ public:
   ASMJIT_API void rename(Reg& reg, const char* fmt, ...);
 
   // --------------------------------------------------------------------------
-  // [Stack]
-  // --------------------------------------------------------------------------
-
-  //! \internal
-  //!
-  //! Create a new memory chunk allocated on the current function's stack.
-  virtual Error _newStack(Mem& m, uint32_t size, uint32_t alignment, const char* name) = 0;
-
-  // --------------------------------------------------------------------------
-  // [Const]
-  // --------------------------------------------------------------------------
-
-  //! \internal
-  //!
-  //! Put data to a constant-pool and get a memory reference to it.
-  virtual Error _newConst(Mem& m, uint32_t scope, const void* data, size_t size) = 0;
-
-  // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  const uint32_t* _typeIdMap;            //!< Mapping between arch-independent type-id and backend specific one.
   uint32_t _maxLookAhead;                //!< Maximum look-ahead of RA.
-
   CCFunc* _func;                         //!< Current function.
 
-  Zone _vRegAllocator;                   //!< Allocates \ref VirtReg objects.
-  PodVector<VirtReg*> _vRegArray;        //!< Stores array of \ref VirtReg pointers.
+  Zone _vRegZone;                        //!< Allocates \ref VirtReg objects.
+  ZoneVector<VirtReg*> _vRegArray;       //!< Stores array of \ref VirtReg pointers.
 
   CBConstPool* _localConstPool;          //!< Local constant pool, flushed at the end of each function.
   CBConstPool* _globalConstPool;         //!< Global constant pool, flushed at the end of the compilation.

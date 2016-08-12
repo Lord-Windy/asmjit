@@ -40,7 +40,7 @@ namespace asmjit {
 //! variables, thus, not needed to be managed.
 //!
 //! NOTE: At the moment `X86RegCount` can fit into 32-bits, having 8-bits for
-//! each register class except FP. This can change in the future after a new
+//! each register kind except FP. This can change in the future after a new
 //! instruction set, which adds more registers, is introduced.
 struct X86RegCount {
   // --------------------------------------------------------------------------
@@ -54,66 +54,66 @@ struct X86RegCount {
   // [Get]
   // --------------------------------------------------------------------------
 
-  //! Get register count by a register class `rc`.
-  ASMJIT_INLINE uint32_t get(uint32_t rc) const noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  //! Get register count by a register `kind`.
+  ASMJIT_INLINE uint32_t get(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    uint32_t shift = Utils::byteShiftOfDWordStruct(rc);
+    uint32_t shift = Utils::byteShiftOfDWordStruct(kind);
     return (_packed >> shift) & static_cast<uint32_t>(0xFF);
   }
 
   //! Get Gp count.
-  ASMJIT_INLINE uint32_t getGp() const noexcept { return get(X86Reg::kClassGp); }
+  ASMJIT_INLINE uint32_t getGp() const noexcept { return get(X86Reg::kKindGp); }
   //! Get Mm count.
-  ASMJIT_INLINE uint32_t getMm() const noexcept { return get(X86Reg::kClassMm); }
+  ASMJIT_INLINE uint32_t getMm() const noexcept { return get(X86Reg::kKindMm); }
   //! Get K count.
-  ASMJIT_INLINE uint32_t getK() const noexcept { return get(X86Reg::kClassK); }
+  ASMJIT_INLINE uint32_t getK() const noexcept { return get(X86Reg::kKindK); }
   //! Get XMM/YMM/ZMM count.
-  ASMJIT_INLINE uint32_t getXyz() const noexcept { return get(X86Reg::kClassXyz); }
+  ASMJIT_INLINE uint32_t getXyz() const noexcept { return get(X86Reg::kKindXyz); }
 
   // --------------------------------------------------------------------------
   // [Set]
   // --------------------------------------------------------------------------
 
-  //! Set register count by a register class `rc`.
-  ASMJIT_INLINE void set(uint32_t rc, uint32_t n) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  //! Set register count by a register `kind`.
+  ASMJIT_INLINE void set(uint32_t kind, uint32_t n) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
     ASMJIT_ASSERT(n <= 0xFF);
 
-    uint32_t shift = Utils::byteShiftOfDWordStruct(rc);
+    uint32_t shift = Utils::byteShiftOfDWordStruct(kind);
     _packed = (_packed & ~static_cast<uint32_t>(0xFF << shift)) + (n << shift);
   }
 
   //! Set Gp count.
-  ASMJIT_INLINE void setGp(uint32_t n) noexcept { set(X86Reg::kClassGp, n); }
+  ASMJIT_INLINE void setGp(uint32_t n) noexcept { set(X86Reg::kKindGp, n); }
   //! Set Mm count.
-  ASMJIT_INLINE void setMm(uint32_t n) noexcept { set(X86Reg::kClassMm, n); }
+  ASMJIT_INLINE void setMm(uint32_t n) noexcept { set(X86Reg::kKindMm, n); }
   //! Set K count.
-  ASMJIT_INLINE void setK(uint32_t n) noexcept { set(X86Reg::kClassK, n); }
+  ASMJIT_INLINE void setK(uint32_t n) noexcept { set(X86Reg::kKindK, n); }
   //! Set XMM/YMM/ZMM count.
-  ASMJIT_INLINE void setXyz(uint32_t n) noexcept { set(X86Reg::kClassXyz, n); }
+  ASMJIT_INLINE void setXyz(uint32_t n) noexcept { set(X86Reg::kKindXyz, n); }
 
   // --------------------------------------------------------------------------
   // [Add]
   // --------------------------------------------------------------------------
 
-  //! Add register count by a register class `rc`.
-  ASMJIT_INLINE void add(uint32_t rc, uint32_t n = 1) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
-    ASMJIT_ASSERT(0xFF - static_cast<uint32_t>(_regs[rc]) >= n);
+  //! Add register count by a register `kind`.
+  ASMJIT_INLINE void add(uint32_t kind, uint32_t n = 1) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
+    ASMJIT_ASSERT(0xFF - static_cast<uint32_t>(_regs[kind]) >= n);
 
-    uint32_t shift = Utils::byteShiftOfDWordStruct(rc);
+    uint32_t shift = Utils::byteShiftOfDWordStruct(kind);
     _packed += n << shift;
   }
 
   //! Add GP count.
-  ASMJIT_INLINE void addGp(uint32_t n) noexcept { add(X86Reg::kClassGp, n); }
+  ASMJIT_INLINE void addGp(uint32_t n) noexcept { add(X86Reg::kKindGp, n); }
   //! Add MMX count.
-  ASMJIT_INLINE void addMm(uint32_t n) noexcept { add(X86Reg::kClassMm, n); }
+  ASMJIT_INLINE void addMm(uint32_t n) noexcept { add(X86Reg::kKindMm, n); }
   //! Add K count.
-  ASMJIT_INLINE void addK(uint32_t n) noexcept { add(X86Reg::kClassK, n); }
+  ASMJIT_INLINE void addK(uint32_t n) noexcept { add(X86Reg::kKindK, n); }
   //! Add XMM/YMM/ZMM count.
-  ASMJIT_INLINE void addXyz(uint32_t n) noexcept { add(X86Reg::kClassXyz, n); }
+  ASMJIT_INLINE void addXyz(uint32_t n) noexcept { add(X86Reg::kKindXyz, n); }
 
   // --------------------------------------------------------------------------
   // [Misc]
@@ -177,65 +177,65 @@ struct X86RegMask {
     return _packed.isZero();
   }
 
-  ASMJIT_INLINE bool has(uint32_t rc, uint32_t mask = 0xFFFFFFFFU) const noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE bool has(uint32_t kind, uint32_t mask = 0xFFFFFFFFU) const noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : return (static_cast<uint32_t>(_gp ) & mask) != 0;
-      case X86Reg::kClassMm : return (static_cast<uint32_t>(_mm ) & mask) != 0;
-      case X86Reg::kClassK  : return (static_cast<uint32_t>(_k  ) & mask) != 0;
-      case X86Reg::kClassXyz: return (static_cast<uint32_t>(_xyz) & mask) != 0;
+    switch (kind) {
+      case X86Reg::kKindGp : return (static_cast<uint32_t>(_gp ) & mask) != 0;
+      case X86Reg::kKindMm : return (static_cast<uint32_t>(_mm ) & mask) != 0;
+      case X86Reg::kKindK  : return (static_cast<uint32_t>(_k  ) & mask) != 0;
+      case X86Reg::kKindXyz: return (static_cast<uint32_t>(_xyz) & mask) != 0;
     }
 
     return false;
   }
 
-  ASMJIT_INLINE bool hasGp(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE bool hasMm(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE bool hasK(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE bool hasXyz(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE bool hasGp(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE bool hasMm(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE bool hasK(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE bool hasXyz(uint32_t mask = 0xFFFFFFFFU) const noexcept { return has(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [Get]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE uint32_t get(uint32_t rc) const noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE uint32_t get(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : return _gp;
-      case X86Reg::kClassMm : return _mm;
-      case X86Reg::kClassK  : return _k;
-      case X86Reg::kClassXyz: return _xyz;
+    switch (kind) {
+      case X86Reg::kKindGp : return _gp;
+      case X86Reg::kKindMm : return _mm;
+      case X86Reg::kKindK  : return _k;
+      case X86Reg::kKindXyz: return _xyz;
     }
 
     return 0;
   }
 
-  ASMJIT_INLINE uint32_t getGp() const noexcept { return get(X86Reg::kClassGp); }
-  ASMJIT_INLINE uint32_t getMm() const noexcept { return get(X86Reg::kClassMm); }
-  ASMJIT_INLINE uint32_t getK() const noexcept { return get(X86Reg::kClassK); }
-  ASMJIT_INLINE uint32_t getXyz() const noexcept { return get(X86Reg::kClassXyz); }
+  ASMJIT_INLINE uint32_t getGp() const noexcept { return get(X86Reg::kKindGp); }
+  ASMJIT_INLINE uint32_t getMm() const noexcept { return get(X86Reg::kKindMm); }
+  ASMJIT_INLINE uint32_t getK() const noexcept { return get(X86Reg::kKindK); }
+  ASMJIT_INLINE uint32_t getXyz() const noexcept { return get(X86Reg::kKindXyz); }
 
   // --------------------------------------------------------------------------
   // [Zero]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE void zero(uint32_t rc) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE void zero(uint32_t kind) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  = 0; break;
-      case X86Reg::kClassMm : _mm  = 0; break;
-      case X86Reg::kClassK  : _k   = 0; break;
-      case X86Reg::kClassXyz: _xyz = 0; break;
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  = 0; break;
+      case X86Reg::kKindMm : _mm  = 0; break;
+      case X86Reg::kKindK  : _k   = 0; break;
+      case X86Reg::kKindXyz: _xyz = 0; break;
     }
   }
 
-  ASMJIT_INLINE void zeroGp() noexcept { zero(X86Reg::kClassGp); }
-  ASMJIT_INLINE void zeroMm() noexcept { zero(X86Reg::kClassMm); }
-  ASMJIT_INLINE void zeroK() noexcept { zero(X86Reg::kClassK); }
-  ASMJIT_INLINE void zeroXyz() noexcept { zero(X86Reg::kClassXyz); }
+  ASMJIT_INLINE void zeroGp() noexcept { zero(X86Reg::kKindGp); }
+  ASMJIT_INLINE void zeroMm() noexcept { zero(X86Reg::kKindMm); }
+  ASMJIT_INLINE void zeroK() noexcept { zero(X86Reg::kKindK); }
+  ASMJIT_INLINE void zeroXyz() noexcept { zero(X86Reg::kKindXyz); }
 
   // --------------------------------------------------------------------------
   // [Set]
@@ -245,21 +245,21 @@ struct X86RegMask {
     _packed = other._packed;
   }
 
-  ASMJIT_INLINE void set(uint32_t rc, uint32_t mask) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE void set(uint32_t kind, uint32_t mask) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  = static_cast<uint16_t>(mask); break;
-      case X86Reg::kClassMm : _mm  = static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassK  : _k   = static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassXyz: _xyz = static_cast<uint32_t>(mask); break;
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  = static_cast<uint16_t>(mask); break;
+      case X86Reg::kKindMm : _mm  = static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindK  : _k   = static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindXyz: _xyz = static_cast<uint32_t>(mask); break;
     }
   }
 
-  ASMJIT_INLINE void setGp(uint32_t mask) noexcept { return set(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE void setMm(uint32_t mask) noexcept { return set(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE void setK(uint32_t mask) noexcept { return set(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE void setXyz(uint32_t mask) noexcept { return set(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE void setGp(uint32_t mask) noexcept { return set(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE void setMm(uint32_t mask) noexcept { return set(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE void setK(uint32_t mask) noexcept { return set(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE void setXyz(uint32_t mask) noexcept { return set(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [And]
@@ -269,21 +269,21 @@ struct X86RegMask {
     _packed.and_(other._packed);
   }
 
-  ASMJIT_INLINE void and_(uint32_t rc, uint32_t mask) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE void and_(uint32_t kind, uint32_t mask) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  &= static_cast<uint16_t>(mask); break;
-      case X86Reg::kClassMm : _mm  &= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassK  : _k   &= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassXyz: _xyz &= static_cast<uint32_t>(mask); break;
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  &= static_cast<uint16_t>(mask); break;
+      case X86Reg::kKindMm : _mm  &= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindK  : _k   &= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindXyz: _xyz &= static_cast<uint32_t>(mask); break;
     }
   }
 
-  ASMJIT_INLINE void andGp(uint32_t mask) noexcept { and_(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE void andMm(uint32_t mask) noexcept { and_(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE void andK(uint32_t mask) noexcept { and_(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE void andXyz(uint32_t mask) noexcept { and_(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE void andGp(uint32_t mask) noexcept { and_(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE void andMm(uint32_t mask) noexcept { and_(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE void andK(uint32_t mask) noexcept { and_(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE void andXyz(uint32_t mask) noexcept { and_(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [AndNot]
@@ -293,21 +293,21 @@ struct X86RegMask {
     _packed.andNot(other._packed);
   }
 
-  ASMJIT_INLINE void andNot(uint32_t rc, uint32_t mask) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE void andNot(uint32_t kind, uint32_t mask) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  &= ~static_cast<uint16_t>(mask); break;
-      case X86Reg::kClassMm : _mm  &= ~static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassK  : _k   &= ~static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassXyz: _xyz &= ~static_cast<uint32_t>(mask); break;
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  &= ~static_cast<uint16_t>(mask); break;
+      case X86Reg::kKindMm : _mm  &= ~static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindK  : _k   &= ~static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindXyz: _xyz &= ~static_cast<uint32_t>(mask); break;
     }
   }
 
-  ASMJIT_INLINE void andNotGp(uint32_t mask) noexcept { andNot(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE void andNotMm(uint32_t mask) noexcept { andNot(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE void andNotK(uint32_t mask) noexcept { andNot(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE void andNotXyz(uint32_t mask) noexcept { andNot(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE void andNotGp(uint32_t mask) noexcept { andNot(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE void andNotMm(uint32_t mask) noexcept { andNot(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE void andNotK(uint32_t mask) noexcept { andNot(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE void andNotXyz(uint32_t mask) noexcept { andNot(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [Or]
@@ -317,20 +317,20 @@ struct X86RegMask {
     _packed.or_(other._packed);
   }
 
-  ASMJIT_INLINE void or_(uint32_t rc, uint32_t mask) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  |= static_cast<uint16_t>(mask); break;
-      case X86Reg::kClassMm : _mm  |= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassK  : _k   |= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassXyz: _xyz |= static_cast<uint32_t>(mask); break;
+  ASMJIT_INLINE void or_(uint32_t kind, uint32_t mask) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  |= static_cast<uint16_t>(mask); break;
+      case X86Reg::kKindMm : _mm  |= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindK  : _k   |= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindXyz: _xyz |= static_cast<uint32_t>(mask); break;
     }
   }
 
-  ASMJIT_INLINE void orGp(uint32_t mask) noexcept { return or_(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE void orMm(uint32_t mask) noexcept { return or_(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE void orK(uint32_t mask) noexcept { return or_(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE void orXyz(uint32_t mask) noexcept { return or_(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE void orGp(uint32_t mask) noexcept { return or_(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE void orMm(uint32_t mask) noexcept { return or_(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE void orK(uint32_t mask) noexcept { return or_(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE void orXyz(uint32_t mask) noexcept { return or_(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [Xor]
@@ -340,21 +340,21 @@ struct X86RegMask {
     _packed.xor_(other._packed);
   }
 
-  ASMJIT_INLINE void xor_(uint32_t rc, uint32_t mask) noexcept {
-    ASMJIT_ASSERT(rc < X86Reg::_kClassManagedCount);
+  ASMJIT_INLINE void xor_(uint32_t kind, uint32_t mask) noexcept {
+    ASMJIT_ASSERT(kind < X86Reg::_kKindRACount);
 
-    switch (rc) {
-      case X86Reg::kClassGp : _gp  ^= static_cast<uint16_t>(mask); break;
-      case X86Reg::kClassMm : _mm  ^= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassK  : _k   ^= static_cast<uint8_t >(mask); break;
-      case X86Reg::kClassXyz: _xyz ^= static_cast<uint32_t>(mask); break;
+    switch (kind) {
+      case X86Reg::kKindGp : _gp  ^= static_cast<uint16_t>(mask); break;
+      case X86Reg::kKindMm : _mm  ^= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindK  : _k   ^= static_cast<uint8_t >(mask); break;
+      case X86Reg::kKindXyz: _xyz ^= static_cast<uint32_t>(mask); break;
     }
   }
 
-  ASMJIT_INLINE void xorGp(uint32_t mask) noexcept { xor_(X86Reg::kClassGp, mask); }
-  ASMJIT_INLINE void xorMm(uint32_t mask) noexcept { xor_(X86Reg::kClassMm, mask); }
-  ASMJIT_INLINE void xorK(uint32_t mask) noexcept { xor_(X86Reg::kClassK, mask); }
-  ASMJIT_INLINE void xorXyz(uint32_t mask) noexcept { xor_(X86Reg::kClassXyz, mask); }
+  ASMJIT_INLINE void xorGp(uint32_t mask) noexcept { xor_(X86Reg::kKindGp, mask); }
+  ASMJIT_INLINE void xorMm(uint32_t mask) noexcept { xor_(X86Reg::kKindMm, mask); }
+  ASMJIT_INLINE void xorK(uint32_t mask) noexcept { xor_(X86Reg::kKindK, mask); }
+  ASMJIT_INLINE void xorXyz(uint32_t mask) noexcept { xor_(X86Reg::kKindXyz, mask); }
 
   // --------------------------------------------------------------------------
   // [Members]

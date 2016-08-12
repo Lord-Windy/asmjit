@@ -33,13 +33,6 @@ class X86CCCall;
 //! \addtogroup asmjit_x86
 //! \{
 
-struct X86TypeData {
-  VirtType typeInfo[VirtType::kIdCount]; //!< Type information.
-  uint32_t idMapX86[VirtType::kIdCount]; //!< Map a type-id to X86 specific type-id.
-  uint32_t idMapX64[VirtType::kIdCount]; //!< Map a type-id to X64 specific type-id.
-};
-ASMJIT_VARAPI const X86TypeData _x86TypeData;
-
 // ============================================================================
 // [asmjit::X86Func]
 // ============================================================================
@@ -85,12 +78,12 @@ public:
 
   //! Get argument.
   ASMJIT_INLINE VirtReg* getArg(uint32_t i) const noexcept {
-    ASMJIT_ASSERT(i < _x86Decl.getNumArgs());
+    ASMJIT_ASSERT(i < _x86Decl.getArgCount());
     return static_cast<VirtReg*>(_args[i]);
   }
 
   //! Get registers which have to be saved in prolog/epilog.
-  ASMJIT_INLINE uint32_t getSaveRestoreRegs(uint32_t rc) noexcept { return _saveRestoreRegs.get(rc); }
+  ASMJIT_INLINE uint32_t getSaveRestoreRegs(uint32_t kind) noexcept { return _saveRestoreRegs.get(kind); }
 
   //! Get stack size needed to align stack back to the nature alignment.
   ASMJIT_INLINE uint32_t getAlignStackSize() const noexcept { return _alignStackSize; }
@@ -326,135 +319,112 @@ public:
   ASMJIT_API Error setArg(uint32_t argIndex, const Reg& reg);
 
   // --------------------------------------------------------------------------
-  // [Vars]
+  // [VirtReg]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API Error _newReg(Reg& out, uint32_t typeId, const char* name);
-  ASMJIT_API Error _newReg(Reg& out, uint32_t typeId, const char* nameFmt, va_list ap);
-
-  ASMJIT_API Error _newRegAs(Reg& out, const Reg& ref, const char* name);
-  ASMJIT_API Error _newRegAs(Reg& out, const Reg& ref, const char* nameFmt, va_list ap);
+  ASMJIT_API virtual Error _prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept override;
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-#define ASMJIT_NEW_REG(OUT, PARAM, NAME_FMT) \
-  va_list ap;                                \
-  va_start(ap, NAME_FMT);                    \
-  _newReg(OUT, PARAM, NAME_FMT, ap);         \
+#define ASMJIT_NEW_REG(OUT, PARAM, NAME_FMT)            \
+  va_list ap;                                           \
+  va_start(ap, NAME_FMT);                               \
+  _newReg(OUT, PARAM, NAME_FMT, ap);                    \
   va_end(ap)
 #else
-#define ASMJIT_NEW_REG(OUT, PARAM, NAME_FMT) \
-  ASMJIT_UNUSED(NAME_FMT);                   \
+#define ASMJIT_NEW_REG(OUT, PARAM, NAME_FMT)            \
+  ASMJIT_UNUSED(NAME_FMT);                              \
   _newReg(OUT, PARAM, nullptr)
 #endif
 
+#define ASMJIT_NEW_REG_USER(FUNC, REG)                  \
+  ASMJIT_INLINE REG FUNC(uint32_t typeId) {             \
+    REG reg(NoInit);                                    \
+    _newReg(reg, typeId, nullptr);                      \
+    return reg;                                         \
+  }                                                     \
+                                                        \
+  REG FUNC(uint32_t typeId, const char* nameFmt, ...) { \
+    REG reg(NoInit);                                    \
+    ASMJIT_NEW_REG(reg, typeId, nameFmt);               \
+    return reg;                                         \
+  }
+
+#define ASMJIT_NEW_REG_AUTO(FUNC, REG, TYPE_ID)         \
+  ASMJIT_INLINE REG FUNC() {                            \
+    REG reg(NoInit);                                    \
+    _newReg(reg, TYPE_ID, nullptr);                     \
+    return reg;                                         \
+  }                                                     \
+                                                        \
+  REG FUNC(const char* nameFmt, ...) {                  \
+    REG reg(NoInit);                                    \
+    ASMJIT_NEW_REG(reg, TYPE_ID, nameFmt);              \
+    return reg;                                         \
+  }
+
   template<typename RegT>
-  RegT newAs(const RegT& ref, const char* nameFmt, ...) {
+  RegT newSimilarReg(const RegT& ref, const char* nameFmt, ...) {
     RegT reg(NoInit);
-    ASMJIT_NEW_REG(reg, ref.getTypeId(), nameFmt);
+    ASMJIT_NEW_REG(reg, ref, nameFmt);
     return reg;
   }
 
-#define ASMJIT_NEW_VAR_TYPE_EX(FUNC, REG, FIRST, LAST) \
-  REG new##FUNC(uint32_t typeId, const char* nameFmt, ...) { \
-    ASMJIT_ASSERT(typeId < VirtType::kIdCount); \
-    ASMJIT_ASSERT(Utils::inInterval<uint32_t>(typeId, FIRST, LAST)); \
-    \
-    REG reg(NoInit); \
-    ASMJIT_NEW_REG(reg, typeId, nameFmt); \
-    return reg; \
-  }
-#define ASMJIT_NEW_VAR_AUTO_EX(FUNC, REG, typeId) \
-  ASMJIT_NOINLINE REG new##FUNC(const char* nameFmt, ...) { \
-    REG reg(NoInit); \
-    ASMJIT_NEW_REG(reg, typeId, nameFmt); \
-    return reg; \
-  }
+  ASMJIT_NEW_REG_USER(newReg    , X86Reg )
+  ASMJIT_NEW_REG_USER(newGpReg  , X86Gp  )
+  ASMJIT_NEW_REG_USER(newMmReg  , X86Mm  )
+  ASMJIT_NEW_REG_USER(newKReg   , X86KReg)
+  ASMJIT_NEW_REG_USER(newXmmReg , X86Xmm )
+  ASMJIT_NEW_REG_USER(newYmmReg , X86Ymm )
+  ASMJIT_NEW_REG_USER(newZmmReg , X86Zmm )
 
-#define ASMJIT_REG_FUNC_USER(FUNC, REG, FIRST, LAST) \
-  ASMJIT_INLINE REG get##FUNC##ById(uint32_t typeId, uint32_t id) { \
-    ASMJIT_ASSERT(typeId < VirtType::kIdCount); \
-    ASMJIT_ASSERT(Utils::inInterval<uint32_t>(typeId, FIRST, LAST)); \
-    \
-    REG reg(NoInit); \
-    \
-    typeId = _typeIdMap[typeId]; \
-    const VirtType& typeInfo = _x86TypeData.typeInfo[typeId]; \
-    \
-    reg._initReg(typeInfo.getSignature(), id); \
-    reg._reg.typeId = typeId; \
-    \
-    return reg; \
-  } \
-  \
-  ASMJIT_INLINE REG new##FUNC(uint32_t typeId) { \
-    ASMJIT_ASSERT(typeId < VirtType::kIdCount); \
-    ASMJIT_ASSERT(Utils::inInterval<uint32_t>(typeId, FIRST, LAST)); \
-    \
-    REG reg(NoInit); \
-    _newReg(reg, typeId, nullptr); \
-    return reg; \
-  } \
-  \
-  ASMJIT_NEW_VAR_TYPE_EX(FUNC, REG, FIRST, LAST)
+  ASMJIT_NEW_REG_AUTO(newI8     , X86Gp  , TypeId::kI8     )
+  ASMJIT_NEW_REG_AUTO(newU8     , X86Gp  , TypeId::kU8     )
+  ASMJIT_NEW_REG_AUTO(newI16    , X86Gp  , TypeId::kI16    )
+  ASMJIT_NEW_REG_AUTO(newU16    , X86Gp  , TypeId::kU16    )
+  ASMJIT_NEW_REG_AUTO(newI32    , X86Gp  , TypeId::kI32    )
+  ASMJIT_NEW_REG_AUTO(newU32    , X86Gp  , TypeId::kU32    )
+  ASMJIT_NEW_REG_AUTO(newI64    , X86Gp  , TypeId::kI64    )
+  ASMJIT_NEW_REG_AUTO(newU64    , X86Gp  , TypeId::kU64    )
+  ASMJIT_NEW_REG_AUTO(newInt8   , X86Gp  , TypeId::kI8     )
+  ASMJIT_NEW_REG_AUTO(newUInt8  , X86Gp  , TypeId::kU8     )
+  ASMJIT_NEW_REG_AUTO(newInt16  , X86Gp  , TypeId::kI16    )
+  ASMJIT_NEW_REG_AUTO(newUInt16 , X86Gp  , TypeId::kU16    )
+  ASMJIT_NEW_REG_AUTO(newInt32  , X86Gp  , TypeId::kI32    )
+  ASMJIT_NEW_REG_AUTO(newUInt32 , X86Gp  , TypeId::kU32    )
+  ASMJIT_NEW_REG_AUTO(newInt64  , X86Gp  , TypeId::kI64    )
+  ASMJIT_NEW_REG_AUTO(newUInt64 , X86Gp  , TypeId::kU64    )
+  ASMJIT_NEW_REG_AUTO(newIntPtr , X86Gp  , TypeId::kIntPtr )
+  ASMJIT_NEW_REG_AUTO(newUIntPtr, X86Gp  , TypeId::kUIntPtr)
 
-#define ASMJIT_REG_FUNC_SAFE(FUNC, REG, TYPE_ID) \
-  ASMJIT_INLINE REG get##FUNC##ById(uint32_t id) { \
-    REG reg(NoInit); \
-    \
-    uint32_t typeId = _typeIdMap[TYPE_ID]; \
-    const VirtType& type = _x86TypeData.typeInfo[typeId]; \
-    \
-    reg._initReg(type.getSignature(), id); \
-    reg._reg.typeId = typeId; \
-    \
-    return reg; \
-  } \
-  \
-  ASMJIT_INLINE REG new##FUNC() { \
-    REG reg(NoInit); \
-    _newReg(reg, TYPE_ID, nullptr); \
-    return reg; \
-  } \
-  \
-  ASMJIT_NEW_VAR_AUTO_EX(FUNC, REG, TYPE_ID)
+  ASMJIT_NEW_REG_AUTO(newGpb    , X86Gp  , TypeId::kU8     )
+  ASMJIT_NEW_REG_AUTO(newGpw    , X86Gp  , TypeId::kU16    )
+  ASMJIT_NEW_REG_AUTO(newGpd    , X86Gp  , TypeId::kU32    )
+  ASMJIT_NEW_REG_AUTO(newGpq    , X86Gp  , TypeId::kU64    )
+  ASMJIT_NEW_REG_AUTO(newGpz    , X86Gp  , TypeId::kUIntPtr)
+  ASMJIT_NEW_REG_AUTO(newKb     , X86KReg, TypeId::kMask8  )
+  ASMJIT_NEW_REG_AUTO(newKw     , X86KReg, TypeId::kMask16 )
+  ASMJIT_NEW_REG_AUTO(newKd     , X86KReg, TypeId::kMask32 )
+  ASMJIT_NEW_REG_AUTO(newKq     , X86KReg, TypeId::kMask64 )
+  ASMJIT_NEW_REG_AUTO(newMm     , X86Mm  , TypeId::kMmx64  )
+  ASMJIT_NEW_REG_AUTO(newXmm    , X86Xmm , TypeId::kI32x4  )
+  ASMJIT_NEW_REG_AUTO(newXmmSs  , X86Xmm , TypeId::kF32x1  )
+  ASMJIT_NEW_REG_AUTO(newXmmSd  , X86Xmm , TypeId::kF64x1  )
+  ASMJIT_NEW_REG_AUTO(newXmmPs  , X86Xmm , TypeId::kF32x4  )
+  ASMJIT_NEW_REG_AUTO(newXmmPd  , X86Xmm , TypeId::kF64x2  )
+  ASMJIT_NEW_REG_AUTO(newYmm    , X86Ymm , TypeId::kI32x8  )
+  ASMJIT_NEW_REG_AUTO(newYmmPs  , X86Ymm , TypeId::kF32x8  )
+  ASMJIT_NEW_REG_AUTO(newYmmPd  , X86Ymm , TypeId::kF64x4  )
+  ASMJIT_NEW_REG_AUTO(newZmm    , X86Zmm , TypeId::kI32x16 )
+  ASMJIT_NEW_REG_AUTO(newZmmPs  , X86Zmm , TypeId::kF32x16 )
+  ASMJIT_NEW_REG_AUTO(newZmmPd  , X86Zmm , TypeId::kF64x8  )
 
-  ASMJIT_REG_FUNC_USER(GpVar  , X86Gp  , VirtType::kIdI8       , VirtType::kIdUIntPtr )
-  ASMJIT_REG_FUNC_USER(MmVar  , X86Mm  , VirtType::kIdX86Mm    , VirtType::kIdX86Mm   )
-  ASMJIT_REG_FUNC_USER(XmmVar , X86Xmm , VirtType::kIdX86Xmm   , VirtType::kIdX86XmmPd)
-  ASMJIT_REG_FUNC_USER(YmmVar , X86Ymm , VirtType::kIdX86Ymm   , VirtType::kIdX86YmmPd)
-
-  ASMJIT_REG_FUNC_SAFE(Int8   , X86Gp  , VirtType::kIdI8      )
-  ASMJIT_REG_FUNC_SAFE(UInt8  , X86Gp  , VirtType::kIdU8      )
-  ASMJIT_REG_FUNC_SAFE(Int16  , X86Gp  , VirtType::kIdI16     )
-  ASMJIT_REG_FUNC_SAFE(UInt16 , X86Gp  , VirtType::kIdU16     )
-  ASMJIT_REG_FUNC_SAFE(Int32  , X86Gp  , VirtType::kIdI32     )
-  ASMJIT_REG_FUNC_SAFE(UInt32 , X86Gp  , VirtType::kIdU32     )
-  ASMJIT_REG_FUNC_SAFE(Int64  , X86Gp  , VirtType::kIdI64     )
-  ASMJIT_REG_FUNC_SAFE(UInt64 , X86Gp  , VirtType::kIdU64     )
-  ASMJIT_REG_FUNC_SAFE(IntPtr , X86Gp  , VirtType::kIdIntPtr  )
-  ASMJIT_REG_FUNC_SAFE(UIntPtr, X86Gp  , VirtType::kIdUIntPtr )
-  ASMJIT_REG_FUNC_SAFE(Mm     , X86Mm  , VirtType::kIdX86Mm   )
-  ASMJIT_REG_FUNC_SAFE(Xmm    , X86Xmm , VirtType::kIdX86Xmm  )
-  ASMJIT_REG_FUNC_SAFE(XmmSs  , X86Xmm , VirtType::kIdX86XmmSs)
-  ASMJIT_REG_FUNC_SAFE(XmmSd  , X86Xmm , VirtType::kIdX86XmmSd)
-  ASMJIT_REG_FUNC_SAFE(XmmPs  , X86Xmm , VirtType::kIdX86XmmPs)
-  ASMJIT_REG_FUNC_SAFE(XmmPd  , X86Xmm , VirtType::kIdX86XmmPd)
-  ASMJIT_REG_FUNC_SAFE(Ymm    , X86Ymm , VirtType::kIdX86Ymm  )
-  ASMJIT_REG_FUNC_SAFE(YmmPs  , X86Ymm , VirtType::kIdX86YmmPs)
-  ASMJIT_REG_FUNC_SAFE(YmmPd  , X86Ymm , VirtType::kIdX86YmmPd)
-  ASMJIT_REG_FUNC_SAFE(Zmm    , X86Zmm , VirtType::kIdX86Zmm  )
-  ASMJIT_REG_FUNC_SAFE(ZmmPs  , X86Zmm , VirtType::kIdX86ZmmPs)
-  ASMJIT_REG_FUNC_SAFE(ZmmPd  , X86Zmm , VirtType::kIdX86ZmmPd)
-
-#undef ASMJIT_NEW_VAR_AUTO
-#undef ASMJIT_NEW_VAR_TYPE
+#undef ASMJIT_NEW_REG_AUTO
+#undef ASMJIT_NEW_REG_USER
 #undef ASMJIT_NEW_REG
 
   // --------------------------------------------------------------------------
   // [Stack]
   // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _newStack(Mem& m, uint32_t size, uint32_t alignment, const char* name);
 
   //! Create a new memory chunk allocated on the current function's stack.
   ASMJIT_INLINE X86Mem newStack(uint32_t size, uint32_t alignment, const char* name = nullptr) {
@@ -466,8 +436,6 @@ public:
   // --------------------------------------------------------------------------
   // [Const]
   // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _newConst(Mem& m, uint32_t scope, const void* data, size_t size);
 
   //! Put data to a constant-pool and get a memory reference to it.
   ASMJIT_INLINE X86Mem newConst(uint32_t scope, const void* data, size_t size) {

@@ -39,7 +39,7 @@ public:
     uint32_t logOptions,
     uint32_t instId,
     uint32_t options,
-    const Operand_& opMask,
+    const Operand_& opExtra,
     const Operand_* opArray, uint32_t opCount) const noexcept override;
 };
 

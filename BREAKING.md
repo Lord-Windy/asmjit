@@ -18,7 +18,7 @@ Operand API is mostly intact, omitting Var/Reg should fix most compile-time erro
   * Added new functionality into `asmjit::x86` namespace related to operands.
   * X86Xmm/X86Ymm/X86Zmm register operands now inherit from X86Xyz.
   * Register class is now part of `Reg` operand, you can get it by using `reg.getRegClass()`.
-  * Register class enum moved to `X86Reg`, `kX86RegClassGp` is now `X86Reg::kClassGp`.
+  * Register class enum moved to `X86Reg`, `kX86RegClassGp` is now `X86Reg::kKindGp`.
   * Register type enum moved to `X86Reg`, `kX86RegTypeXmm` is now `X86Reg::kTypeXmm`.
   * Register index enum moved to `X86Gp`, `kX86RegIndexAx` is now `X86Gp::kIdAx`.
   * Segment index enum moved to `X86Seg`, `kX86SegFs` is now `X86Seg::kIdFs`.

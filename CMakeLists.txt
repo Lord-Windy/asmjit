@@ -259,10 +259,9 @@ asmjit_add_source(ASMJIT_SRC asmjit/base
   codeholder.h
   constpool.cpp
   constpool.h
-  containers.cpp
-  containers.h
   cpuinfo.cpp
   cpuinfo.h
+  func.cpp
   func.h
   globals.cpp
   globals.h
@@ -285,6 +284,10 @@ asmjit_add_source(ASMJIT_SRC asmjit/base
   vmem.h
   zone.cpp
   zone.h
+  zoneallocator.cpp
+  zoneallocator.h
+  zonecontainers.cpp
+  zonecontainers.h
 )
 
 if(0)

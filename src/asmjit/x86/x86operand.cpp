@@ -79,7 +79,7 @@ UNIT(x86_operand) {
   EXPECT(x86::eax.getId() == 0);
   EXPECT(x86::eax.getSize() == 4);
   EXPECT(x86::eax.getRegType() == X86Reg::kRegGpd);
-  EXPECT(x86::eax.getRegClass() == X86Reg::kClassGp);
+  EXPECT(x86::eax.getRegKind() == X86Reg::kKindGp);
 
   INFO("Checking FP register properties");
   EXPECT(X86Fp().isReg() == false);
@@ -87,7 +87,7 @@ UNIT(x86_operand) {
   EXPECT(x86::fp1.getId() == 1);
   EXPECT(x86::fp1.getSize() == 10);
   EXPECT(x86::fp1.getRegType() == X86Reg::kRegFp);
-  EXPECT(x86::fp1.getRegClass() == X86Reg::kClassFp);
+  EXPECT(x86::fp1.getRegKind() == X86Reg::kKindFp);
 
   INFO("Checking MM register properties");
   EXPECT(X86Mm().isReg() == false);
@@ -95,7 +95,7 @@ UNIT(x86_operand) {
   EXPECT(x86::mm2.getId() == 2);
   EXPECT(x86::mm2.getSize() == 8);
   EXPECT(x86::mm2.getRegType() == X86Reg::kRegMm);
-  EXPECT(x86::mm2.getRegClass() == X86Reg::kClassMm);
+  EXPECT(x86::mm2.getRegKind() == X86Reg::kKindMm);
 
   INFO("Checking K register properties");
   EXPECT(X86KReg().isReg() == false);
@@ -103,7 +103,7 @@ UNIT(x86_operand) {
   EXPECT(x86::k3.getId() == 3);
   EXPECT(x86::k3.getSize() == 8);
   EXPECT(x86::k3.getRegType() == X86Reg::kRegK);
-  EXPECT(x86::k3.getRegClass() == X86Reg::kClassK);
+  EXPECT(x86::k3.getRegKind() == X86Reg::kKindK);
 
   INFO("Checking XMM register properties");
   EXPECT(X86Xmm().isReg() == false);
@@ -111,7 +111,7 @@ UNIT(x86_operand) {
   EXPECT(x86::xmm4.getId() == 4);
   EXPECT(x86::xmm4.getSize() == 16);
   EXPECT(x86::xmm4.getRegType() == X86Reg::kRegXmm);
-  EXPECT(x86::xmm4.getRegClass() == X86Reg::kClassXyz);
+  EXPECT(x86::xmm4.getRegKind() == X86Reg::kKindXyz);
   EXPECT(x86::xmm4.isXyz());
 
   INFO("Checking YMM register properties");
@@ -120,7 +120,7 @@ UNIT(x86_operand) {
   EXPECT(x86::ymm5.getId() == 5);
   EXPECT(x86::ymm5.getSize() == 32);
   EXPECT(x86::ymm5.getRegType() == X86Reg::kRegYmm);
-  EXPECT(x86::ymm5.getRegClass() == X86Reg::kClassXyz);
+  EXPECT(x86::ymm5.getRegKind() == X86Reg::kKindXyz);
   EXPECT(x86::ymm5.isXyz());
 
   INFO("Checking ZMM register properties");
@@ -129,7 +129,7 @@ UNIT(x86_operand) {
   EXPECT(x86::zmm6.getId() == 6);
   EXPECT(x86::zmm6.getSize() == 64);
   EXPECT(x86::zmm6.getRegType() == X86Reg::kRegZmm);
-  EXPECT(x86::zmm6.getRegClass() == X86Reg::kClassXyz);
+  EXPECT(x86::zmm6.getRegKind() == X86Reg::kKindXyz);
   EXPECT(x86::zmm6.isXyz());
 
   INFO("Checking XYZ register properties");
