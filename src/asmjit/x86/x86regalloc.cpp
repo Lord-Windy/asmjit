@@ -610,7 +610,6 @@ Error X86RAPass::emitImmToReg(uint32_t dstTypeId, uint32_t dstPhysId, const Imm*
     case TypeId::kU32:
 Mov32Truncate:
       imm.truncateTo32Bits();
-Mov32:
       r0.setX86RegT<X86Reg::kRegGpd>(dstPhysId);
       cc()->emit(X86Inst::kIdMov, r0, imm);
       break;

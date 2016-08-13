@@ -484,22 +484,17 @@ Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t name
   le->_hVal = hVal;
   le->_setId(id);
   le->_type = static_cast<uint8_t>(type);
-  le->_nameLength = static_cast<uint16_t>(nameLength);
   le->_parentId = kInvalidValue;
   le->_offset = -1;
 
-  if (nameLength >= LabelEntry::kEmbeddedSize) {
-    char* nameExternal = static_cast<char*>(_dataZone.alloc(nameLength + 1));
-    if (ASMJIT_UNLIKELY(!nameExternal))
-      return DebugUtils::errored(kErrorNoHeapMemory);
-
-    ::memcpy(nameExternal, name, nameLength);
-    nameExternal[nameLength] = '\0';
-    le->_nameExternal = nameExternal;
+  if (le->_name.mustEmbed(nameLength)) {
+    le->_name.setEmbedded(name, nameLength);
   }
   else {
-    ::memcpy(le->_nameEmbedded, name, nameLength);
-    le->_nameEmbedded[nameLength] = '\0';
+    char* nameExternal = static_cast<char*>(_dataZone.dup(name, nameLength, true));
+    if (ASMJIT_UNLIKELY(!nameExternal))
+      return DebugUtils::errored(kErrorNoHeapMemory);
+    le->_name.setExternal(nameExternal, nameLength);
   }
 
   _labels.appendUnsafe(le);

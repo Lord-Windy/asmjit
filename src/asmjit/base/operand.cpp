@@ -19,7 +19,7 @@ namespace asmjit {
 // [asmjit::TypeId]
 // ============================================================================
 
-template<uint32_t ID>
+template<int ID>
 struct TypeIdSizeOf_T {
   enum {
     kValue = (ID == TypeId::kI8    ) ?  1 :
@@ -47,7 +47,7 @@ struct TypeIdSizeOf_T {
   };
 };
 
-template<uint32_t ID>
+template<int ID>
 struct TypeIdElementOf_T {
   enum {
     kValue = (ID == TypeId::kMask8 ) ? TypeId::kU8  :

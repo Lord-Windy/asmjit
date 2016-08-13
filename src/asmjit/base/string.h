@@ -20,6 +20,57 @@ namespace asmjit {
 //! \{
 
 // ============================================================================
+// [asmjit::SmallString]
+// ============================================================================
+
+//! Small string is a template that helps to create strings that can be either
+//! statically allocated if they are small, or externally allocated in case
+//! their length exceed the limit. The `WholeSize` represents the size of the
+//! whole `SmallString` structure, based on that size the maximum size of the
+//! internal buffer is determined.
+template<size_t WholeSize>
+class SmallString {
+public:
+  enum { kMaxEmbeddedLength = WholeSize - 5 };
+
+  ASMJIT_INLINE SmallString() noexcept { reset(); }
+  ASMJIT_INLINE void reset() noexcept { ::memset(this, 0, sizeof(*this)); }
+
+  ASMJIT_INLINE bool isEmpty() const noexcept { return _length == 0; }
+  ASMJIT_INLINE bool isEmbedded() const noexcept { return _length <= kMaxEmbeddedLength; }
+  ASMJIT_INLINE bool mustEmbed(size_t len) const noexcept { return len <= kMaxEmbeddedLength; }
+
+  ASMJIT_INLINE uint32_t getLength() const noexcept { return _length; }
+  ASMJIT_INLINE char* getData() const noexcept {
+    return _length <= kMaxEmbeddedLength ? const_cast<char*>(_embedded) : _external[1];
+  }
+
+  ASMJIT_INLINE void setEmbedded(const char* data, size_t len) noexcept {
+    ASMJIT_ASSERT(len <= kMaxEmbeddedLength);
+
+    _length = static_cast<uint32_t>(len);
+    ::memcpy(_embedded, data, len);
+    _embedded[len] = '\0';
+  }
+
+  ASMJIT_INLINE void setExternal(const char* data, size_t len) noexcept {
+    ASMJIT_ASSERT(len > kMaxEmbeddedLength);
+    ASMJIT_ASSERT(len <= ~static_cast<uint32_t>(0));
+
+    _length = static_cast<uint32_t>(len);
+    _external[1] = const_cast<char*>(data);
+  }
+
+  union {
+    struct {
+      uint32_t _length;
+      char _embedded[WholeSize - 4];
+    };
+    char* _external[2];
+  };
+};
+
+// ============================================================================
 // [asmjit::StringBuilder]
 // ============================================================================
 

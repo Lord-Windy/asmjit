@@ -33,7 +33,7 @@ namespace asmjit {
 //! ZoneHeap is used by AsmJit containers to make containers having only
 //! few elements fast (and lightweight) and to allow them to grow and use
 //! dynamic blocks when require more storage.
-struct ZoneHeap {
+class ZoneHeap {
   ASMJIT_NONCOPYABLE(ZoneHeap)
 
   enum {

@@ -329,8 +329,6 @@ public:
     // to fill a padding that a C++ compiler targeting 64-bit CPU will add to align
     // the structure to 64-bits.
 
-    enum { kEmbeddedSize = 8 };
-
     //! Get label id.
     ASMJIT_INLINE uint32_t getId() const noexcept { return _customData; }
     //! Set label id (internal, used only by \ref CodeHolder).
@@ -345,25 +343,20 @@ public:
     ASMJIT_INLINE uint32_t getParentId() const noexcept { return _parentId; }
 
     //! Get if the label has name.
-    ASMJIT_INLINE bool hasName() const noexcept { return _nameLength > 0; }
-
-    //! Get if the label's name is embedded in `_nameEmbedded` field.
-    ASMJIT_INLINE bool _isNameEmbedded() const noexcept { return _nameLength < kEmbeddedSize; }
+    ASMJIT_INLINE bool hasName() const noexcept { return !_name.isEmpty(); }
 
     //! Get the label's name.
     //!
     //! NOTE: Local labels will return their local name without their parent
     //! part, for example ".L1".
-    ASMJIT_INLINE const char* getName() const noexcept {
-      return _isNameEmbedded() ? const_cast<char*>(_nameEmbedded) : _nameExternal;
-    }
+    ASMJIT_INLINE const char* getName() const noexcept { return _name.getData(); }
 
     //! Get length of label's name.
     //!
     //! NOTE: Label name is always null terminated, so you can use `strlen()` to
     //! get it, however, it's also cached in `LabelEntry`, so if you want to know
     //! the length the easiest way is to use `LabelEntry::getNameLength()`.
-    ASMJIT_INLINE size_t getNameLength() const noexcept { return _nameLength; }
+    ASMJIT_INLINE size_t getNameLength() const noexcept { return _name.getLength(); }
 
     //! Get if the label is bound.
     ASMJIT_INLINE bool isBound() const noexcept { return _offset != -1; }
@@ -380,18 +373,21 @@ public:
     // [Members]
     // ------------------------------------------------------------------------
 
-    uint8_t _type;                       //!< Label type, see Label::Type.
-    uint8_t _flags;                      //!< Must be zero.
-    uint16_t _nameLength;                //!< Label's name length.
-    uint32_t _parentId;                  //!< Label parent id or `kInvalidValue`.
-
-    union {
-      char _nameEmbedded[kEmbeddedSize]; //!< Name (embedded 7+1 chars if it's enough).
-      char* _nameExternal;               //!< External pointer to the name if it doesn't fit.
+    enum {
+      // Let's round the size of `LabelEntry` to 64 bytes (as ZoneHeap has 32
+      // bytes granularity anyway). This gives `_name` the remaining space,
+      // which is roughly 24 bytes on 64-bit and 36 bytes on 32-bit.
+      kNameBytes =
+        64 - (sizeof(ZoneHashNode) + 8 + sizeof(intptr_t) + sizeof(LabelLink*))
     };
 
+    uint8_t _type;                       //!< Label type, see Label::Type.
+    uint8_t _flags;                      //!< Must be zero.
+    uint16_t _reserved;                  //!< Reserved.
+    uint32_t _parentId;                  //!< Label parent id or `kInvalidValue`.
     intptr_t _offset;                    //!< Label offset.
     LabelLink* _links;                   //!< Label links.
+    SmallString<kNameBytes> _name;       //!< Label name.
   };
 
   // --------------------------------------------------------------------------

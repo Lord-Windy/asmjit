@@ -126,11 +126,8 @@ static Error X86FuncDecl_initFunc(X86FuncDecl* self, uint32_t arch,
     }
   }
 
-  if (!argCount)
-    return kErrorOk;
-
-  uint32_t stackBase = gpSize + cc._spillZoneSize;
-  uint32_t stackOffset = stackBase;
+  uint32_t stackBase = gpSize;
+  uint32_t stackOffset = stackBase + cc._spillZoneSize;
 
   if (cc.getAlgorithm() == CallConv::kAlgorithmDefault) {
     uint32_t gpzPos = 0;
