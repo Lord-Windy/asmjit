@@ -9,7 +9,7 @@
 
 // [Dependencies]
 #include "../base/utils.h"
-#include "../base/zoneallocator.h"
+#include "../base/zoneheap.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -17,11 +17,11 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::ZoneAllocator - Helpers]
+// [asmjit::ZoneHeap - Helpers]
 // ============================================================================
 
-static bool ZoneAllocator_hasDynamicBlock(ZoneAllocator* self, ZoneAllocator::DynamicBlock* block) noexcept {
-  ZoneAllocator::DynamicBlock* cur = self->_dynamicBlocks;
+static bool ZoneHeap_hasDynamicBlock(ZoneHeap* self, ZoneHeap::DynamicBlock* block) noexcept {
+  ZoneHeap::DynamicBlock* cur = self->_dynamicBlocks;
   while (cur) {
     if (cur == block)
       return true;
@@ -31,10 +31,10 @@ static bool ZoneAllocator_hasDynamicBlock(ZoneAllocator* self, ZoneAllocator::Dy
 }
 
 // ============================================================================
-// [asmjit::ZoneAllocator - Init / Reset]
+// [asmjit::ZoneHeap - Init / Reset]
 // ============================================================================
 
-void ZoneAllocator::reset(Zone* zone) noexcept {
+void ZoneHeap::reset(Zone* zone) noexcept {
   // Free dynamic blocks.
   DynamicBlock* block = _dynamicBlocks;
   while (block) {
@@ -49,10 +49,10 @@ void ZoneAllocator::reset(Zone* zone) noexcept {
 }
 
 // ============================================================================
-// [asmjit::ZoneAllocator - Alloc / Release]
+// [asmjit::ZoneHeap - Alloc / Release]
 // ============================================================================
 
-void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
+void* ZoneHeap::_alloc(size_t size, size_t& allocatedSize) noexcept {
   ASMJIT_ASSERT(isInitialized());
 
   // We use our memory pool only if the requested block is of a reasonable size.
@@ -143,7 +143,7 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
   }
 }
 
-void* ZoneAllocator::_allocZeroed(size_t size, size_t& allocatedSize) noexcept {
+void* ZoneHeap::_allocZeroed(size_t size, size_t& allocatedSize) noexcept {
   ASMJIT_ASSERT(isInitialized());
 
   void* p = _alloc(size, allocatedSize);
@@ -151,13 +151,13 @@ void* ZoneAllocator::_allocZeroed(size_t size, size_t& allocatedSize) noexcept {
   return ::memset(p, 0, allocatedSize);
 }
 
-void ZoneAllocator::_releaseDynamic(void* p, size_t size) noexcept {
+void ZoneHeap::_releaseDynamic(void* p, size_t size) noexcept {
   ASMJIT_ASSERT(isInitialized());
   //printf("RELEASING DYNAMIC %p of size %d\n", p, int(size));
 
   // Pointer to `DynamicBlock` is stored at [-1].
   DynamicBlock* block = reinterpret_cast<DynamicBlock**>(p)[-1];
-  ASMJIT_ASSERT(ZoneAllocator_hasDynamicBlock(this, block));
+  ASMJIT_ASSERT(ZoneHeap_hasDynamicBlock(this, block));
 
   // Unlink and free.
   DynamicBlock* prev = block->prev;

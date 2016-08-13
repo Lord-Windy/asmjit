@@ -32,7 +32,7 @@ namespace asmjit {
 //!
 //! Zone has no function to release the allocated memory. It has to be released
 //! all at once by calling `reset()`. If you need a more friendly allocator that
-//! also supports `release()`, consider using Zone with \ref ZoneAllocator.
+//! also supports `release()`, consider using \ref Zone with \ref ZoneHeap.
 class Zone {
 public:
   //! \internal

@@ -14,8 +14,8 @@
 // [Dependencies]
 #include "../base/codecompiler.h"
 #include "../base/zone.h"
-#include "../base/zoneallocator.h"
 #include "../base/zonecontainers.h"
+#include "../base/zoneheap.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -524,7 +524,7 @@ public:
 
   CodeCompiler* _cc;                     //!< CodeCompiler.
   Zone* _zone;                           //!< Zone passed to `process()`.
-  ZoneAllocator _allocator;              //!< Zone allocator using `_zone`.
+  ZoneHeap _heap;                        //!< ZoneHeap that uses `_zone`.
 
   CCFunc* _func;                         //!< Function being processed.
   CBNode* _stop;                         //!< Stop node.

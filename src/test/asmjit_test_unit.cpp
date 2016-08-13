@@ -188,7 +188,7 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(Runtime);
   DUMP_TYPE(StringBuilder);
   DUMP_TYPE(Zone);
-  DUMP_TYPE(ZoneAllocator);
+  DUMP_TYPE(ZoneHeap);
   DUMP_TYPE(ZoneHash<ZoneHashNode>);
   DUMP_TYPE(ZoneList<void*>);
   DUMP_TYPE(ZoneVector<void*>);

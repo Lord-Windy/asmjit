@@ -64,14 +64,14 @@ static void CodeHolder_resetInternal(CodeHolder* self, bool releaseMemory) noexc
   }
 
   // Reset zone allocator and all containers using it.
-  ZoneAllocator* allocator = &self->_baseAllocator;
+  ZoneHeap* heap = &self->_baseHeap;
 
-  self->_namedLabels.reset(allocator);
-  self->_relocations.reset(allocator);
-  self->_labels.reset(allocator);
-  self->_sections.reset(allocator);
+  self->_namedLabels.reset(heap);
+  self->_relocations.reset(heap);
+  self->_labels.reset(heap);
+  self->_sections.reset(heap);
 
-  allocator->reset(&self->_baseZone);
+  heap->reset(&self->_baseZone);
   self->_baseZone.reset(releaseMemory);
 }
 
@@ -90,10 +90,10 @@ CodeHolder::CodeHolder() noexcept
     _trampolinesSize(0),
     _baseZone(16384 - Zone::kZoneOverhead),
     _dataZone(16384 - Zone::kZoneOverhead),
-    _baseAllocator(&_baseZone),
-    _labels(&_baseAllocator),
-    _sections(&_baseAllocator),
-    _relocations(&_baseAllocator) {
+    _baseHeap(&_baseZone),
+    _labels(&_baseHeap),
+    _sections(&_baseHeap),
+    _relocations(&_baseHeap) {
 }
 
 CodeHolder::~CodeHolder() noexcept {
@@ -399,7 +399,7 @@ static uint32_t CodeHolder_hashNameAndFixLen(const char* name, size_t& nameLengt
 } // anonymous namespace
 
 CodeHolder::LabelLink* CodeHolder::newLabelLink() noexcept {
-  LabelLink* link = _baseAllocator.allocT<LabelLink>();
+  LabelLink* link = _baseHeap.allocT<LabelLink>();
   if (ASMJIT_UNLIKELY(!link)) return nullptr;
 
   link->prev = nullptr;
@@ -418,7 +418,7 @@ Error CodeHolder::newLabelId(uint32_t& idOut) noexcept {
     return DebugUtils::errored(kErrorLabelIndexOverflow);
 
   ASMJIT_PROPAGATE(_labels.willGrow(1));
-  LabelEntry* le = _baseAllocator.allocZeroedT<LabelEntry>();
+  LabelEntry* le = _baseHeap.allocZeroedT<LabelEntry>();
 
   if (ASMJIT_UNLIKELY(!le))
     return DebugUtils::errored(kErrorNoHeapMemory);;
@@ -475,7 +475,7 @@ Error CodeHolder::newNamedLabelId(uint32_t& idOut, const char* name, size_t name
     return DebugUtils::errored(kErrorLabelIndexOverflow);
 
   ASMJIT_PROPAGATE(_labels.willGrow(1));
-  le = _baseAllocator.allocZeroedT<LabelEntry>();
+  le = _baseHeap.allocZeroedT<LabelEntry>();
 
   if (ASMJIT_UNLIKELY(!le))
     return  DebugUtils::errored(kErrorNoHeapMemory);

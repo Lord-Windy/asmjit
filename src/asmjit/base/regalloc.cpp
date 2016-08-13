@@ -36,7 +36,7 @@ RAPass::~RAPass() noexcept {}
 Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
   _cc = static_cast<CodeCompiler*>(cb);
   _zone = zone;
-  _allocator.reset(zone);
+  _heap.reset(zone);
   _emitComments = (cb->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
 
   Error err = kErrorOk;
@@ -58,7 +58,7 @@ Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
     } while (node && node->getType() != CBNode::kNodeFunc);
   } while (node);
 
-  _allocator.reset(nullptr);
+  _heap.reset(nullptr);
   _zone = nullptr;
   _cc = nullptr;
 
@@ -108,7 +108,7 @@ Error RAPass::prepare(CCFunc* func) noexcept {
   _unreachableList.reset();
   _returningList.reset();
   _jccList.reset();
-  _contextVd.reset(&_allocator);
+  _contextVd.reset(&_heap);
 
   _memVarCells = nullptr;
   _memStackCells = nullptr;

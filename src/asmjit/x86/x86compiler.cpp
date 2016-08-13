@@ -161,7 +161,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
 
   // decide between `CBInst` and `CBJump`.
   if (Utils::inInterval<uint32_t>(instId, X86Inst::_kIdJbegin, X86Inst::_kIdJend)) {
-    CBJump* node = _cbBaseAllocator.allocT<CBJump>(sizeof(CBJump) + opCount * sizeof(Operand));
+    CBJump* node = _cbHeap.allocT<CBJump>(sizeof(CBJump) + opCount * sizeof(Operand));
     Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBJump));
 
     if (ASMJIT_UNLIKELY(!node))
@@ -207,7 +207,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     return kErrorOk;
   }
   else {
-    CBInst* node = _cbBaseAllocator.allocT<CBInst>(sizeof(CBInst) + opCount * sizeof(Operand));
+    CBInst* node = _cbHeap.allocT<CBInst>(sizeof(CBInst) + opCount * sizeof(Operand));
     Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CBInst));
 
     if (ASMJIT_UNLIKELY(!node))
@@ -267,7 +267,7 @@ X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   // Allocate space for function arguments.
   func->_args = nullptr;
   if (func->getArgCount() != 0) {
-    func->_args = _cbBaseAllocator.allocT<VirtReg*>(func->getArgCount() * sizeof(VirtReg*));
+    func->_args = _cbHeap.allocT<VirtReg*>(func->getArgCount() * sizeof(VirtReg*));
     if (!func->_args) goto _NoMemory;
 
     ::memset(func->_args, 0, func->getArgCount() * sizeof(VirtReg*));
@@ -341,7 +341,7 @@ X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) n
   Error err;
   uint32_t nArgs;
 
-  X86CCCall* node = _cbBaseAllocator.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
+  X86CCCall* node = _cbHeap.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
   Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CCCall));
 
   if (ASMJIT_UNLIKELY(!node))
@@ -359,7 +359,7 @@ X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) n
   if ((nArgs = sign.getArgCount()) == 0)
     return node;
 
-  node->_args = static_cast<Operand*>(_cbBaseAllocator.alloc(nArgs * sizeof(Operand)));
+  node->_args = static_cast<Operand*>(_cbHeap.alloc(nArgs * sizeof(Operand)));
   if (!node->_args) goto _NoMemory;
 
   ::memset(node->_args, 0, nArgs * sizeof(Operand));

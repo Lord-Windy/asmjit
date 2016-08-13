@@ -73,19 +73,19 @@ public:
 
   //! \internal
   template<typename T>
-  ASMJIT_INLINE T* newNodeT() noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this); }
+  ASMJIT_INLINE T* newNodeT() noexcept { return new(_cbHeap.alloc(sizeof(T))) T(this); }
 
   //! \internal
   template<typename T, typename P0>
-  ASMJIT_INLINE T* newNodeT(P0 p0) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0); }
+  ASMJIT_INLINE T* newNodeT(P0 p0) noexcept { return new(_cbHeap.alloc(sizeof(T))) T(this, p0); }
 
   //! \internal
   template<typename T, typename P0, typename P1>
-  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0, p1); }
+  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1) noexcept { return new(_cbHeap.alloc(sizeof(T))) T(this, p0, p1); }
 
   //! \internal
   template<typename T, typename P0, typename P1, typename P2>
-  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1, P2 p2) noexcept { return new(_cbBaseAllocator.alloc(sizeof(T))) T(this, p0, p1, p2); }
+  ASMJIT_INLINE T* newNodeT(P0 p0, P1 p1, P2 p2) noexcept { return new(_cbHeap.alloc(sizeof(T))) T(this, p0, p1, p2); }
 
   ASMJIT_API Error registerLabelNode(CBLabel* node) noexcept;
   //! Get `CBLabel` by `id`.
@@ -161,8 +161,8 @@ public:
   Zone _cbDataZone;                      //!< Data zone used to allocate data and names.
   Zone _cbPassZone;                      //!< Zone passed to `CBPass::process()`.
 
-  ZoneAllocator _cbBaseAllocator;        //!< Allocator using `_cbBaseZone`.
-  ZoneVector<CBLabel*> _labelArray;      //!< Maps label indexes to CBLabel nodes.
+  ZoneHeap _cbHeap;                      //!< ZoneHeap that uses `_cbBaseZone`.
+  ZoneVector<CBLabel*> _cbLabels;        //!< Maps label indexes to `CBLabel` nodes.
 
   CBNode* _firstNode;                    //!< First node of the current section.
   CBNode* _lastNode;                     //!< Last node of the current section.
@@ -565,7 +565,7 @@ public:
 class CBData : public CBNode {
 public:
   ASMJIT_NONCOPYABLE(CBData)
-  enum { kInlineBufferSize = 12 };
+  enum { kInlineBufferSize = static_cast<int>(64 - sizeof(CBNode) - 4) };
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]

@@ -15,8 +15,8 @@
 #include "../base/simdtypes.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
-#include "../base/zoneallocator.h"
 #include "../base/zonecontainers.h"
+#include "../base/zoneheap.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -644,7 +644,7 @@ public:
 
   Zone _baseZone;                        //!< Base zone (used to allocate core structures).
   Zone _dataZone;                        //!< Data zone (used to allocate extra data like label names).
-  ZoneAllocator _baseAllocator;          //!< Zone allocator, used to manage internal containers.
+  ZoneHeap _baseHeap;                    //!< Zone allocator, used to manage internal containers.
 
   ZoneVector<SectionEntry*> _sections;   //!< Section entries.
   ZoneVector<LabelEntry*> _labels;       //!< Label entries (each label is stored here).

@@ -48,8 +48,6 @@ typedef void (*VoidFunc)(void);
 
 int main(int argc, char* argv[]) {
   TestErrorHandler eh;
-  FileLogger logger(stdout);
-  logger.addOptions(Logger::kOptionBinaryForm);
 
   OpcodeDumpInfo infoList[] = {
     { Arch::kTypeX86, false, false },
@@ -69,8 +67,13 @@ int main(int argc, char* argv[]) {
 
     CodeHolder code;
     code.init(CodeInfo(info.arch));
-    code.setLogger(&logger);
     code.setErrorHandler(&eh);
+
+#if !defined(ASMJIT_DISABLE_LOGGING)
+    FileLogger logger(stdout);
+    logger.addOptions(Logger::kOptionBinaryForm);
+    code.setLogger(&logger);
+#endif // ASMJIT_DISABLE_LOGGING
 
     X86Assembler a(&code);
     asmtest::generateOpcodes(a, info.useRex1, info.useRex2);

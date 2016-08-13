@@ -9,8 +9,8 @@
 
 // [Dependencies]
 #include "../base/utils.h"
-#include "../base/zoneallocator.h"
 #include "../base/zonecontainers.h"
+#include "../base/zoneheap.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -22,13 +22,13 @@ namespace asmjit {
 // ============================================================================
 
 //! Clear vector data and free internal buffer.
-void ZoneVectorBase::_reset(size_t sizeOfT, ZoneAllocator* allocator) noexcept {
+void ZoneVectorBase::_reset(size_t sizeOfT, ZoneHeap* heap) noexcept {
   if (_data) {
-    ASMJIT_ASSERT(_allocator != nullptr);
-    _allocator->release(_data, _capacity * sizeOfT);
+    ASMJIT_ASSERT(_heap != nullptr);
+    _heap->release(_data, _capacity * sizeOfT);
   }
 
-  _allocator = allocator;
+  _heap = heap;
   _length = 0;
   _capacity = 0;
   _data = nullptr;
@@ -51,8 +51,8 @@ Error ZoneVectorBase::_grow(size_t sizeOfT, size_t n) noexcept {
 
   // ZoneVector is used as an array to hold short-lived data structures used
   // during code generation. The growing strategy is simple - use small capacity
-  // at the beginning (very good for ZoneAllocator) and then grow quicker to
-  // prevent successive reallocations.
+  // at the beginning (very good for ZoneHeap) and then grow quicker to prevent
+  // successive reallocations.
   if (capacity < 4)
     capacity = 4;
   else if (capacity < 8)
@@ -82,7 +82,7 @@ Error ZoneVectorBase::_reserve(size_t sizeOfT, size_t n) noexcept {
   if (nBytes < n) return DebugUtils::errored(kErrorNoHeapMemory);
 
   size_t allocatedBytes;
-  uint8_t* newData = static_cast<uint8_t*>(_allocator->alloc(nBytes, allocatedBytes));
+  uint8_t* newData = static_cast<uint8_t*>(_heap->alloc(nBytes, allocatedBytes));
 
   if (ASMJIT_UNLIKELY(!newData))
     return DebugUtils::errored(kErrorNoHeapMemory);
@@ -92,7 +92,7 @@ Error ZoneVectorBase::_reserve(size_t sizeOfT, size_t n) noexcept {
     ::memcpy(newData, oldData, _length * sizeOfT);
 
   if (oldData)
-    _allocator->release(oldData, oldCapacity * sizeOfT);
+    _heap->release(oldData, oldCapacity * sizeOfT);
 
   _capacity = allocatedBytes / sizeOfT;
   ASMJIT_ASSERT(_capacity >= n);
@@ -139,12 +139,12 @@ static uint32_t ZoneHashGetClosestPrime(uint32_t x) noexcept {
 // [asmjit::ZoneHashBase - Reset]
 // ============================================================================
 
-void ZoneHashBase::reset(ZoneAllocator* allocator) noexcept {
+void ZoneHashBase::reset(ZoneHeap* heap) noexcept {
   ZoneHashNode** oldData = _data;
   if (oldData != _embedded)
-    _allocator->release(oldData, _bucketsCount * sizeof(ZoneHashNode*));
+    _heap->release(oldData, _bucketsCount * sizeof(ZoneHashNode*));
 
-  _allocator = allocator;
+  _heap = heap;
   _size = 0;
   _bucketsCount = 1;
   _bucketsGrow = 1;
@@ -161,7 +161,7 @@ void ZoneHashBase::_rehash(uint32_t newCount) noexcept {
 
   ZoneHashNode** oldData = _data;
   ZoneHashNode** newData = reinterpret_cast<ZoneHashNode**>(
-    _allocator->alloc(static_cast<size_t>(newCount) * sizeof(ZoneHashNode*)));
+    _heap->alloc(static_cast<size_t>(newCount) * sizeof(ZoneHashNode*)));
 
   // We can still store nodes into the table, but it will degrade.
   if (ASMJIT_UNLIKELY(newData == nullptr))
@@ -186,7 +186,7 @@ void ZoneHashBase::_rehash(uint32_t newCount) noexcept {
   // 90% is the maximum occupancy, can't overflow since the maximum capacity
   // is limited to the last prime number stored in the prime table.
   if (oldData != _embedded)
-    _allocator->release(oldData, _bucketsCount * sizeof(ZoneHashNode*));
+    _heap->release(oldData, _bucketsCount * sizeof(ZoneHashNode*));
 
   _bucketsCount = newCount;
   _bucketsGrow = newCount * 9 / 10;

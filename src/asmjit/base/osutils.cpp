@@ -36,7 +36,7 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::OSUtils - Virtual Memory - Windows]
+// [asmjit::OSUtils - Virtual Memory]
 // ============================================================================
 
 // Windows specific implementation using `VirtualAllocEx` and `VirtualFree`.
@@ -105,11 +105,7 @@ Error OSUtils::releaseProcessMemory(HANDLE hProcess, void* p, size_t size) noexc
 }
 #endif // ASMJIT_OS_WINDOWS
 
-// ============================================================================
-// [asmjit::OSUtils - Virtual Memory - Posix]
-// ============================================================================
-
-// Posix specific implementation using `mmap` and `munmap`.
+// Posix specific implementation using `mmap()` and `munmap()`.
 #if ASMJIT_OS_POSIX
 
 // Mac uses MAP_ANON instead of MAP_ANONYMOUS.
@@ -119,13 +115,11 @@ Error OSUtils::releaseProcessMemory(HANDLE hProcess, void* p, size_t size) noexc
 
 static const VMemInfo& OSUtils_GetVMemInfo() noexcept {
   static VMemInfo vmi;
-
   if (ASMJIT_UNLIKELY(!vmi.pageSize)) {
     size_t pageSize = ::getpagesize();
     vmi.pageSize = pageSize;
     vmi.pageGranularity = Utils::iMax<size_t>(pageSize, 65536);
   }
-
   return vmi;
 };
 
@@ -156,78 +150,65 @@ Error OSUtils::releaseVirtualMemory(void* p, size_t size) noexcept {
 #endif // ASMJIT_OS_POSIX
 
 // ============================================================================
-// [asmjit::OSUtils - GetTickCount - Windows]
+// [asmjit::OSUtils - GetTickCount]
 // ============================================================================
 
 #if ASMJIT_OS_WINDOWS
-static volatile uint32_t OSUtils_hiResTicks;
-static volatile double OSUtils_hiResFreq;
+static ASMJIT_INLINE uint32_t OSUtils_calcHiRes(const LARGE_INTEGER& now, double freq) noexcept {
+  return static_cast<uint32_t>(
+    (int64_t)(double(now.QuadPart) / freq) & 0xFFFFFFFF);
+}
 
 uint32_t OSUtils::getTickCount() noexcept {
+  static volatile uint32_t _hiResTicks;
+  static volatile double _hiResFreq;
+
   do {
-    uint32_t hiResOk = OSUtils_hiResTicks;
+    uint32_t hiResOk = _hiResTicks;
+    LARGE_INTEGER qpf, now;
 
-    if (hiResOk == 1) {
-      LARGE_INTEGER now;
-      if (!::QueryPerformanceCounter(&now))
-        break;
-      return (int64_t)(double(now.QuadPart) / OSUtils_hiResFreq);
+    // If for whatever reason this fails, bail to `GetTickCount()`.
+    if (!::QueryPerformanceCounter(&now)) break;
+
+    // Expected - if we ran through this at least once `hiResTicks` will be
+    // either 1 or 0xFFFFFFFF. If it's '1' then the Hi-Res counter is available
+    // and `QueryPerformanceCounter()` can be used.
+    if (hiResOk == 1) return OSUtils_calcHiRes(now, _hiResFreq);
+
+    // Hi-Res counter is not available, bail to `GetTickCount()`.
+    if (hiResOk != 0) break;
+
+    // Detect availability of Hi-Res counter, if not available, bail to `GetTickCount()`.
+    if (!::QueryPerformanceFrequency(&qpf)) {
+      _InterlockedCompareExchange((LONG*)&_hiResTicks, 0xFFFFFFFF, 0);
+      break;
     }
 
-    if (hiResOk == 0) {
-      LARGE_INTEGER qpf;
-      if (!::QueryPerformanceFrequency(&qpf)) {
-        _InterlockedCompareExchange((LONG*)&OSUtils_hiResTicks, 0xFFFFFFFF, 0);
-        break;
-      }
+    double freq = double(qpf.QuadPart) / 1000.0;
+    _hiResFreq = freq;
 
-      LARGE_INTEGER now;
-      if (!::QueryPerformanceCounter(&now)) {
-        _InterlockedCompareExchange((LONG*)&OSUtils_hiResTicks, 0xFFFFFFFF, 0);
-        break;
-      }
-
-      double freqDouble = double(qpf.QuadPart) / 1000.0;
-      OSUtils_hiResFreq = freqDouble;
-      _InterlockedCompareExchange((LONG*)&OSUtils_hiResTicks, 1, 0);
-
-      return static_cast<uint32_t>(
-        static_cast<int64_t>(double(now.QuadPart) / freqDouble) & 0xFFFFFFFF);
-    }
+    _InterlockedCompareExchange((LONG*)&_hiResTicks, 1, 0);
+    return OSUtils_calcHiRes(now, freq);
   } while (0);
 
-  // Bail to a less precise GetTickCount().
   return ::GetTickCount();
 }
-
-// ============================================================================
-// [asmjit::OSUtils - GetTickCount - Mac]
-// ============================================================================
-
 #elif ASMJIT_OS_MAC
-static mach_timebase_info_data_t OSUtils_machTime;
-
 uint32_t OSUtils::getTickCount() noexcept {
-  // Initialize the first time CpuTicks::now() is called (See Apple's QA1398).
-  if (ASMJIT_UNLIKELY(OSUtils_machTime.denom == 0)) {
-    if (mach_timebase_info(&OSUtils_machTime) != KERN_SUCCESS)
-      return 0;
-  }
+  static mach_timebase_info_data_t _machTime;
 
-  // mach_absolute_time() returns nanoseconds, we need just milliseconds.
+  // See Apple's QA1398.
+  if (ASMJIT_UNLIKELY(_machTime.denom == 0) || mach_timebase_info(&_machTime) != KERN_SUCCESS)
+    return 0;
+
+  // `mach_absolute_time()` returns nanoseconds, we want milliseconds.
   uint64_t t = mach_absolute_time() / 1000000;
 
-  t = t * OSUtils_machTime.numer / OSUtils_machTime.denom;
+  t = t * _machTime.numer / _machTime.denom;
   return static_cast<uint32_t>(t & 0xFFFFFFFFU);
 }
-
-// ============================================================================
-// [asmjit::OSUtils - GetTickCount - Posix]
-// ============================================================================
-
-#else
+#elif defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
 uint32_t OSUtils::getTickCount() noexcept {
-#if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
   struct timespec ts;
 
   if (ASMJIT_UNLIKELY(clock_gettime(CLOCK_MONOTONIC, &ts) != 0))
@@ -235,12 +216,11 @@ uint32_t OSUtils::getTickCount() noexcept {
 
   uint64_t t = (uint64_t(ts.tv_sec ) * 1000) + (uint64_t(ts.tv_nsec) / 1000000);
   return static_cast<uint32_t>(t & 0xFFFFFFFFU);
-#else  // _POSIX_MONOTONIC_CLOCK
-#error "[asmjit] OSUtils::getTickCount() is not implemented for your target OS."
-  return 0;
-#endif  // _POSIX_MONOTONIC_CLOCK
 }
-#endif // ASMJIT_OS
+#else
+#error "[asmjit] OSUtils::getTickCount() is not implemented for your target OS."
+uint32_t OSUtils::getTickCount() noexcept { return 0; }
+#endif
 
 } // asmjit namespace
 

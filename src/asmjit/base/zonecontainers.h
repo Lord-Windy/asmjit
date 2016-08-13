@@ -23,7 +23,7 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-class ZoneAllocator;
+class ZoneHeap;
 
 // ============================================================================
 // [asmjit::ZoneList<T>]
@@ -113,8 +113,8 @@ protected:
   // --------------------------------------------------------------------------
 
   //! Create a new instance of `ZoneVectorBase`.
-  explicit ASMJIT_INLINE ZoneVectorBase(ZoneAllocator* allocator) noexcept
-    : _allocator(allocator),
+  explicit ASMJIT_INLINE ZoneVectorBase(ZoneHeap* heap) noexcept
+    : _heap(heap),
       _length(0),
       _capacity(0),
       _data(nullptr) {}
@@ -130,7 +130,7 @@ protected:
   //!
   //! If `releaseMemory` is true the vector buffer will be released to the
   //! system.
-  ASMJIT_API void _reset(size_t sizeOfT, ZoneAllocator* allocator) noexcept;
+  ASMJIT_API void _reset(size_t sizeOfT, ZoneHeap* heap) noexcept;
 
   // --------------------------------------------------------------------------
   // [Grow / Reserve]
@@ -144,7 +144,7 @@ protected:
   // [Members]
   // --------------------------------------------------------------------------
 
-  ZoneAllocator* _allocator;             //!< Zone allocator used to allocate data.
+  ZoneHeap* _heap;                       //!< Zone heap used to allocate data.
   size_t _length;                        //!< Length of the vector.
   size_t _capacity;                      //!< Capacity of the vector.
   void* _data;                           //!< Vector data.
@@ -160,7 +160,7 @@ protected:
 //! - Always non-copyable (designed to be non-copyable, we want it).
 //! - No copy-on-write (some implementations of STL can use it).
 //! - Optimized for working only with POD types.
-//! - Uses ZoneAllocator, thus small vectors are basically for free.
+//! - Uses ZoneHeap, thus small vectors are basically for free.
 template <typename T>
 class ZoneVector : public ZoneVectorBase {
 public:
@@ -171,8 +171,8 @@ public:
   // --------------------------------------------------------------------------
 
   //! Create a new instance of `ZoneVector<T>`.
-  explicit ASMJIT_INLINE ZoneVector(ZoneAllocator* allocator = nullptr) noexcept
-    : ZoneVectorBase(allocator) {}
+  explicit ASMJIT_INLINE ZoneVector(ZoneHeap* heap = nullptr) noexcept
+    : ZoneVectorBase(heap) {}
 
   //! Destroy the `ZoneVector<T>` and its data.
   ASMJIT_INLINE ~ZoneVector() noexcept { _reset(sizeof(T), nullptr); }
@@ -182,9 +182,9 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get if this `ZoneVectorBase` has been initialized.
-  ASMJIT_INLINE bool isInitialized() const noexcept { return _allocator != nullptr; }
-  //! Reset this vector and initialize to use the given allocator (can be null).
-  ASMJIT_INLINE void reset(ZoneAllocator* allocator) noexcept { _reset(sizeof(T), allocator); }
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _heap != nullptr; }
+  //! Reset this vector and initialize to use the given ZoneHeap (can be null).
+  ASMJIT_INLINE void reset(ZoneHeap* heap) noexcept { _reset(sizeof(T), heap); }
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -226,7 +226,7 @@ public:
   // [Ops]
   // --------------------------------------------------------------------------
 
-  //! Clears the vector without reseting the \ref ZoneAllocator.
+  //! Clears the vector without reseting \ref ZoneHeap.
   ASMJIT_INLINE void clear() noexcept { _length = 0; }
 
   //! Prepend `item` to the vector.
@@ -302,7 +302,7 @@ public:
 
   //! Swap this pod-vector with `other`.
   ASMJIT_INLINE void swap(ZoneVector<T>& other) noexcept {
-    ASMJIT_ASSERT(_allocator == other._allocator);
+    ASMJIT_ASSERT(_heap == other._heap);
 
     Utils::swap(_length, other._length);
     Utils::swap(_capacity, other._capacity);
@@ -356,8 +356,8 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE ZoneHashBase(ZoneAllocator* allocator) noexcept {
-    _allocator = allocator;
+  ASMJIT_INLINE ZoneHashBase(ZoneHeap* heap) noexcept {
+    _heap = heap;
     _size = 0;
     _bucketsCount = 1;
     _bucketsGrow = 1;
@@ -370,8 +370,8 @@ public:
   // [Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE bool isInitialized() const noexcept { return _allocator != nullptr; }
-  ASMJIT_API void reset(ZoneAllocator* allocator) noexcept;
+  ASMJIT_INLINE bool isInitialized() const noexcept { return _heap != nullptr; }
+  ASMJIT_API void reset(ZoneHeap* heap) noexcept;
 
   // --------------------------------------------------------------------------
   // [Ops]
@@ -387,7 +387,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  ZoneAllocator* _allocator;             //!< Zone allocator used to allocate data.
+  ZoneHeap* _heap;                       //!< ZoneHeap used to allocate data.
   size_t _size;                          //!< Count of records inserted into the hash table.
   uint32_t _bucketsCount;                //!< Count of hash buckets.
   uint32_t _bucketsGrow;                 //!< When buckets array should grow.
@@ -409,8 +409,8 @@ public:
 template<typename Node>
 class ZoneHash : public ZoneHashBase {
 public:
-  explicit ASMJIT_INLINE ZoneHash(ZoneAllocator* allocator = nullptr) noexcept
-    : ZoneHashBase(allocator) {}
+  explicit ASMJIT_INLINE ZoneHash(ZoneHeap* heap = nullptr) noexcept
+    : ZoneHashBase(heap) {}
   ASMJIT_INLINE ~ZoneHash() noexcept {}
 
   template<typename Key>

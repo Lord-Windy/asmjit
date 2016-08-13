@@ -284,10 +284,10 @@ asmjit_add_source(ASMJIT_SRC asmjit/base
   vmem.h
   zone.cpp
   zone.h
-  zoneallocator.cpp
-  zoneallocator.h
   zonecontainers.cpp
   zonecontainers.h
+  zoneheap.cpp
+  zoneheap.h
 )
 
 if(0)

@@ -41,7 +41,7 @@ CodeCompiler::CodeCompiler() noexcept
     _maxLookAhead(kCompilerDefaultLookAhead),
     _func(nullptr),
     _vRegZone(4096 - Zone::kZoneOverhead),
-    _vRegArray(&_cbBaseAllocator),
+    _vRegArray(&_cbHeap),
     _localConstPool(nullptr),
     _globalConstPool(nullptr) {
 
@@ -64,7 +64,7 @@ Error CodeCompiler::onDetach(CodeHolder* code) noexcept {
   _localConstPool = nullptr;
   _globalConstPool = nullptr;
 
-  _vRegArray.reset(&_cbBaseAllocator);
+  _vRegArray.reset(&_cbHeap);
   _vRegZone.reset(false);
 
   return Base::onDetach(code);

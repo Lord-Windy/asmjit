@@ -28,8 +28,8 @@ CodeBuilder::CodeBuilder(CodeHolder* code) noexcept
     _cbBaseZone(32768 - Zone::kZoneOverhead),
     _cbDataZone(16384 - Zone::kZoneOverhead),
     _cbPassZone(32768 - Zone::kZoneOverhead),
-    _cbBaseAllocator(&_cbBaseZone),
-    _labelArray(&_cbBaseAllocator),
+    _cbHeap(&_cbBaseZone),
+    _cbLabels(&_cbHeap),
     _nodeFlowId(0),
     _nodeFlags(0),
     _firstNode(nullptr),
@@ -50,8 +50,8 @@ Error CodeBuilder::onAttach(CodeHolder* code) noexcept {
 }
 
 Error CodeBuilder::onDetach(CodeHolder* code) noexcept {
-  _labelArray.reset(&_cbBaseAllocator);
-  _cbBaseAllocator.reset(&_cbBaseZone);
+  _cbLabels.reset(&_cbHeap);
+  _cbHeap.reset(&_cbBaseZone);
 
   _cbBaseZone.reset(false);
   _cbDataZone.reset(false);
@@ -79,15 +79,15 @@ Error CodeBuilder::getCBLabel(CBLabel** pOut, uint32_t id) noexcept {
   if (ASMJIT_UNLIKELY(index >= _code->getLabelsCount()))
     return DebugUtils::errored(kErrorInvalidLabel);
 
-  if (index >= _labelArray.getLength())
-    ASMJIT_PROPAGATE(_labelArray.resize(index + 1));
+  if (index >= _cbLabels.getLength())
+    ASMJIT_PROPAGATE(_cbLabels.resize(index + 1));
 
-  CBLabel* node = _labelArray[index];
+  CBLabel* node = _cbLabels[index];
   if (!node) {
     node = newNodeT<CBLabel>(id);
     if (ASMJIT_UNLIKELY(!node))
       return DebugUtils::errored(kErrorNoHeapMemory);
-    _labelArray[index] = node;
+    _cbLabels[index] = node;
   }
 
   *pOut = node;
@@ -105,10 +105,10 @@ Error CodeBuilder::registerLabelNode(CBLabel* node) noexcept {
   size_t index = Operand::unpackId(id);
 
   // We just added one label so it must be true.
-  ASMJIT_ASSERT(_labelArray.getLength() < index + 1);
-  ASMJIT_PROPAGATE(_labelArray.resize(index + 1));
+  ASMJIT_ASSERT(_cbLabels.getLength() < index + 1);
+  ASMJIT_PROPAGATE(_cbLabels.resize(index + 1));
 
-  _labelArray[index] = node;
+  _cbLabels[index] = node;
   node->_id = id;
   return kErrorOk;
 }

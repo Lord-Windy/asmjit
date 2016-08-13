@@ -3185,7 +3185,7 @@ public:
   // --------------------------------------------------------------------------
 
   Zone _zone;
-  ZoneAllocator _allocator;
+  ZoneHeap _zoneHeap;
   ZoneVector<X86Test*> _tests;
 
   int _returnCode;
@@ -3198,8 +3198,8 @@ public:
 
 X86TestSuite::X86TestSuite() :
   _zone(8096 - Zone::kZoneOverhead),
-  _allocator(&_zone),
-  _tests(&_allocator),
+  _zoneHeap(&_zone),
+  _tests(&_zoneHeap),
   _returnCode(0),
   _binSize(0),
   _alwaysPrintLog(false) {
@@ -3284,11 +3284,13 @@ int X86TestSuite::run() {
 
   FILE* file = stdout;
 
+#if !defined(ASMJIT_DISABLE_LOGGING)
   FileLogger fileLogger(file);
   fileLogger.addOptions(Logger::kOptionBinaryForm);
 
   StringLogger stringLogger;
   stringLogger.addOptions(Logger::kOptionBinaryForm);
+#endif // ASMJIT_DISABLE_LOGGING
 
   MyErrorHandler errorHandler;
 
@@ -3299,6 +3301,7 @@ int X86TestSuite::run() {
     code.init(runtime.getCodeInfo());
     code.setErrorHandler(&errorHandler);
 
+#if !defined(ASMJIT_DISABLE_LOGGING)
     if (_alwaysPrintLog) {
       fprintf(file, "\n");
       code.setLogger(&fileLogger);
@@ -3307,6 +3310,7 @@ int X86TestSuite::run() {
       stringLogger.clearString();
       code.setLogger(&stringLogger);
     }
+#endif // ASMJIT_DISABLE_LOGGING
 
     X86Compiler cc(&code);
     X86Test* test = _tests[i];
@@ -3327,9 +3331,11 @@ int X86TestSuite::run() {
         fprintf(file, "[Success] %s.\n", test->getName());
       }
       else {
+#if !defined(ASMJIT_DISABLE_LOGGING)
         if (!_alwaysPrintLog) {
           fprintf(file, "\n%s", stringLogger.getString());
         }
+#endif // ASMJIT_DISABLE_LOGGING
 
         fprintf(file, "-------------------------------------------------------------------------------\n");
         fprintf(file, "[Failure] %s.\n", test->getName());
@@ -3344,9 +3350,11 @@ int X86TestSuite::run() {
       runtime.release(func);
     }
     else {
+#if !defined(ASMJIT_DISABLE_LOGGING)
       if (!_alwaysPrintLog) {
         fprintf(file, "%s\n", stringLogger.getString());
       }
+#endif // ASMJIT_DISABLE_LOGGING
 
       fprintf(file, "-------------------------------------------------------------------------------\n");
       fprintf(file, "[Failure] %s (%s).\n", test->getName(), DebugUtils::errorAsString(err));

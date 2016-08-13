@@ -19,8 +19,8 @@
 #include "../base/operand.h"
 #include "../base/utils.h"
 #include "../base/zone.h"
-#include "../base/zoneallocator.h"
 #include "../base/zonecontainers.h"
+#include "../base/zoneheap.h"
 
 // [Api-Begin]
 #include "../apibegin.h"

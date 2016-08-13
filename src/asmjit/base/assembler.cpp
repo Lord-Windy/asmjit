@@ -202,7 +202,7 @@ Error Assembler::bind(const Label& label) {
     }
 
     prev = link->prev;
-    _code->_baseAllocator.release(link, sizeof(CodeHolder::LabelLink));
+    _code->_baseHeap.release(link, sizeof(CodeHolder::LabelLink));
     link = prev;
   }
 

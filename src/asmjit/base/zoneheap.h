@@ -5,8 +5,8 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _ASMJIT_BASE_ZONEALLOCATOR_H
-#define _ASMJIT_BASE_ZONEALLOCATOR_H
+#ifndef _ASMJIT_BASE_ZONEHEAP_H
+#define _ASMJIT_BASE_ZONEHEAP_H
 
 // [Dependencies]
 #include "../base/utils.h"
@@ -18,28 +18,23 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::ZoneAllocator]
+// [asmjit::ZoneHeap]
 // ============================================================================
 
 //! Zone-based memory allocator that uses an existing \ref Zone and provides
 //! a `release()` functionality on top of it. It uses \ref Zone only for chunks
 //! that can be pooled, and uses libc `malloc()` for chunks that are large.
 //!
-//! The advantage of ZoneAllocator is that it can allocate small chunks of
-//! memory really fast, and these chunks, when released, are reused by next
-//! allocations. Also, since ZoneAllocator uses \ref Zone, you can simply turn
-//! an existing \ref Zone into a ZoneAllocator, and use it by your \ref CBPass
-//! when necessary.
+//! The advantage of ZoneHeap is that it can allocate small chunks of memory
+//! really fast, and these chunks, when released, will be reused by consecutive
+//! calls to `alloc()`. Also, since ZoneHeap uses \ref Zone, you can turn any
+//! \ref Zone into a \ref ZoneHeap, and use it in your \ref CBPass when necessary.
 //!
-//! ZoneAllocator is used by AsmJit containers to make containers having only
+//! ZoneHeap is used by AsmJit containers to make containers having only
 //! few elements fast (and lightweight) and to allow them to grow and use
-//! dynamic blocks when necessary.
-//!
-//! NOTE: ZoneAllocator also improves cache locality, as small objects that we
-//! expect to be accessed often are kept close to each other and large objects
-//! are allocated outside of the \ref Zone.
-struct ZoneAllocator {
-  ASMJIT_NONCOPYABLE(ZoneAllocator)
+//! dynamic blocks when require more storage.
+struct ZoneHeap {
+  ASMJIT_NONCOPYABLE(ZoneHeap)
 
   enum {
     //! How many bytes per a low granularity pool (has to be at least 16).
@@ -78,35 +73,35 @@ struct ZoneAllocator {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `ZoneAllocator`.
+  //! Create a new `ZoneHeap`.
   //!
   //! NOTE: To use it, you must first `init()` it.
-  ASMJIT_INLINE ZoneAllocator() noexcept {
+  ASMJIT_INLINE ZoneHeap() noexcept {
     ::memset(this, 0, sizeof(*this));
   }
-  //! Create a new `ZoneAllocator` initialized to use `zone`.
-  explicit ASMJIT_INLINE ZoneAllocator(Zone* zone) noexcept {
+  //! Create a new `ZoneHeap` initialized to use `zone`.
+  explicit ASMJIT_INLINE ZoneHeap(Zone* zone) noexcept {
     ::memset(this, 0, sizeof(*this));
     _zone = zone;
   }
-  //! Destroy the `ZoneAllocator`.
-  ASMJIT_INLINE ~ZoneAllocator() noexcept { reset(); }
+  //! Destroy the `ZoneHeap`.
+  ASMJIT_INLINE ~ZoneHeap() noexcept { reset(); }
 
   // --------------------------------------------------------------------------
   // [Init / Reset]
   // --------------------------------------------------------------------------
 
-  //! Get if the `ZoneAllocator` is initialized (i.e. has `Zone`).
+  //! Get if the `ZoneHeap` is initialized (i.e. has `Zone`).
   ASMJIT_INLINE bool isInitialized() const noexcept { return _zone != nullptr; }
 
-  //! Convenience method to initialize the `ZoneAllocator` with `zone`.
+  //! Convenience method to initialize the `ZoneHeap` with `zone`.
   //!
   //! It's the same as calling `reset(zone)`.
   ASMJIT_INLINE void init(Zone* zone) noexcept { reset(zone); }
 
-  //! Reset this `ZoneAllocator` and also forget about the current `Zone` which
+  //! Reset this `ZoneHeap` and also forget about the current `Zone` which
   //! is attached (if any). Reset optionally attaches a new `zone` passed, or
-  //! keeps the `ZoneAllocator` in an uninitialized state, if `zone` is null.
+  //! keeps the `ZoneHeap` in an uninitialized state, if `zone` is null.
   ASMJIT_API void reset(Zone* zone = nullptr) noexcept;
 
   // --------------------------------------------------------------------------
@@ -236,4 +231,4 @@ struct ZoneAllocator {
 #include "../apiend.h"
 
 // [Guard]
-#endif // _ASMJIT_BASE_ZONEALLOCATOR_H
+#endif // _ASMJIT_BASE_ZONEHEAP_H
