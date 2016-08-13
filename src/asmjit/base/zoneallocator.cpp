@@ -60,6 +60,8 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
   if (_getSlotIndex(size, slot, allocatedSize)) {
     // Slot reuse.
     uint8_t* p = reinterpret_cast<uint8_t*>(_slots[slot]);
+    size = allocatedSize;
+
     if (p) {
       _slots[slot] = reinterpret_cast<Slot*>(p)->next;
       //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
@@ -70,53 +72,40 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
     // check if there is enough room for the new chunk in zone, and if not,
     // we redistribute the remaining memory in Zone's current block into slots.
     Zone* zone = _zone;
-    size = allocatedSize;
-
     p = Utils::alignTo(zone->getCursor(), kBlockAlignment);
-    size_t remain = (size_t)(zone->getEnd() - p);
+    size_t remain = (p <= zone->getEnd()) ? (size_t)(zone->getEnd() - p) : size_t(0);
 
     if (ASMJIT_LIKELY(remain >= size)) {
       zone->setCursor(p + size);
+      //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
+      return p;
     }
     else {
-      // Distribute the remaining block to suitable slots.
-      while (remain >= kLoGranularity) {
-        size_t distSize = Utils::iMin<size_t>(remain, kLoMaxSize);
-        uint32_t distSlot = static_cast<uint32_t>((distSize - 1) / kLoGranularity);
+      // Distribute the remaining memory to suitable slots.
+      if (remain >= kLoGranularity) {
+        do {
+          size_t distSize = Utils::iMin<size_t>(remain, kLoMaxSize);
+          uint32_t distSlot = static_cast<uint32_t>((distSize - kLoGranularity) / kLoGranularity);
+          ASMJIT_ASSERT(distSlot < kLoCount);
 
-        reinterpret_cast<Slot*>(p)->next = _slots[distSlot];
-        _slots[distSlot] = reinterpret_cast<Slot*>(p);
+          reinterpret_cast<Slot*>(p)->next = _slots[distSlot];
+          _slots[distSlot] = reinterpret_cast<Slot*>(p);
 
-        p += distSize;
-        remain -= distSize;
+          p += distSize;
+          remain -= distSize;
+        } while (remain >= kLoGranularity);
+        zone->setCursor(p);
       }
-      zone->setCursor(p);
 
       p = static_cast<uint8_t*>(zone->_alloc(size));
       if (ASMJIT_UNLIKELY(!p)) {
         allocatedSize = 0;
         return nullptr;
       }
+
+      //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
+      return p;
     }
-
-    // `p` now contains a valid address to be returned. But before returning
-    // we preallocate some chunks so another successive allocations of the same
-    // size can happen in `alloc()` instead of going over `_alloc()`. We only
-    // preallocate small chunks.
-    if (slot < kLoCount && zone->getRemainingSize() >= size) {
-      Slot** pNext = &_slots[slot];
-      uint32_t i = 3;
-      do {
-        Slot* extra = static_cast<Slot*>(zone->allocNoCheck(size));
-        *pNext = extra;
-        pNext = &extra->next;
-      } while (--i && zone->getRemainingSize() >= size);
-
-      *pNext = nullptr;
-    }
-
-    //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
-    return p;
   }
   else {
     // Allocate a dynamic block.
@@ -157,7 +146,7 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
 void* ZoneAllocator::_allocZeroed(size_t size, size_t& allocatedSize) noexcept {
   ASMJIT_ASSERT(isInitialized());
 
-  void* p = alloc(size, allocatedSize);
+  void* p = _alloc(size, allocatedSize);
   if (ASMJIT_UNLIKELY(!p)) return p;
   return ::memset(p, 0, allocatedSize);
 }

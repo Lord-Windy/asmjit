@@ -47,9 +47,7 @@ public:
 
   enum {
     //! Zone allocator overhead.
-    kZoneOverhead =
-      kMemAllocOverhead +
-        static_cast<int>(sizeof(Block) - sizeof(void*))
+    kZoneOverhead = kMemAllocOverhead + static_cast<int>(sizeof(Block))
   };
 
   // --------------------------------------------------------------------------

@@ -122,20 +122,22 @@ void* Zone::_alloc(size_t size) noexcept {
   }
 
   // Prevent arithmetic overflow.
-  if (blockSize > (~static_cast<size_t>(0) - sizeof(Block) - blockAlignment))
+  if (ASMJIT_UNLIKELY(blockSize > (~static_cast<size_t>(0) - sizeof(Block) - blockAlignment)))
     return nullptr;
 
-  Block* newBlock = static_cast<Block*>(ASMJIT_ALLOC(sizeof(Block) - sizeof(void*) + blockSize + blockAlignment));
-  if (ASMJIT_UNLIKELY(!newBlock)) return nullptr;
+  blockSize += blockAlignment;
+  Block* newBlock = static_cast<Block*>(ASMJIT_ALLOC(sizeof(Block) + blockSize));
+
+  if (ASMJIT_UNLIKELY(!newBlock))
+    return nullptr;
 
   // Align the pointer to `blockAlignment` and adjust the size of this block
   // accordingly. It's the same as using `blockAlignment - Utils::alignDiff()`,
   // just written differently.
   p = Utils::alignTo(newBlock->data, blockAlignment);
-  newBlock->size = blockSize + blockAlignment - (size_t)(p - newBlock->data);
-
   newBlock->prev = nullptr;
   newBlock->next = nullptr;
+  newBlock->size = blockSize;
 
   if (curBlock != &Zone_zeroBlock) {
     newBlock->prev = curBlock;
@@ -152,7 +154,7 @@ void* Zone::_alloc(size_t size) noexcept {
 
   _block = newBlock;
   _ptr = p + size;
-  _end = newBlock->data + blockSize + blockAlignment;
+  _end = newBlock->data + blockSize;
 
   return static_cast<void*>(p);
 }

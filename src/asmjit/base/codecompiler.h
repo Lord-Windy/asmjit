@@ -442,7 +442,7 @@ public:
 // [asmjit::CCFuncRet]
 // ============================================================================
 
-//! AIR function return.
+//! Function return (CodeCompiler).
 class CCFuncRet : public CBNode {
 public:
   ASMJIT_NONCOPYABLE(CCFuncRet)

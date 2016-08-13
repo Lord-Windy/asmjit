@@ -162,23 +162,8 @@ struct ZoneAllocator {
   //! NOTE: `size` can't be zero, it will assert in debug mode in such case.
   ASMJIT_INLINE void* alloc(size_t size) noexcept {
     ASMJIT_ASSERT(isInitialized());
-
-    // NOTE: This is the most used allocation function, so the ideal path has
-    // been inlined. If the `size` is a constant expression `_getSlotIndex()`
-    // will be folded to a slot index directly and the code generated for the
-    // whole allocation will be just few instructions.
-    uint8_t* p;
-    uint32_t slot;
-
-    if (ASMJIT_LIKELY(_getSlotIndex(size, slot)) && (p = reinterpret_cast<uint8_t*>(_slots[slot]))) {
-      _slots[slot] = reinterpret_cast<Slot*>(p)->next;
-      //printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(size), slot);
-      return p;
-    }
-    else {
-      size_t allocatedSize;
-      return _alloc(size, allocatedSize);
-    }
+    size_t allocatedSize;
+    return _alloc(size, allocatedSize);
   }
 
   //! Like `alloc(size)`, but provides a second argument `allocatedSize` that
@@ -186,22 +171,7 @@ struct ZoneAllocator {
   //! useful for containers to prevent growing too early.
   ASMJIT_INLINE void* alloc(size_t size, size_t& allocatedSize) noexcept {
     ASMJIT_ASSERT(isInitialized());
-
-    void* p;
-    uint32_t slot;
-
-    // NOTE: This is the most used allocation function, so the ideal path has
-    // been inlined. If the `size` is a constant expression `_getSlotIndex()`
-    // will be folded to a slot index directly and the code generated for the
-    // whole allocation will be just few instructions.
-    if (ASMJIT_LIKELY(_getSlotIndex(size, slot, allocatedSize)) && (p = reinterpret_cast<uint8_t*>(_slots[slot]))) {
-      _slots[slot] = reinterpret_cast<Slot*>(p)->next;
-      //printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(allocatedSize), slot);
-      return p;
-    }
-    else {
-      return _alloc(size, allocatedSize);
-    }
+    return _alloc(size, allocatedSize);
   }
 
   //! Like `alloc()`, but the return pointer is casted to `T*`.
@@ -240,7 +210,6 @@ struct ZoneAllocator {
     ASMJIT_ASSERT(p != nullptr);
     ASMJIT_ASSERT(size != 0);
 
-    // NOTE: Inlined for the same reason as `alloc()`.
     uint32_t slot;
     if (_getSlotIndex(size, slot)) {
       //printf("RELEASING %p of size %d (SLOT %u)\n", p, int(size), slot);
