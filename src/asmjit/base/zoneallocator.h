@@ -33,7 +33,7 @@ namespace asmjit {
 //!
 //! ZoneAllocator is used by AsmJit containers to make containers having only
 //! few elements fast (and lightweight) and to allow them to grow and use
-//! dynamic chunks when necessary.
+//! dynamic blocks when necessary.
 //!
 //! NOTE: ZoneAllocator also improves cache locality, as small objects that we
 //! expect to be accessed often are kept close to each other and large objects
@@ -60,7 +60,7 @@ struct ZoneAllocator {
     kBlockAlignment = kLoGranularity
   };
 
-  //! Single-linked list used to store unused blocks.
+  //! Single-linked list used to store unused chunks.
   struct Slot {
     //! Link to a next slot in a single-linked list.
     Slot* next;
@@ -155,7 +155,6 @@ struct ZoneAllocator {
 
   ASMJIT_API void* _alloc(size_t size, size_t& allocatedSize) noexcept;
   ASMJIT_API void* _allocZeroed(size_t size, size_t& allocatedSize) noexcept;
-  ASMJIT_API char* _allocString(const char* s, size_t len) noexcept;
   ASMJIT_API void _releaseDynamic(void* p, size_t size) noexcept;
 
   //! Allocate `size` bytes of memory, ideally from an available pool.
@@ -173,7 +172,7 @@ struct ZoneAllocator {
 
     if (ASMJIT_LIKELY(_getSlotIndex(size, slot)) && (p = reinterpret_cast<uint8_t*>(_slots[slot]))) {
       _slots[slot] = reinterpret_cast<Slot*>(p)->next;
-      //printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(size), slot);
+      printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(size), slot);
       return p;
     }
     else {
@@ -197,7 +196,7 @@ struct ZoneAllocator {
     // whole allocation will be just few instructions.
     if (ASMJIT_LIKELY(_getSlotIndex(size, slot, allocatedSize)) && (p = reinterpret_cast<uint8_t*>(_slots[slot]))) {
       _slots[slot] = reinterpret_cast<Slot*>(p)->next;
-      //printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(allocatedSize), slot);
+      printf("ALLOCATED %p of size %d (SLOT %u)\n", p, int(allocatedSize), slot);
       return p;
     }
     else {
@@ -244,7 +243,7 @@ struct ZoneAllocator {
     // NOTE: Inlined for the same reason as `alloc()`.
     uint32_t slot;
     if (_getSlotIndex(size, slot)) {
-      //printf("RELEASING %p of size %d (SLOT %u)\n", p, int(size), slot);
+      printf("RELEASING %p of size %d (SLOT %u)\n", p, int(size), slot);
       static_cast<Slot*>(p)->next = static_cast<Slot*>(_slots[slot]);
       _slots[slot] = static_cast<Slot*>(p);
     }

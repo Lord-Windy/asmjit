@@ -99,7 +99,7 @@ Error CodeBuilder::registerLabelNode(CBLabel* node) noexcept {
   ASMJIT_ASSERT(_code != nullptr);
 
   // Don't call setLastError() from here, we are noexcept and we are called
-  // by `newLabelNode()` and `newFuncNode()`, which are noexcept as too.
+  // by `newLabelNode()` and `newFuncNode()`, which are noexcept as well.
   uint32_t id;
   ASMJIT_PROPAGATE(_code->newLabelId(id));
   size_t index = Operand::unpackId(id);

@@ -102,8 +102,12 @@ Error Assembler::comment(const char* s, size_t len) {
     return _lastError;
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-  if (_globalOptions & kOptionLoggingEnabled)
-    return _code->_logger->log(s, len);
+  if (_globalOptions & kOptionLoggingEnabled) {
+    Logger* logger = _code->getLogger();
+    logger->log(s, len);
+    logger->log("\n", 1);
+    return kErrorOk;
+  }
 #else
   ASMJIT_UNUSED(s);
   ASMJIT_UNUSED(len);

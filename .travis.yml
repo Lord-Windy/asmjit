@@ -53,3 +53,4 @@ script:
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_unit; fi;
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_x86; fi;

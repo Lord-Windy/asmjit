@@ -11,7 +11,6 @@ Complete x86/x64 JIT and Remote Assembler for C++.
 'NEXT' TODO:
 
   * This readme contains outdated code.
-  * Named labels and symbol support required.
   * Only the first section works atm.
   * CodeInfo requires also target feature set for x86 (None, AVX, AVX512) and ARM (None, Thumb).
   * AVX512 validation not supported yet.

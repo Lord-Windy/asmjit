@@ -62,7 +62,7 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
     uint8_t* p = reinterpret_cast<uint8_t*>(_slots[slot]);
     if (p) {
       _slots[slot] = reinterpret_cast<Slot*>(p)->next;
-      //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
+      printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
       return p;
     }
 
@@ -81,14 +81,14 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
     else {
       // Distribute the remaining block to suitable slots.
       while (remain >= kLoGranularity) {
-        size_t curSize = Utils::iMin<size_t>(remain, kLoMaxSize);
-        slot = static_cast<uint32_t>(curSize - (kLoGranularity - 1)) / kLoCount;
+        size_t distSize = Utils::iMin<size_t>(remain, kLoMaxSize);
+        uint32_t distSlot = static_cast<uint32_t>((distSize - 1) / kLoGranularity);
 
-        reinterpret_cast<Slot*>(p)->next = _slots[slot];
-        _slots[slot] = reinterpret_cast<Slot*>(p);
+        reinterpret_cast<Slot*>(p)->next = _slots[distSlot];
+        _slots[distSlot] = reinterpret_cast<Slot*>(p);
 
-        p += curSize;
-        remain -= curSize;
+        p += distSize;
+        remain -= distSize;
       }
       zone->setCursor(p);
 
@@ -115,7 +115,7 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
       *pNext = nullptr;
     }
 
-    //printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
+    printf("ALLOCATED %p of size %d (SLOT %d)\n", p, int(size), slot);
     return p;
   }
   else {
@@ -149,7 +149,7 @@ void* ZoneAllocator::_alloc(size_t size, size_t& allocatedSize) noexcept {
     reinterpret_cast<DynamicBlock**>(p)[-1] = block;
 
     allocatedSize = size;
-    //printf("ALLOCATED DYNAMIC %p of size %d\n", p, int(size));
+    printf("ALLOCATED DYNAMIC %p of size %d\n", p, int(size));
     return p;
   }
 }
@@ -164,7 +164,7 @@ void* ZoneAllocator::_allocZeroed(size_t size, size_t& allocatedSize) noexcept {
 
 void ZoneAllocator::_releaseDynamic(void* p, size_t size) noexcept {
   ASMJIT_ASSERT(isInitialized());
-  //printf("RELEASING DYNAMIC %p of size %d\n", p, int(size));
+  printf("RELEASING DYNAMIC %p of size %d\n", p, int(size));
 
   // Pointer to `DynamicBlock` is stored at [-1].
   DynamicBlock* block = reinterpret_cast<DynamicBlock**>(p)[-1];

@@ -75,7 +75,8 @@ Error ZoneVectorBase::_grow(size_t sizeOfT, size_t n) noexcept {
 }
 
 Error ZoneVectorBase::_reserve(size_t sizeOfT, size_t n) noexcept {
-  if (_capacity >= n) return kErrorOk;
+  size_t oldCapacity = _capacity;
+  if (oldCapacity >= n) return kErrorOk;
 
   size_t nBytes = n * sizeOfT;
   if (nBytes < n) return DebugUtils::errored(kErrorNoHeapMemory);
@@ -91,7 +92,7 @@ Error ZoneVectorBase::_reserve(size_t sizeOfT, size_t n) noexcept {
     ::memcpy(newData, oldData, _length * sizeOfT);
 
   if (oldData)
-    _allocator->release(oldData, _capacity * sizeOfT);
+    _allocator->release(oldData, oldCapacity * sizeOfT);
 
   _capacity = allocatedBytes / sizeOfT;
   ASMJIT_ASSERT(_capacity >= n);
@@ -101,13 +102,16 @@ Error ZoneVectorBase::_reserve(size_t sizeOfT, size_t n) noexcept {
 }
 
 Error ZoneVectorBase::_resize(size_t sizeOfT, size_t n) noexcept {
-  if (_capacity < n)
-    ASMJIT_PROPAGATE(_grow(sizeOfT, n - _length));
-
   size_t length = _length;
-  if (n > length) ::memset(static_cast<uint8_t*>(_data) + length * sizeOfT, 0, (n - length) * sizeOfT);
-  if (n != length) _length = n;
+  if (_capacity < n) {
+    ASMJIT_PROPAGATE(_grow(sizeOfT, n - length));
+    ASMJIT_ASSERT(_capacity >= n);
+  }
 
+  if (length < n)
+    ::memset(static_cast<uint8_t*>(_data) + length * sizeOfT, 0, (n - length) * sizeOfT);
+
+  _length = n;
   return kErrorOk;
 }
 
