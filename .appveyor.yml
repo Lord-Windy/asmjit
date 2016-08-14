@@ -65,14 +65,14 @@ environment:
 
 install:
   - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%PATH:C:\Program Files\Git\usr\bin;=%
-  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW_PATH%\bin;%PATH%
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%MINGW_PATH%\bin;%PATH%
 
 build_script:
   - cd c:\dev\asmjit
   - md build
   - cd build
   - if "%TOOLCHAIN%"=="MinGW Makefiles" (
-      cmake .. -G"%TOOLCHAIN%" -DCMAKE_PREFIX_PATH="C:\%MINGW_PATH%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
+      cmake .. -G"%TOOLCHAIN%" -DCMAKE_PREFIX_PATH="%MINGW_PATH%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
       mingw32-make
     )
     else (
