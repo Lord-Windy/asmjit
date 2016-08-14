@@ -1,10 +1,28 @@
-version: asmjit-{build}
+version: "{build}"
 
 image: Visual Studio 2015
 clone_folder: c:\dev\asmjit
 
 environment:
   matrix:
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "MinGW Makefiles"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "MinGW Makefiles"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 9"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 9"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 9 Win64"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 9 Win64"
+
     - BUILD_TYPE: Debug
       TOOLCHAIN: "Visual Studio 10"
 
@@ -45,10 +63,21 @@ build_script:
   - cd c:\dev\asmjit
   - md build
   - cd build
-  - cmake .. -G"%TOOLCHAIN%" -DASMJIT_BUILD_TEST=1
-  - msbuild /m /nologo /v:quiet /p:Configuration=%BUILD_TYPE% asmjit.sln
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" (
+      cmake .. -G"%TOOLCHAIN%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
+      mingw32-make
+    )
+    else (
+      cmake .. -G"%TOOLCHAIN%" -DASMJIT_BUILD_TEST=1 &&
+      msbuild /m /nologo /v:quiet /p:Configuration=%BUILD_TYPE% asmjit.sln
+    )
 
 test_script:
-  - cd c:\dev\asmjit\build\%BUILD_TYPE%
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" (
+      cd c:\dev\asmjit\build
+    )
+    else (
+      cd c:\dev\asmjit\build\%BUILD_TYPE%
+    )
   - asmjit_test_unit.exe
   - asmjit_test_x86.exe

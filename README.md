@@ -48,25 +48,26 @@ Supported Environments
 
 ### Operating Systems
 
-  * **BSDs** (not tested regularly).
   * **Linux** (tested by Travis-CI).
   * **Mac** (tested by Travis-CI).
-  * **Windows** (tested manually, at least WinXP).
+  * **Windows** (tested by AppVeyor).
+  * **BSDs** (no maintainers).
+  * Other operating systems would require some testing and support in [asmjit/build.h](./asmjit/build.h).
 
 ### C++ Compilers
 
   * **Clang** (tested by Travis-CI).
-  * **CodeGear** (including BorlandC++, not tested regularly).
   * **GCC** (tested by Travis-CI).
   * **MinGW** (tested manually).
-  * **MSVC** (tested manually, at least VS2003 is required).
-  * Other compilers require some testing and support in [asmjit/build.h](./asmjit/build.h).
+  * **MSVC** (tested by AppVeyor).
+  * **CodeGear** (no maintainers).
+  * Other compilers would require some testing and support in [asmjit/build.h](./asmjit/build.h).
 
 ### Backends
 
   * **ARM** (work-in-progress).
-  * **X86** (tested by Travis-CI).
-  * **X64** (tested by Travis-CI).
+  * **X86** (tested by Travis-CI and AppVeyor).
+  * **X64** (tested by Travis-CI and AppVeyor).
 
 Project Organization
 --------------------
@@ -75,8 +76,8 @@ Project Organization
     * **src**      - Source code
       * **asmjit** - Source code and headers (always point include path in here)
         * **base** - Generic API and interfaces, used by all backends
-        * **arm**  - ARM/ARM64 specific API, used only by ARM and ARM64 backends
-        * **x86**  - X86/X64 specific API, used only by X86 and X64 backends
+        * **arm**  - ARM specific API, used only by ARM32 and ARM64 backends
+        * **x86**  - X86 specific API, used only by X86 and X64 backends
       * **test**   - Unit and integration tests (don't embed in your project)
     * **tools**    - Tools used for configuring, documenting and generating files
 
@@ -705,6 +706,12 @@ AsmJit contains another instruction option that controls (forces) REX prefix - `
 ### TODO
 
 Documentation not updated from here...
+
+
+
+
+
+
 
 
 
