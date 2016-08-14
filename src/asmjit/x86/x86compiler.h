@@ -15,7 +15,6 @@
 #include "../base/codecompiler.h"
 #include "../base/simdtypes.h"
 #include "../x86/x86assembler.h"
-#include "../x86/x86func.h"
 #include "../x86/x86misc.h"
 
 // [Api-Begin]
@@ -23,211 +22,8 @@
 
 namespace asmjit {
 
-// ============================================================================
-// [Forward Declarations]
-// ============================================================================
-
-class X86Func;
-class X86CCCall;
-
 //! \addtogroup asmjit_x86
 //! \{
-
-// ============================================================================
-// [asmjit::X86Func]
-// ============================================================================
-
-//! X86/X64 function node.
-class X86Func : public CCFunc {
-public:
-  ASMJIT_NONCOPYABLE(X86Func)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `X86Func` instance.
-  ASMJIT_INLINE X86Func(CodeBuilder* cb) noexcept : CCFunc(cb) {
-    _decl = &_x86Decl;
-    _saveRestoreRegs.reset();
-
-    _alignStackSize = 0;
-    _alignedMemStackSize = 0;
-    _pushPopStackSize = 0;
-    _moveStackSize = 0;
-    _extraStackSize = 0;
-
-    _stackFrameRegIndex = kInvalidReg;
-    _isStackFrameRegPreserved = false;
-
-    for (uint32_t i = 0; i < ASMJIT_ARRAY_SIZE(_stackFrameCopyGpIndex); i++)
-      _stackFrameCopyGpIndex[i] = static_cast<uint8_t>(kInvalidReg);
-  }
-
-  //! Destroy the `X86Func` instance (NEVER CALLED).
-  ASMJIT_INLINE ~X86Func() noexcept {}
-
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
-
-  //! Get function declaration as `X86FuncDecl`.
-  ASMJIT_INLINE X86FuncDecl* getDecl() const noexcept {
-    return const_cast<X86FuncDecl*>(&_x86Decl);
-  }
-
-  //! Get argument.
-  ASMJIT_INLINE VirtReg* getArg(uint32_t i) const noexcept {
-    ASMJIT_ASSERT(i < _x86Decl.getArgCount());
-    return static_cast<VirtReg*>(_args[i]);
-  }
-
-  //! Get registers which have to be saved in prolog/epilog.
-  ASMJIT_INLINE uint32_t getSaveRestoreRegs(uint32_t kind) noexcept { return _saveRestoreRegs.get(kind); }
-
-  //! Get stack size needed to align stack back to the nature alignment.
-  ASMJIT_INLINE uint32_t getAlignStackSize() const noexcept { return _alignStackSize; }
-  //! Set stack size needed to align stack back to the nature alignment.
-  ASMJIT_INLINE void setAlignStackSize(uint32_t s) noexcept { _alignStackSize = s; }
-
-  //! Get aligned stack size used by variables and memory allocated on the stack.
-  ASMJIT_INLINE uint32_t getAlignedMemStackSize() const noexcept { return _alignedMemStackSize; }
-
-  //! Get stack size used by push/pop sequences in prolog/epilog.
-  ASMJIT_INLINE uint32_t getPushPopStackSize() const noexcept { return _pushPopStackSize; }
-  //! Set stack size used by push/pop sequences in prolog/epilog.
-  ASMJIT_INLINE void setPushPopStackSize(uint32_t s) noexcept { _pushPopStackSize = s; }
-
-  //! Get stack size used by mov sequences in prolog/epilog.
-  ASMJIT_INLINE uint32_t getMoveStackSize() const noexcept { return _moveStackSize; }
-  //! Set stack size used by mov sequences in prolog/epilog.
-  ASMJIT_INLINE void setMoveStackSize(uint32_t s) noexcept { _moveStackSize = s; }
-
-  //! Get extra stack size.
-  ASMJIT_INLINE uint32_t getExtraStackSize() const noexcept { return _extraStackSize; }
-  //! Set extra stack size.
-  ASMJIT_INLINE void setExtraStackSize(uint32_t s) noexcept { _extraStackSize  = s; }
-
-  //! Get whether the function has stack frame register (only when the stack is misaligned).
-  //!
-  //! NOTE: Stack frame register can be used for both - aligning purposes or
-  //! generating standard prolog/epilog sequence.
-  ASMJIT_INLINE bool hasStackFrameReg() const noexcept { return _stackFrameRegIndex != kInvalidReg; }
-
-  //! Get stack frame register index.
-  //!
-  //! NOTE: Used only when stack is misaligned.
-  ASMJIT_INLINE uint32_t getStackFrameRegIndex() const noexcept { return _stackFrameRegIndex; }
-
-  //! Get whether the stack frame register is preserved.
-  //!
-  //! NOTE: Used only when stack is misaligned.
-  ASMJIT_INLINE bool isStackFrameRegPreserved() const noexcept { return static_cast<bool>(_isStackFrameRegPreserved); }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! X86 function decl.
-  X86FuncDecl _x86Decl;
-  //! Registers which must be saved/restored in prolog/epilog.
-  X86RegMask _saveRestoreRegs;
-
-  //! Stack size needed to align function back to the nature alignment.
-  uint32_t _alignStackSize;
-  //! Like `_memStackSize`, but aligned.
-  uint32_t _alignedMemStackSize;
-
-  //! Stack required for push/pop in prolog/epilog (X86/X64 specific).
-  uint32_t _pushPopStackSize;
-  //! Stack required for movs in prolog/epilog (X86/X64 specific).
-  uint32_t _moveStackSize;
-
-  //! Stack required to put extra data (for example function arguments
-  //! when manually aligning to requested alignment).
-  uint32_t _extraStackSize;
-
-  //! Stack frame register.
-  uint8_t _stackFrameRegIndex;
-  //! Whether the stack frame register is preserved.
-  uint8_t _isStackFrameRegPreserved;
-  //! Gp registers indexes that can be used to copy function arguments
-  //! to a new location in case we are doing manual stack alignment.
-  uint8_t _stackFrameCopyGpIndex[6];
-};
-
-// ============================================================================
-// [asmjit::X86CCCall]
-// ============================================================================
-
-//! X86/X64 function-call node.
-class X86CCCall : public CCCall {
-public:
-  ASMJIT_NONCOPYABLE(X86CCCall)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `X86CCCall` instance.
-  ASMJIT_INLINE X86CCCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
-    : CCCall(cb, instId, options, opArray, opCount) {
-
-    _decl = &_x86Decl;
-    _usedArgs.reset();
-  }
-
-  //! Destroy the `X86CCCall` instance (NEVER CALLED).
-  ASMJIT_INLINE ~X86CCCall() noexcept {}
-
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
-
-  //! Get the function prototype.
-  ASMJIT_INLINE X86FuncDecl* getDecl() const noexcept {
-    return const_cast<X86FuncDecl*>(&_x86Decl);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Signature]
-  // --------------------------------------------------------------------------
-
-  //! Set function signature.
-  ASMJIT_INLINE Error setSignature(const FuncSignature& sign) noexcept {
-    return _x86Decl.setSignature(sign);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Arg / Ret]
-  // --------------------------------------------------------------------------
-
-  //! Set argument at `i` to `op`.
-  ASMJIT_API bool _setArg(uint32_t i, const Operand_& op) noexcept;
-  //! Set return at `i` to `op`.
-  ASMJIT_API bool _setRet(uint32_t i, const Operand_& op) noexcept;
-
-  //! Set argument at `i` to `reg`.
-  ASMJIT_INLINE bool setArg(uint32_t i, const Reg& reg) noexcept { return _setArg(i, reg); }
-  //! Set argument at `i` to `imm`.
-  ASMJIT_INLINE bool setArg(uint32_t i, const Imm& imm) noexcept { return _setArg(i, imm); }
-
-  //! Set return at `i` to `var`.
-  ASMJIT_INLINE bool setRet(uint32_t i, const Reg& reg) noexcept { return _setRet(i, reg); }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  //! X86 declaration.
-  X86FuncDecl _x86Decl;
-  //! Mask of all registers actually used to pass function arguments.
-  //!
-  //! NOTE: This bit-mask is not the same as `X86Func::_passed`. It contains
-  //! only registers actually used to do the call while `X86Func::_passed`
-  //! mask contains all registers for all possible signatures (defined by ABI).
-  X86RegMask _usedArgs;
-};
 
 // ============================================================================
 // [asmjit::X86Compiler]
@@ -274,24 +70,16 @@ public:
   // [Func]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86Func`.
-  ASMJIT_API X86Func* newFunc(const FuncSignature& sign) noexcept;
+  //! Create a new `CCFunc`.
+  ASMJIT_API CCFunc* newFunc(const FuncSignature& sign) noexcept;
 
   using CodeCompiler::addFunc;
 
   //! Add a new function.
-  ASMJIT_API X86Func* addFunc(const FuncSignature& sign);
+  ASMJIT_API CCFunc* addFunc(const FuncSignature& sign);
 
   //! Emit a sentinel that marks the end of the current function.
   ASMJIT_API CBSentinel* endFunc();
-
-  //! Get the current function casted to \ref X86Func.
-  //!
-  //! This method can be called within `addFunc()` and `endFunc()` block to get
-  //! current function you are working with. It's recommended to store `CCFunc`
-  //! pointer returned by `addFunc<>` method, because this allows you in future
-  //! implement function sections outside of the function itself.
-  ASMJIT_INLINE X86Func* getFunc() const noexcept { return static_cast<X86Func*>(_func); }
 
   // --------------------------------------------------------------------------
   // [Ret]
@@ -306,10 +94,10 @@ public:
   // [Call]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86CCCall`.
-  ASMJIT_API X86CCCall* newCall(const Operand_& o0, const FuncSignature& sign) noexcept;
-  //! Add a new `X86CCCall`.
-  ASMJIT_API X86CCCall* addCall(const Operand_& o0, const FuncSignature& sign) noexcept;
+  //! Create a new `CCFuncCall`.
+  ASMJIT_API CCFuncCall* newCall(const Operand_& o0, const FuncSignature& sign) noexcept;
+  //! Add a new `CCFuncCall`.
+  ASMJIT_API CCFuncCall* addCall(const Operand_& o0, const FuncSignature& sign) noexcept;
 
   // --------------------------------------------------------------------------
   // [Args]
@@ -492,15 +280,15 @@ public:
   // --------------------------------------------------------------------------
 
   //! Call a function.
-  ASMJIT_INLINE X86CCCall* call(const X86Gp& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const X86Gp& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CCCall* call(const X86Mem& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const X86Mem& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CCCall* call(const Label& label, const FuncSignature& sign) { return addCall(label, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const Label& label, const FuncSignature& sign) { return addCall(label, sign); }
   //! \overload
-  ASMJIT_INLINE X86CCCall* call(const Imm& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const Imm& dst, const FuncSignature& sign) { return addCall(dst, sign); }
   //! \overload
-  ASMJIT_INLINE X86CCCall* call(uint64_t dst, const FuncSignature& sign) { return addCall(Imm(dst), sign); }
+  ASMJIT_INLINE CCFuncCall* call(uint64_t dst, const FuncSignature& sign) { return addCall(Imm(dst), sign); }
 
   //! Return.
   ASMJIT_INLINE CCFuncRet* ret() { return addRet(Operand(), Operand()); }

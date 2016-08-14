@@ -492,7 +492,7 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
       }
 
       case CBNode::kNodeInst:
-      case CBNode::kNodeCall: {
+      case CBNode::kNodeFuncCall: {
         CBInst* node = static_cast<CBInst*>(node_);
 
         uint32_t instId = node->getInstId();

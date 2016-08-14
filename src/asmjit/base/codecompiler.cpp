@@ -30,7 +30,26 @@ namespace asmjit {
 // ============================================================================
 
 static const char noName[1] = { '\0' };
-enum { kCompilerDefaultLookAhead = 64 };
+
+// ============================================================================
+// [asmjit::CCFuncCall - Arg / Ret]
+// ============================================================================
+
+bool CCFuncCall::_setArg(uint32_t i, const Operand_& op) noexcept {
+  if ((i & ~kFuncArgHi) >= _decl.getArgCount())
+    return false;
+
+  _args[i] = op;
+  return true;
+}
+
+bool CCFuncCall::_setRet(uint32_t i, const Operand_& op) noexcept {
+  if (i >= 2)
+    return false;
+
+  _ret[i] = op;
+  return true;
+}
 
 // ============================================================================
 // [asmjit::CodeCompiler - Construction / Destruction]
@@ -38,7 +57,6 @@ enum { kCompilerDefaultLookAhead = 64 };
 
 CodeCompiler::CodeCompiler() noexcept
   : CodeBuilder(),
-    _maxLookAhead(kCompilerDefaultLookAhead),
     _func(nullptr),
     _vRegZone(4096 - Zone::kZoneOverhead),
     _vRegArray(&_cbHeap),
@@ -58,7 +76,6 @@ Error CodeCompiler::onAttach(CodeHolder* code) noexcept {
 }
 
 Error CodeCompiler::onDetach(CodeHolder* code) noexcept {
-  _maxLookAhead = kCompilerDefaultLookAhead;
   _func = nullptr;
 
   _localConstPool = nullptr;
@@ -90,7 +107,7 @@ CCFunc* CodeCompiler::addFunc(CCFunc* func) {
   _func = func;
 
   addNode(func);                 // Function node.
-  CBNode* cursor = getCursor(); // {CURSOR}.
+  CBNode* cursor = getCursor();  // {CURSOR}.
   addNode(func->getExitNode());  // Function exit label.
   addNode(func->getEnd());       // Function end marker.
 

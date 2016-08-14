@@ -160,7 +160,7 @@ static void dumpCpu(void) {
   INFO("  %-26s: %u", #__VA_ARGS__, static_cast<uint32_t>(sizeof(__VA_ARGS__)))
 
 static void dumpSizeOf(void) {
-  INFO("Size of built-in types:");
+  INFO("Size of built-ins:");
   DUMP_TYPE(int8_t);
   DUMP_TYPE(int16_t);
   DUMP_TYPE(int32_t);
@@ -174,10 +174,9 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(void*);
   INFO("");
 
-  INFO("Size of core classes:");
+  INFO("Size of Base:");
   DUMP_TYPE(Assembler);
   DUMP_TYPE(CodeBuffer);
-  DUMP_TYPE(CodeBuilder);
   DUMP_TYPE(CodeEmitter);
   DUMP_TYPE(CodeHolder);
   DUMP_TYPE(CodeHolder::LabelEntry);
@@ -194,7 +193,7 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(ZoneVector<void*>);
   INFO("");
 
-  INFO("Size of core operands:");
+  INFO("Size of Operand:");
   DUMP_TYPE(Operand);
   DUMP_TYPE(Reg);
   DUMP_TYPE(Mem);
@@ -202,9 +201,8 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(Label);
   INFO("");
 
-#if !defined(ASMJIT_DISABLE_COMPILER)
-  INFO("Size of CodeCompiler:");
-  DUMP_TYPE(CodeCompiler);
+  INFO("Size of CodeBuilder:");
+  DUMP_TYPE(CodeBuilder);
   DUMP_TYPE(CBNode);
   DUMP_TYPE(CBInst);
   DUMP_TYPE(CBJump);
@@ -213,33 +211,29 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(CBLabel);
   DUMP_TYPE(CBComment);
   DUMP_TYPE(CBSentinel);
-  DUMP_TYPE(CCCall);
+
+#if !defined(ASMJIT_DISABLE_COMPILER)
+  INFO("Size of CodeCompiler:");
+  DUMP_TYPE(CodeCompiler);
   DUMP_TYPE(CCFunc);
+  DUMP_TYPE(CCFuncRet);
+  DUMP_TYPE(CCFuncCall);
   DUMP_TYPE(FuncDecl);
   DUMP_TYPE(FuncInOut);
   DUMP_TYPE(FuncSignature);
   INFO("");
 #endif // !ASMJIT_DISABLE_COMPILER
 
-  // --------------------------------------------------------------------------
-  // [X86/X64]
-  // --------------------------------------------------------------------------
-
 #if defined(ASMJIT_BUILD_X86)
-  INFO("Size of X86 related classes:");
+  INFO("Size of X86-Backend:");
   DUMP_TYPE(X86Assembler);
+#if !defined(ASMJIT_DISABLE_COMPILER)
+  DUMP_TYPE(X86Compiler);
+#endif // !ASMJIT_DISABLE_COMPILER
   DUMP_TYPE(X86Inst);
   DUMP_TYPE(X86Inst::ISignature);
   DUMP_TYPE(X86Inst::OSignature);
   DUMP_TYPE(X86Inst::ExtendedData);
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-  DUMP_TYPE(X86Compiler);
-  DUMP_TYPE(X86CCCall);
-  DUMP_TYPE(X86Func);
-  DUMP_TYPE(X86FuncDecl);
-#endif // !ASMJIT_DISABLE_COMPILER
-
   INFO("");
 #endif // ASMJIT_BUILD_X86
 }

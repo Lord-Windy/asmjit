@@ -1,0 +1,35 @@
+image:
+  - Visual Studio 2015
+
+clone_folder:
+  - c:\dev\asmjit
+
+platform:
+  - x86
+  - x64
+
+environment:
+  matrix:
+    - TOOLCHAIN: "Visual Studio 14"
+      BUILD_TYPE: Release
+
+    - TOOLCHAIN: "Visual Studio 14"
+      BUILD_TYPE: Debug
+
+    - TOOLCHAIN: "Visual Studio 14 Win64"
+      BUILD_TYPE: Release
+
+    - TOOLCHAIN: "Visual Studio 14 Win64"
+      BUILD_TYPE: Debug
+
+build_script:
+  - cd c:\dev\asmjit
+  - md build
+  - cd build
+  - cmake .. -G"%TOOLCHAIN%" -DASMJIT_BUILD_TEST=1
+  - msbuild /m /p:Configuration=%BUILD_TYPE% asmjit.sln
+
+test_script:
+  - cd c:\dev\asmjit\build\%BUILD_TYPE%
+  - asmjit_test_unit.exe
+  - asmjit_test_x86.exe

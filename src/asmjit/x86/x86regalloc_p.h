@@ -309,8 +309,6 @@ public:
 
   //! Get compiler as `X86Compiler`.
   ASMJIT_INLINE X86Compiler* cc() const { return static_cast<X86Compiler*>(_cc); }
-  //! Get function as `X86Func`.
-  ASMJIT_INLINE X86Func* getFunc() const { return static_cast<X86Func*>(_func); }
   //! Get clobbered registers (global).
   ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t kind) { return _clobberedRegs.get(kind); }
 

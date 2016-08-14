@@ -238,7 +238,7 @@ public:
     // [CodeCompiler]
     kNodeFunc       = 16,                //!< Node is \ref CCFunc (considered as \ref CBLabel by \ref CodeBuilder).
     kNodeFuncExit   = 17,                //!< Node is \ref CCFuncRet.
-    kNodeCall       = 18,                //!< Node is \ref CCCall.
+    kNodeFuncCall   = 18,                //!< Node is \ref CCFuncCall.
     kNodePushArg    = 19,                //!< Node is \ref CCPushArg.
     kNodeHint       = 20,                //!< Node is \ref CCHint.
 

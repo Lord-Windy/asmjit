@@ -27,6 +27,8 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
+enum { kCompilerDefaultLookAhead = 64 };
+
 static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uint32_t opCount);
 
 // ============================================================================
@@ -313,8 +315,8 @@ static void ASMJIT_CDECL X86RAPass_traceNode(X86RAPass* self, CBNode* node_, con
       break;
     }
 
-    case CBNode::kNodeCall: {
-      CCCall* node = static_cast<CCCall*>(node_);
+    case CBNode::kNodeFuncCall: {
+      CCFuncCall* node = static_cast<CCFuncCall*>(node_);
       sb.appendFormat("[call]");
       break;
     }
@@ -1391,9 +1393,11 @@ static void X86RAPass_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
 //! \internal
 //!
 //! Get mask of all registers actually used to pass function arguments.
-static ASMJIT_INLINE X86RegMask X86RAPass_getUsedArgs(X86RAPass* self, X86CCCall* node, X86FuncDecl* decl) {
-  X86RegMask regs;
-  regs.reset();
+static ASMJIT_INLINE void X86RAPass_queryUsedArgs(X86RAPass* self, CCFuncCall* node, FuncDecl* decl, uint32_t dst[4]) {
+  dst[0] = 0;
+  dst[1] = 0;
+  dst[2] = 0;
+  dst[3] = 0;
 
   uint32_t i;
   uint32_t argCount = decl->getArgCount();
@@ -1401,10 +1405,10 @@ static ASMJIT_INLINE X86RegMask X86RAPass_getUsedArgs(X86RAPass* self, X86CCCall
   for (i = 0; i < argCount; i++) {
     const FuncInOut& arg = decl->getArg(i);
     if (!arg.byReg()) continue;
-    regs.or_(x86RegTypeToKind(arg.getRegType()), Utils::mask(arg.getRegId()));
-  }
 
-  return regs;
+    uint32_t kind = x86RegTypeToKind(arg.getRegType());
+    dst[kind] |= Utils::mask(arg.getRegId());
+  }
 }
 
 // ============================================================================
@@ -1439,7 +1443,7 @@ static ASMJIT_INLINE uint32_t X86RAPass_typeOfConvertedSArg(X86RAPass* self, uin
 }
 
 static ASMJIT_INLINE Error X86RAPass_insertPushArg(
-  X86RAPass* self, X86CCCall* call,
+  X86RAPass* self, CCFuncCall* call,
   VirtReg* sReg, const uint32_t* gaRegs,
   const FuncInOut& arg, uint32_t argIndex,
   SArgData* sArgList, uint32_t& sArgCount) {
@@ -1575,7 +1579,7 @@ Error X86RAPass::fetch() {
   ASMJIT_TLOG("[F] ======= Fetch (Begin)\n");
 
   uint32_t archType = cc()->getArchType();
-  X86Func* func = getFunc();
+  CCFunc* func = getFunc();
 
   CBNode* node_ = func;
   CBNode* next = nullptr;
@@ -2109,7 +2113,7 @@ _NextGroup:
 
       case CBNode::kNodeFunc: {
         ASMJIT_ASSERT(node_ == func);
-        X86FuncDecl* decl = func->getDecl();
+        FuncDecl* decl = func->getDecl();
 
         RA_DECLARE();
         for (uint32_t i = 0, argCount = decl->getArgCount(); i < argCount; i++) {
@@ -2170,7 +2174,7 @@ _NextGroup:
         CCFuncRet* node = static_cast<CCFuncRet*>(node_);
         ASMJIT_PROPAGATE(addReturningNode(node));
 
-        X86FuncDecl* decl = func->getDecl();
+        FuncDecl* decl = func->getDecl();
         RA_DECLARE();
 
         if (decl->hasRet()) {
@@ -2211,22 +2215,22 @@ _NextGroup:
       // [Func-Call]
       // ----------------------------------------------------------------------
 
-      case CBNode::kNodeCall: {
-        X86CCCall* node = static_cast<X86CCCall*>(node_);
-        X86FuncDecl* decl = node->getDecl();
+      case CBNode::kNodeFuncCall: {
+        CCFuncCall* node = static_cast<CCFuncCall*>(node_);
+        FuncDecl* decl = node->getDecl();
 
         Operand_* target = node->_opArray;
         Operand_* args = node->_args;
         Operand_* rets = node->_ret;
 
         func->addFuncFlags(kFuncFlagIsCaller);
-        func->mergeCallStackSize(node->_x86Decl.getArgStackSize());
-        node->_usedArgs = X86RAPass_getUsedArgs(this, node, decl);
+        func->mergeCallStackSize(node->_decl.getArgStackSize());
+        X86RAPass_queryUsedArgs(this, node, decl, node->_usedArgs);
 
         uint32_t i;
         uint32_t argCount = decl->getArgCount();
         uint32_t sArgCount = 0;
-        uint32_t gpAllocableMask = gaRegs[X86Reg::kKindGp] & ~node->_usedArgs.get(X86Reg::kKindGp);
+        uint32_t gpAllocableMask = gaRegs[X86Reg::kKindGp] & ~node->_usedArgs[X86Reg::kKindGp];
 
         VirtReg* vreg;
         TiedReg* tied;
@@ -2702,8 +2706,8 @@ ASMJIT_INLINE Error X86VarAlloc::run(CBNode* node_) {
     else if (node_->getType() == CBNode::kNodePushArg) {
       CCPushArg* node = static_cast<CCPushArg*>(node_);
 
-      X86CCCall* call = static_cast<X86CCCall*>(node->getCall());
-      X86FuncDecl* decl = call->getDecl();
+      CCFuncCall* call = static_cast<CCFuncCall*>(node->getCall());
+      FuncDecl* decl = call->getDecl();
 
       uint32_t argIndex = 0;
       uint32_t argMask = node->_args;
@@ -3170,7 +3174,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
     return safeRegs;
 
   uint32_t counter = 0;
-  uint32_t maxInst = _cc->_maxLookAhead;
+  uint32_t maxInst = kCompilerDefaultLookAhead;
 
   uint32_t raId = vreg->_raId;
   uint32_t localToken = _cc->_generateUniqueToken();
@@ -3366,7 +3370,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
   uint32_t safeRegs = allocableRegs;
 
   uint32_t i;
-  uint32_t maxLookAhead = _cc->_maxLookAhead;
+  uint32_t maxLookAhead = kCompilerDefaultLookAhead;
 
   // Look ahead and calculate mask of special registers on both - input/output.
   CBNode* node = _node;
@@ -3484,13 +3488,13 @@ struct X86CallAlloc : public X86BaseAlloc {
   // --------------------------------------------------------------------------
 
   //! Get the node.
-  ASMJIT_INLINE X86CCCall* getNode() const { return static_cast<X86CCCall*>(_node); }
+  ASMJIT_INLINE CCFuncCall* getNode() const { return static_cast<CCFuncCall*>(_node); }
 
   // --------------------------------------------------------------------------
   // [Run]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Error run(X86CCCall* node);
+  ASMJIT_INLINE Error run(CCFuncCall* node);
 
   // --------------------------------------------------------------------------
   // [Init / Cleanup]
@@ -3498,7 +3502,7 @@ struct X86CallAlloc : public X86BaseAlloc {
 
 protected:
   // Just to prevent calling these methods from X86RAPass::translate().
-  ASMJIT_INLINE void init(X86CCCall* node, X86RAData* raData);
+  ASMJIT_INLINE void init(CCFuncCall* node, X86RAData* raData);
   ASMJIT_INLINE void cleanup();
 
   // --------------------------------------------------------------------------
@@ -3571,7 +3575,7 @@ protected:
 // [asmjit::X86CallAlloc - Run]
 // ============================================================================
 
-ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
+ASMJIT_INLINE Error X86CallAlloc::run(CCFuncCall* node) {
   // Initialize the allocator; prepare basics and connect Vd->Va.
   X86RAData* raData = node->getPassData<X86RAData>();
   init(node, raData);
@@ -3613,8 +3617,8 @@ ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
   _cc->_setCursor(node);
 
   // If the callee pops stack it has to be manually adjusted back.
-  X86FuncDecl* decl = node->getDecl();
-  if (decl->_callConv.calleePopsStack() && decl->getArgStackSize() != 0)
+  FuncDecl* decl = node->getDecl();
+  if (decl->hasFlag(CallConv::kFlagCalleePopsStack) && decl->getArgStackSize() != 0)
     _cc->emit(X86Inst::kIdSub, _context->_zsp, static_cast<int>(decl->getArgStackSize()));
 
   // Clobber.
@@ -3640,11 +3644,15 @@ ASMJIT_INLINE Error X86CallAlloc::run(X86CCCall* node) {
 // [asmjit::X86CallAlloc - Init / Cleanup]
 // ============================================================================
 
-ASMJIT_INLINE void X86CallAlloc::init(X86CCCall* node, X86RAData* raData) {
+ASMJIT_INLINE void X86CallAlloc::init(CCFuncCall* node, X86RAData* raData) {
   X86BaseAlloc::init(node, raData);
 
   // Create mask of all registers that will be used to pass function arguments.
-  _willAlloc = node->_usedArgs;
+  _willAlloc.reset();
+  _willAlloc.set(X86Reg::kKindGp , node->_usedArgs[X86Reg::kKindGp ]);
+  _willAlloc.set(X86Reg::kKindMm , node->_usedArgs[X86Reg::kKindMm ]);
+  _willAlloc.set(X86Reg::kKindK  , node->_usedArgs[X86Reg::kKindK  ]);
+  _willAlloc.set(X86Reg::kKindXyz, node->_usedArgs[X86Reg::kKindXyz]);
   _willSpill.reset();
 }
 
@@ -3890,8 +3898,8 @@ ASMJIT_INLINE void X86CallAlloc::alloc() {
 // ============================================================================
 
 ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
-  X86CCCall* node = getNode();
-  X86FuncDecl* decl = node->getDecl();
+  CCFuncCall* node = getNode();
+  FuncDecl* decl = node->getDecl();
 
   uint32_t argCount = decl->getArgCount();
   Operand_* args = node->_args;
@@ -3961,7 +3969,7 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessAlloc(VirtReg* vreg, uint32_t allocabl
 
   uint32_t i;
   uint32_t safeRegs = allocableRegs;
-  uint32_t maxLookAhead = _cc->_maxLookAhead;
+  uint32_t maxLookAhead = kCompilerDefaultLookAhead;
 
   // Look ahead and calculate mask of special registers on both - input/output.
   CBNode* node = _node;
@@ -4075,8 +4083,8 @@ ASMJIT_INLINE void X86CallAlloc::clobber() {
 // ============================================================================
 
 ASMJIT_INLINE void X86CallAlloc::ret() {
-  X86CCCall* node = getNode();
-  X86FuncDecl* decl = node->getDecl();
+  CCFuncCall* node = getNode();
+  FuncDecl* decl = node->getDecl();
 
   Operand_* rets = node->_ret;
   for (uint32_t i = 0; i < 2; i++) {
@@ -4173,20 +4181,18 @@ static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uin
 // ============================================================================
 
 //! \internal
-static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
+static Error X86RAPass_initFunc(X86RAPass* self, CCFunc* func) {
   X86Compiler* cc = self->cc();
-  X86FuncDecl* decl = func->getDecl();
+  FuncDecl* decl = func->getDecl();
 
   X86RegMask& clobberedRegs = self->_clobberedRegs;
   uint32_t gpSize = cc->getGpSize();
 
   // Setup "Save-Restore" registers.
-  func->_saveRestoreRegs.set(X86Reg::kKindGp , clobberedRegs.get(X86Reg::kKindGp ) & decl->_callConv.getPreservedMask(X86Reg::kKindGp ));
-  func->_saveRestoreRegs.set(X86Reg::kKindMm , clobberedRegs.get(X86Reg::kKindMm ) & decl->_callConv.getPreservedMask(X86Reg::kKindMm ));
-  func->_saveRestoreRegs.set(X86Reg::kKindK  , 0);
-  func->_saveRestoreRegs.set(X86Reg::kKindXyz, clobberedRegs.get(X86Reg::kKindXyz) & decl->_callConv.getPreservedMask(X86Reg::kKindXyz));
-
-  ASMJIT_ASSERT(!func->_saveRestoreRegs.has(X86Reg::kKindGp, Utils::mask(X86Gp::kIdSp)));
+  func->_saveRestoreRegs[X86Reg::kKindGp ] = clobberedRegs.get(X86Reg::kKindGp ) & decl->_callConv.getPreservedMask(X86Reg::kKindGp);
+  func->_saveRestoreRegs[X86Reg::kKindMm ] = clobberedRegs.get(X86Reg::kKindMm ) & decl->_callConv.getPreservedMask(X86Reg::kKindMm);
+  func->_saveRestoreRegs[X86Reg::kKindK  ] = 0;
+  func->_saveRestoreRegs[X86Reg::kKindXyz] = clobberedRegs.get(X86Reg::kKindXyz) & decl->_callConv.getPreservedMask(X86Reg::kKindXyz);
 
   // Setup required stack alignment and kFuncFlagIsStackMisaligned.
   {
@@ -4196,7 +4202,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
       // Require 16-byte alignment if 8-byte vars are used.
       if (self->_mem8ByteVarsUsed)
         requiredStackAlignment = 16;
-      else if (func->_saveRestoreRegs.get(X86Reg::kKindMm) || func->_saveRestoreRegs.get(X86Reg::kKindXyz))
+      else if (func->_saveRestoreRegs[X86Reg::kKindMm] || func->_saveRestoreRegs[X86Reg::kKindXyz])
         requiredStackAlignment = 16;
       else if (Utils::inInterval<uint32_t>(func->getRequiredStackAlignment(), 8, 16))
         requiredStackAlignment = 16;
@@ -4233,7 +4239,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
     uint32_t fRegMask = Utils::bits(self->_regCount.getGp());
     uint32_t stackFrameCopyRegs;
 
-    fRegMask &= ~(decl->getUsedMask(X86Reg::kKindGp) | Utils::mask(X86Gp::kIdSp));
+    fRegMask &= ~(decl->_usedMask[X86Reg::kKindGp] | Utils::mask(X86Gp::kIdSp));
     stackFrameCopyRegs = fRegMask;
 
     // Try to remove modified registers from the mask.
@@ -4256,7 +4262,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
     // from '_saveRestoreRegs' in case that it is preserved.
     fRegMask = Utils::mask(fRegIndex);
     if ((fRegMask & decl->_callConv.getPreservedMask(X86Reg::kKindGp)) != 0) {
-      func->_saveRestoreRegs.andNot(X86Reg::kKindGp, fRegMask);
+      func->_saveRestoreRegs[X86Reg::kKindGp] &= ~fRegMask;
       func->_isStackFrameRegPreserved = true;
     }
 
@@ -4272,7 +4278,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
       else
         stackFrameCopyRegs = Utils::keepNOnesFromRight(stackFrameCopyRegs, Utils::iMin<uint32_t>(maxRegs, 2));
 
-      func->_saveRestoreRegs.or_(X86Reg::kKindGp, stackFrameCopyRegs & decl->_callConv.getPreservedMask(X86Reg::kKindGp));
+      func->_saveRestoreRegs[X86Reg::kKindGp] |= stackFrameCopyRegs & decl->_callConv.getPreservedMask(X86Reg::kKindGp);
       Utils::indexNOnesFromRight(func->_stackFrameCopyGpIndex, stackFrameCopyRegs, maxRegs);
     }
   }
@@ -4287,15 +4293,15 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
   ASMJIT_PROPAGATE(self->resolveCellOffsets());
 
   // Adjust stack pointer if requested memory can't fit into "Red Zone" or "Spill Zone".
-  if (self->_memAllTotal > Utils::iMax<uint32_t>(func->getRedZoneSize(), func->getSpillZoneSize())) {
+  if (self->_memAllTotal > Utils::iMax<uint32_t>(func->_decl._callConv.getRedZoneSize(), func->_decl._callConv.getSpillZoneSize())) {
     func->addFuncFlags(kFuncFlagIsStackAdjusted);
   }
 
   // Setup stack size used to save preserved registers.
   {
-    uint32_t memGpSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindGp )) * gpSize;
-    uint32_t memMmSize  = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindMm )) * 8;
-    uint32_t memXmmSize = Utils::bitCount(func->_saveRestoreRegs.get(X86Reg::kKindXyz)) * 16;
+    uint32_t memGpSize  = Utils::bitCount(func->_saveRestoreRegs[X86Reg::kKindGp ]) * gpSize;
+    uint32_t memMmSize  = Utils::bitCount(func->_saveRestoreRegs[X86Reg::kKindMm ]) * 8;
+    uint32_t memXmmSize = Utils::bitCount(func->_saveRestoreRegs[X86Reg::kKindXyz]) * 16;
 
     func->_pushPopStackSize = memGpSize;
     func->_moveStackSize = memXmmSize + Utils::alignTo<uint32_t>(memMmSize, 16);
@@ -4378,7 +4384,7 @@ static Error X86RAPass_initFunc(X86RAPass* self, X86Func* func) {
 }
 
 //! \internal
-static Error X86RAPass_patchFuncMem(X86RAPass* self, X86Func* func, CBNode* stop) {
+static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop) {
   X86Compiler* cc = self->cc();
   CBNode* node = func;
 
@@ -4417,9 +4423,9 @@ static Error X86RAPass_patchFuncMem(X86RAPass* self, X86Func* func, CBNode* stop
 }
 
 //! \internal
-static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
+static Error X86RAPass_translatePrologEpilog(X86RAPass* self, CCFunc* func) {
   X86Compiler* cc = self->cc();
-  X86FuncDecl* decl = func->getDecl();
+  FuncDecl* decl = func->getDecl();
 
   uint32_t gpSize = cc->getGpSize();
 
@@ -4634,7 +4640,7 @@ static Error X86RAPass_translatePrologEpilog(X86RAPass* self, X86Func* func) {
   }
 
   // Emit return.
-  if (decl->_callConv.calleePopsStack())
+  if (decl->hasFlag(CallConv::kFlagCalleePopsStack))
     cc->emit(X86Inst::kIdRet, static_cast<int32_t>(decl->getArgStackSize()));
   else
     cc->emit(X86Inst::kIdRet);
@@ -4721,7 +4727,7 @@ static Error X86RAPass_translateRet(X86RAPass* self, CCFuncRet* rNode, CBLabel* 
 
       case CBNode::kNodeData:
       case CBNode::kNodeInst:
-      case CBNode::kNodeCall:
+      case CBNode::kNodeFuncCall:
       case CBNode::kNodeFuncExit:
         goto _EmitRet;
 
@@ -4759,7 +4765,7 @@ Error X86RAPass::translate() {
   ASMJIT_TLOG("[T] ======= Translate (Begin)\n");
 
   X86Compiler* cc = this->cc();
-  X86Func* func = getFunc();
+  CCFunc* func = getFunc();
 
   // Register allocator contexts.
   X86VarAlloc vAlloc(this);
@@ -4837,7 +4843,7 @@ _NextGroup:
         // --------------------------------------------------------------------
 
         case CBNode::kNodeInst:
-        case CBNode::kNodeCall:
+        case CBNode::kNodeFuncCall:
         case CBNode::kNodePushArg:
           // Update TiedReg's unuse flags based on liveness of the next node.
           if (!node_->isJcc()) {
@@ -4858,8 +4864,8 @@ _NextGroup:
             }
           }
 
-          if (node_->getType() == CBNode::kNodeCall) {
-            ASMJIT_PROPAGATE(cAlloc.run(static_cast<X86CCCall*>(node_)));
+          if (node_->getType() == CBNode::kNodeFuncCall) {
+            ASMJIT_PROPAGATE(cAlloc.run(static_cast<CCFuncCall*>(node_)));
             break;
           }
           ASMJIT_FALLTHROUGH;
@@ -4940,11 +4946,11 @@ _NextGroup:
         case CBNode::kNodeFunc: {
           ASMJIT_ASSERT(node_ == func);
 
-          X86FuncDecl* decl = func->getDecl();
+          FuncDecl* decl = func->getDecl();
           X86RAData* raData = func->getPassData<X86RAData>();
 
           uint32_t i;
-          uint32_t argCount = func->_x86Decl.getArgCount();
+          uint32_t argCount = func->_decl.getArgCount();
 
           for (i = 0; i < argCount; i++) {
             const FuncInOut& arg = decl->getArg(i);

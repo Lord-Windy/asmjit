@@ -91,10 +91,10 @@ class Utils {
     var iEnd   = s.indexOf(end);
 
     if (iStart === -1)
-      throw new Error(`Couldn't locate start mark.`);
+      throw new Error(`Couldn't locate start mark`);
 
     if (iEnd === -1)
-      throw new Error(`Couldn't locate end mark.`);
+      throw new Error(`Couldn't locate end mark`);
 
     return s.substr(0, iStart + start.length) + code + s.substr(iEnd);
   }
@@ -1034,6 +1034,7 @@ class X86Generator {
       var writeSize   = Utils.trimLeft(m[9]);
       var simdDstSize = Utils.trimLeft(m[10]);
       var simdSrcSize = Utils.trimLeft(m[11]);
+
 /*
       opcode0 = processOpcode(opcode0);
       opcode1 = processOpcode(opcode1);
@@ -1848,10 +1849,12 @@ function main() {
   g.printStats();
 
   // Save only if modified.
+  /*
   if (newData !== data) {
     fs.writeFileSync(kFileName + ".backup", data, "utf8");
     fs.writeFileSync(kFileName, newData, "utf8");
   }
+  */
 }
 
 main();

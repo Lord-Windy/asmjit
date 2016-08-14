@@ -273,19 +273,34 @@ public:
   ASMJIT_INLINE CCFunc(CodeBuilder* cb) noexcept
     : CBLabel(cb),
       _exitNode(nullptr),
-      _decl(nullptr),
+      _decl(),
       _end(nullptr),
       _args(nullptr),
       _funcHints(Utils::mask(kFuncHintNaked)),
       _funcFlags(0),
       _naturalStackAlignment(0),
       _requiredStackAlignment(0),
-      _redZoneSize(0),
-      _spillZoneSize(0),
       _argStackSize(0),
       _memStackSize(0),
       _callStackSize(0) {
+
     _type = kNodeFunc;
+    _saveRestoreRegs[0] = 0;
+    _saveRestoreRegs[1] = 0;
+    _saveRestoreRegs[2] = 0;
+    _saveRestoreRegs[3] = 0;
+
+    _alignStackSize = 0;
+    _alignedMemStackSize = 0;
+    _pushPopStackSize = 0;
+    _moveStackSize = 0;
+    _extraStackSize = 0;
+
+    _stackFrameRegIndex = kInvalidReg;
+    _isStackFrameRegPreserved = false;
+
+    for (uint32_t i = 0; i < ASMJIT_ARRAY_SIZE(_stackFrameCopyGpIndex); i++)
+      _stackFrameCopyGpIndex[i] = static_cast<uint8_t>(kInvalidReg);
   }
 
   //! Destroy the `CCFunc` instance (NEVER CALLED).
@@ -303,10 +318,10 @@ public:
   //! Get the function end sentinel.
   ASMJIT_INLINE CBSentinel* getEnd() const noexcept { return _end; }
   //! Get function declaration.
-  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
+  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return const_cast<FuncDecl*>(&_decl); }
 
   //! Get arguments count.
-  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl->getArgCount(); }
+  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl.getArgCount(); }
   //! Get arguments list.
   ASMJIT_INLINE VirtReg** getArgs() const noexcept { return _args; }
 
@@ -375,16 +390,6 @@ public:
     }
   }
 
-  //! Get red-zone size.
-  ASMJIT_INLINE uint32_t getRedZoneSize() const noexcept { return _redZoneSize; }
-  //! set red-zone size.
-  ASMJIT_INLINE void setRedZoneSize(uint32_t s) noexcept { _redZoneSize = static_cast<uint16_t>(s); }
-
-  //! Get spill-zone size.
-  ASMJIT_INLINE uint32_t getSpillZoneSize() const noexcept { return _spillZoneSize; }
-  //! Set spill-zone size.
-  ASMJIT_INLINE void setSpillZoneSize(uint32_t s) noexcept { _spillZoneSize = static_cast<uint16_t>(s); }
-
   //! Get stack size used by function arguments.
   ASMJIT_INLINE uint32_t getArgStackSize() const noexcept { return _argStackSize; }
   //! Get stack size used by variables and memory allocated on the stack.
@@ -414,11 +419,56 @@ public:
     return (_funcHints >> hint) & 0x1;
   }
 
+  //! Get registers which have to be saved in prolog/epilog.
+  ASMJIT_INLINE uint32_t getSaveRestoreRegs(uint32_t kind) noexcept { return _saveRestoreRegs[kind]; }
+
+  //! Get stack size needed to align stack back to the nature alignment.
+  ASMJIT_INLINE uint32_t getAlignStackSize() const noexcept { return _alignStackSize; }
+  //! Set stack size needed to align stack back to the nature alignment.
+  ASMJIT_INLINE void setAlignStackSize(uint32_t s) noexcept { _alignStackSize = s; }
+
+  //! Get aligned stack size used by variables and memory allocated on the stack.
+  ASMJIT_INLINE uint32_t getAlignedMemStackSize() const noexcept { return _alignedMemStackSize; }
+
+  //! Get stack size used by push/pop sequences in prolog/epilog.
+  ASMJIT_INLINE uint32_t getPushPopStackSize() const noexcept { return _pushPopStackSize; }
+  //! Set stack size used by push/pop sequences in prolog/epilog.
+  ASMJIT_INLINE void setPushPopStackSize(uint32_t s) noexcept { _pushPopStackSize = s; }
+
+  //! Get stack size used by mov sequences in prolog/epilog.
+  ASMJIT_INLINE uint32_t getMoveStackSize() const noexcept { return _moveStackSize; }
+  //! Set stack size used by mov sequences in prolog/epilog.
+  ASMJIT_INLINE void setMoveStackSize(uint32_t s) noexcept { _moveStackSize = s; }
+
+  //! Get extra stack size.
+  ASMJIT_INLINE uint32_t getExtraStackSize() const noexcept { return _extraStackSize; }
+  //! Set extra stack size.
+  ASMJIT_INLINE void setExtraStackSize(uint32_t s) noexcept { _extraStackSize  = s; }
+
+  //! Get whether the function has stack frame register (only when the stack is misaligned).
+  //!
+  //! NOTE: Stack frame register can be used for both - aligning purposes or
+  //! generating standard prolog/epilog sequence.
+  ASMJIT_INLINE bool hasStackFrameReg() const noexcept { return _stackFrameRegIndex != kInvalidReg; }
+
+  //! Get stack frame register index.
+  //!
+  //! NOTE: Used only when stack is misaligned.
+  ASMJIT_INLINE uint32_t getStackFrameRegIndex() const noexcept { return _stackFrameRegIndex; }
+
+  //! Get whether the stack frame register is preserved.
+  //!
+  //! NOTE: Used only when stack is misaligned.
+  ASMJIT_INLINE bool isStackFrameRegPreserved() const noexcept { return static_cast<bool>(_isStackFrameRegPreserved); }
+
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  FuncDecl* _decl;                       //!< Function declaration.
+  FuncDecl _decl;                        //!< Function declaration.
+  // TODO: Not used yet.
+  // FuncFrame _frame;                      //!< Function frame.
+
   CBLabel* _exitNode;                    //!< Function exit.
   CBSentinel* _end;                      //!< Function end.
 
@@ -427,15 +477,37 @@ public:
   uint32_t _funcHints;                   //!< Function hints;
   uint32_t _funcFlags;                   //!< Function flags.
 
-  uint32_t _naturalStackAlignment;       //!< Natural stack alignment (OS/ABI).
-  uint32_t _requiredStackAlignment;      //!< Required stack alignment.
-
-  uint16_t _redZoneSize;                 //!< Red-zone size (AMD64-ABI).
-  uint16_t _spillZoneSize;               //!< Spill-zone size (WIN64-ABI).
-
+  uint8_t _naturalStackAlignment;        //!< Natural stack alignment (OS/ABI).
+  uint8_t _requiredStackAlignment;       //!< Required stack alignment.
   uint32_t _argStackSize;                //!< Stack size needed for function arguments.
   uint32_t _memStackSize;                //!< Stack size needed for all variables and memory allocated on the stack.
   uint32_t _callStackSize;               //!< Stack size needed to call other functions.
+
+  //! Registers which must be saved/restored in prolog/epilog.
+  uint32_t _saveRestoreRegs[4];
+
+  //! Stack size needed to align function back to the nature alignment.
+  uint32_t _alignStackSize;
+  //! Like `_memStackSize`, but aligned.
+  uint32_t _alignedMemStackSize;
+
+  //! Stack required for push/pop in prolog/epilog (X86/X64 specific).
+  uint32_t _pushPopStackSize;
+  //! Stack required for movs in prolog/epilog (X86/X64 specific).
+  uint32_t _moveStackSize;
+
+  //! Stack required to put extra data (for example function arguments
+  //! when manually aligning to requested alignment).
+  uint32_t _extraStackSize;
+
+  //! Stack frame register.
+  uint8_t _stackFrameRegIndex;
+  //! Whether the stack frame register is preserved.
+  uint8_t _isStackFrameRegPreserved;
+  //! Gp registers indexes that can be used to copy function arguments
+  //! to a new location in case we are doing manual stack alignment.
+  uint8_t _stackFrameCopyGpIndex[6];
+
 };
 
 // ============================================================================
@@ -484,39 +556,52 @@ public:
 };
 
 // ============================================================================
-// [asmjit::CCCall]
+// [asmjit::CCFuncCall]
 // ============================================================================
 
 //! Function call (CodeCompiler).
-class CCCall : public CBInst {
+class CCFuncCall : public CBInst {
 public:
-  ASMJIT_NONCOPYABLE(CCCall)
+  ASMJIT_NONCOPYABLE(CCFuncCall)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `CCCall` instance.
-  ASMJIT_INLINE CCCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
+  //! Create a new `CCFuncCall` instance.
+  ASMJIT_INLINE CCFuncCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
     : CBInst(cb, instId, options, opArray, opCount),
-      _decl(nullptr),
+      _decl(),
       _args(nullptr) {
 
-    _type = kNodeCall;
+    _type = kNodeFuncCall;
     _ret[0].reset();
     _ret[1].reset();
+    _usedArgs[0] = 0;
+    _usedArgs[1] = 0;
+    _usedArgs[2] = 0;
+    _usedArgs[3] = 0;
     orFlags(kFlagIsRemovable);
   }
 
-  //! Destroy the `CCCall` instance (NEVER CALLED).
-  ASMJIT_INLINE ~CCCall() noexcept {}
+  //! Destroy the `CCFuncCall` instance (NEVER CALLED).
+  ASMJIT_INLINE ~CCFuncCall() noexcept {}
+
+  // --------------------------------------------------------------------------
+  // [Signature]
+  // --------------------------------------------------------------------------
+
+  //! Set function signature.
+  ASMJIT_INLINE Error setSignature(const FuncSignature& sign) noexcept {
+    return _decl.init(sign);
+  }
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
   //! Get function declaration.
-  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return _decl; }
+  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return const_cast<FuncDecl*>(&_decl); }
 
   //! Get target operand.
   ASMJIT_INLINE Operand& getTarget() noexcept { return static_cast<Operand&>(_opArray[0]); }
@@ -545,13 +630,29 @@ public:
     return static_cast<const Operand&>(_args[i]);
   }
 
+  //! Set argument at `i` to `op`.
+  ASMJIT_API bool _setArg(uint32_t i, const Operand_& op) noexcept;
+  //! Set return at `i` to `op`.
+  ASMJIT_API bool _setRet(uint32_t i, const Operand_& op) noexcept;
+
+  //! Set argument at `i` to `reg`.
+  ASMJIT_INLINE bool setArg(uint32_t i, const Reg& reg) noexcept { return _setArg(i, reg); }
+  //! Set argument at `i` to `imm`.
+  ASMJIT_INLINE bool setArg(uint32_t i, const Imm& imm) noexcept { return _setArg(i, imm); }
+
+  //! Set return at `i` to `var`.
+  ASMJIT_INLINE bool setRet(uint32_t i, const Reg& reg) noexcept { return _setRet(i, reg); }
+
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  FuncDecl* _decl;                       //!< Function declaration.
+  FuncDecl _decl;                        //!< Function declaration.
   Operand_ _ret[2];                      //!< Return.
   Operand_* _args;                       //!< Arguments.
+
+  //! Mask of all registers actually used to pass function arguments.
+  uint32_t _usedArgs[4];
 };
 
 // ============================================================================
@@ -568,7 +669,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Create a new `CCPushArg` instance.
-  ASMJIT_INLINE CCPushArg(CodeBuilder* cb, CCCall* call, VirtReg* src, VirtReg* cvt) noexcept
+  ASMJIT_INLINE CCPushArg(CodeBuilder* cb, CCFuncCall* call, VirtReg* src, VirtReg* cvt) noexcept
     : CBNode(cb, kNodePushArg),
       _call(call),
       _src(src),
@@ -585,7 +686,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get the associated function-call.
-  ASMJIT_INLINE CCCall* getCall() const noexcept { return _call; }
+  ASMJIT_INLINE CCFuncCall* getCall() const noexcept { return _call; }
   //! Get source variable.
   ASMJIT_INLINE VirtReg* getSrcReg() const noexcept { return _src; }
   //! Get conversion variable.
@@ -595,7 +696,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  CCCall* _call;                         //!< Associated `CCCall`.
+  CCFuncCall* _call;                     //!< Associated `CCFuncCall`.
   VirtReg* _src;                         //!< Source variable.
   VirtReg* _cvt;                         //!< Temporary variable used for conversion (or null).
   uint32_t _args;                        //!< Affected arguments bit-array.
@@ -656,7 +757,7 @@ public:
 
   //! Add a function `node` to the stream.
   ASMJIT_API CCFunc* addFunc(CCFunc* func);
-  //! Get current function.
+  //! Get the current function.
   ASMJIT_INLINE CCFunc* getFunc() const noexcept { return _func; }
 
   // --------------------------------------------------------------------------
@@ -751,7 +852,6 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  uint32_t _maxLookAhead;                //!< Maximum look-ahead of RA.
   CCFunc* _func;                         //!< Current function.
 
   Zone _vRegZone;                        //!< Allocates \ref VirtReg objects.

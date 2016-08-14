@@ -23,26 +23,6 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::X86CCCall - Arg / Ret]
-// ============================================================================
-
-bool X86CCCall::_setArg(uint32_t i, const Operand_& op) noexcept {
-  if ((i & ~kFuncArgHi) >= _x86Decl.getArgCount())
-    return false;
-
-  _args[i] = op;
-  return true;
-}
-
-bool X86CCCall::_setRet(uint32_t i, const Operand_& op) noexcept {
-  if (i >= 2)
-    return false;
-
-  _ret[i] = op;
-  return true;
-}
-
-// ============================================================================
 // [asmjit::X86Compiler - Construction / Destruction]
 // ============================================================================
 
@@ -229,10 +209,10 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
 // [asmjit::X86Compiler - Func]
 // ============================================================================
 
-X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
+CCFunc* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   Error err;
 
-  X86Func* func = newNodeT<X86Func>();
+  CCFunc* func = newNodeT<CCFunc>();
   if (!func) goto _NoMemory;
 
   err = registerLabelNode(func);
@@ -248,17 +228,15 @@ X86Func* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   if (!func->_exitNode || !func->_end) goto _NoMemory;
 
   // Function prototype.
-  err = func->_x86Decl.setSignature(sign);
+  err = func->_decl.init(sign);
   if (err != kErrorOk) {
     setLastError(err);
     return nullptr;
   }
 
   // Function arguments stack size. Since function requires _argStackSize to be
-  // set, we have to copy it from X86FuncDecl.
-  func->_argStackSize = func->_x86Decl.getArgStackSize();
-  func->_redZoneSize = static_cast<uint16_t>(func->_x86Decl._callConv.getRedZoneSize());
-  func->_spillZoneSize = static_cast<uint16_t>(func->_x86Decl._callConv.getSpillZoneSize());
+  // set, we have to copy it from FuncDecl.
+  func->_argStackSize = func->_decl.getArgStackSize();
 
   // Expected/Required stack alignment.
   func->_naturalStackAlignment = _codeInfo.getStackAlignment();
@@ -280,19 +258,19 @@ _NoMemory:
   return nullptr;
 }
 
-X86Func* X86Compiler::addFunc(const FuncSignature& sign) {
-  X86Func* func = newFunc(sign);
+CCFunc* X86Compiler::addFunc(const FuncSignature& sign) {
+  CCFunc* func = newFunc(sign);
 
   if (!func) {
     setLastError(DebugUtils::errored(kErrorNoHeapMemory));
     return nullptr;
   }
 
-  return static_cast<X86Func*>(addFunc(func));
+  return static_cast<CCFunc*>(addFunc(func));
 }
 
 CBSentinel* X86Compiler::endFunc() {
-  X86Func* func = getFunc();
+  CCFunc* func = getFunc();
   if (!func) {
     // TODO:
     return nullptr;
@@ -337,20 +315,20 @@ CCFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept 
 // [asmjit::X86Compiler - Call]
 // ============================================================================
 
-X86CCCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) noexcept {
+CCFuncCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) noexcept {
   Error err;
   uint32_t nArgs;
 
-  X86CCCall* node = _cbHeap.allocT<X86CCCall>(sizeof(X86CCCall) + sizeof(Operand));
-  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(X86CCCall));
+  CCFuncCall* node = _cbHeap.allocT<CCFuncCall>(sizeof(CCFuncCall) + sizeof(Operand));
+  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CCFuncCall));
 
   if (ASMJIT_UNLIKELY(!node))
     goto _NoMemory;
 
   opArray[0].copyFrom(o0);
-  new (node) X86CCCall(this, X86Inst::kIdCall, 0, opArray, 1);
+  new (node) CCFuncCall(this, X86Inst::kIdCall, 0, opArray, 1);
 
-  if ((err = node->_x86Decl.setSignature(sign)) != kErrorOk) {
+  if ((err = node->_decl.init(sign)) != kErrorOk) {
     setLastError(err);
     return nullptr;
   }
@@ -370,10 +348,10 @@ _NoMemory:
   return nullptr;
 }
 
-X86CCCall* X86Compiler::addCall(const Operand_& o0, const FuncSignature& sign) noexcept {
-  X86CCCall* node = newCall(o0, sign);
+CCFuncCall* X86Compiler::addCall(const Operand_& o0, const FuncSignature& sign) noexcept {
+  CCFuncCall* node = newCall(o0, sign);
   if (!node) return nullptr;
-  return static_cast<X86CCCall*>(addNode(node));
+  return static_cast<CCFuncCall*>(addNode(node));
 }
 
 // ============================================================================
@@ -381,7 +359,7 @@ X86CCCall* X86Compiler::addCall(const Operand_& o0, const FuncSignature& sign) n
 // ============================================================================
 
 Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
-  X86Func* func = getFunc();
+  CCFunc* func = getFunc();
 
   if (!func)
     return setLastError(DebugUtils::errored(kErrorInvalidState));
