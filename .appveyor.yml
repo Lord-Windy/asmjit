@@ -59,16 +59,12 @@ environment:
     - BUILD_TYPE: Release
       TOOLCHAIN: "Visual Studio 14 2015 Win64"
 
-before_build:
-  # Workaround required to make cmake working with MinGW :(
-  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%PATH:C:\Program Files (x86)\Git\bin;=%
-  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\MinGW\bin;%PATH%
-
 build_script:
   - cd c:\dev\asmjit
   - md build
   - cd build
   - if "%TOOLCHAIN%"=="MinGW Makefiles" (
+      set PATH=%PATH:C:\Program Files (x86)\Git\bin;=% &&
       cmake .. -G"%TOOLCHAIN%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
       mingw32-make
     )
