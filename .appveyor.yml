@@ -72,7 +72,7 @@ environment:
 install:
   - echo %PATH%
   - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%PATH:C:\Program Files\Git\usr\bin;=%
-  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW%:%PATH%
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW%\bin:%PATH%
 
 build_script:
   - cd c:\dev\asmjit
