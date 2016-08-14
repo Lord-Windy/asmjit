@@ -58,7 +58,7 @@ Supported Environments
 
   * **Clang** (tested by Travis-CI).
   * **GCC** (tested by Travis-CI).
-  * **MinGW** (tested manually).
+  * **MinGW** (tested by AppVeyor).
   * **MSVC** (tested by AppVeyor).
   * **CodeGear** (no maintainers).
   * Other compilers would require some testing and support in [asmjit/build.h](./asmjit/build.h).
