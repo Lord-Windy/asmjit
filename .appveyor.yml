@@ -5,17 +5,41 @@ clone_folder: c:\dev\asmjit
 
 environment:
   matrix:
-    - TOOLCHAIN: "Visual Studio 14"
-      BUILD_TYPE: Release
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 10"
 
-    - TOOLCHAIN: "Visual Studio 14"
-      BUILD_TYPE: Debug
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 10"
 
-    - TOOLCHAIN: "Visual Studio 14 Win64"
-      BUILD_TYPE: Release
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 10 Win64"
 
-    - TOOLCHAIN: "Visual Studio 14 Win64"
-      BUILD_TYPE: Debug
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 10 Win64"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 12"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 12"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 12 Win64"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 12 Win64"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 14"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 14"
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "Visual Studio 14 Win64"
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "Visual Studio 14 Win64"
 
 build_script:
   - cd c:\dev\asmjit
