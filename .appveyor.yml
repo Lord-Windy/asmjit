@@ -15,11 +15,11 @@ environment:
 
     - BUILD_TYPE: Debug
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: mingw64
+      MINGW_BIN: mingw-w64
 
     - BUILD_TYPE: Release
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: mingw64
+      MINGW_BIN: mingw-w64
 
     - BUILD_TYPE: Debug
       TOOLCHAIN: "Visual Studio 9 2008"
