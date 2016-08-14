@@ -72,7 +72,7 @@ build_script:
   - md build
   - cd build
   - if "%TOOLCHAIN%"=="MinGW Makefiles" (
-      cmake .. -G"%TOOLCHAIN%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
+      cmake .. -G"%TOOLCHAIN%" -DCMAKE_PREFIX_PATH="C:\%MINGW_BIN%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
       mingw32-make
     )
     else (
