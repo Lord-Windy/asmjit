@@ -6,20 +6,20 @@ clone_folder: c:\dev\asmjit
 environment:
   matrix:
     - BUILD_TYPE: Debug
+      MINGW_PATH: "C:\MinGW"
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: MinGW
 
     - BUILD_TYPE: Release
+      MINGW_PATH: "C:\MinGW"
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: MinGW
 
     - BUILD_TYPE: Debug
+      MINGW_PATH: "C:\msys64\mingw64"
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: mingw-w64
 
     - BUILD_TYPE: Release
+      MINGW_PATH: "C:\msys64\mingw64"
       TOOLCHAIN: "MinGW Makefiles"
-      MINGW_BIN: mingw-w64
 
     - BUILD_TYPE: Debug
       TOOLCHAIN: "Visual Studio 9 2008"
@@ -65,14 +65,14 @@ environment:
 
 install:
   - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%PATH:C:\Program Files\Git\usr\bin;=%
-  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW_BIN%\bin;%PATH%
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW_PATH%\bin;%PATH%
 
 build_script:
   - cd c:\dev\asmjit
   - md build
   - cd build
   - if "%TOOLCHAIN%"=="MinGW Makefiles" (
-      cmake .. -G"%TOOLCHAIN%" -DCMAKE_PREFIX_PATH="C:\%MINGW_BIN%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
+      cmake .. -G"%TOOLCHAIN%" -DCMAKE_PREFIX_PATH="C:\%MINGW_PATH%" -DCMAKE_BUILD_TYPE="%BUILD_TYPE%" -DASMJIT_BUILD_TEST=1 &&
       mingw32-make
     )
     else (
