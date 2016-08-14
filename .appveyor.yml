@@ -7,9 +7,19 @@ environment:
   matrix:
     - BUILD_TYPE: Debug
       TOOLCHAIN: "MinGW Makefiles"
+      MINGW: mingw32
 
     - BUILD_TYPE: Release
       TOOLCHAIN: "MinGW Makefiles"
+      MINGW: mingw32
+
+    - BUILD_TYPE: Debug
+      TOOLCHAIN: "MinGW Makefiles"
+      MINGW: mingw64
+
+    - BUILD_TYPE: Release
+      TOOLCHAIN: "MinGW Makefiles"
+      MINGW: mingw64
 
     - BUILD_TYPE: Debug
       TOOLCHAIN: "Visual Studio 9 2008"
@@ -62,6 +72,7 @@ environment:
 install:
   - echo %PATH%
   - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=%PATH:C:\Program Files\Git\usr\bin;=%
+  - if "%TOOLCHAIN%"=="MinGW Makefiles" set PATH=C:\%MINGW%:%PATH%
 
 build_script:
   - cd c:\dev\asmjit
