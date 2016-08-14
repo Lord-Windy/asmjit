@@ -1,12 +1,7 @@
-image:
-  - Visual Studio 2015
+version: {build}
 
-clone_folder:
-  - c:\dev\asmjit
-
-platform:
-  - x86
-  - x64
+image: Visual Studio 2015
+clone_folder: c:\dev\asmjit
 
 environment:
   matrix:
