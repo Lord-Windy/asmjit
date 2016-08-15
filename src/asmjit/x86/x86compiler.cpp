@@ -401,7 +401,7 @@ Error X86Compiler::_prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut)
     return DebugUtils::errored(kErrorInvalidTypeId);
 
   if (ASMJIT_UNLIKELY(typeId == TypeId::kF80))
-    return DebugUtils::errored(kErrorIllegalUseOfF80);
+    return DebugUtils::errored(kErrorInvalidUseOfF80);
 
   uint32_t regType = 0;
 
@@ -424,7 +424,7 @@ Error X86Compiler::_prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut)
     case TypeId::kI64:
     case TypeId::kU64:
       if (getGpSize() < 8)
-        return DebugUtils::errored(kErrorIllegalUseOfGpq);
+        return DebugUtils::errored(kErrorInvalidUseOfGpq);
 
       regType = X86Reg::kRegGpq;
       break;

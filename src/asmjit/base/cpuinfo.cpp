@@ -507,9 +507,9 @@ static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
 
         if (regs.ebx & 0x00020000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512DQ);
         if (regs.ebx & 0x00200000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512IFMA);
-        if (regs.ebx & 0x04000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512PF);
-        if (regs.ebx & 0x08000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512ER);
-        if (regs.ebx & 0x10000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512CD);
+        if (regs.ebx & 0x04000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512PFI);
+        if (regs.ebx & 0x08000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512ERI);
+        if (regs.ebx & 0x10000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512CDI);
         if (regs.ebx & 0x40000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512BW);
         if (regs.ebx & 0x80000000U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512VL);
         if (regs.ecx & 0x00000002U) cpuInfo->addFeature(CpuInfo::kX86FeatureAVX512VBMI);

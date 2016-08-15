@@ -219,7 +219,6 @@ ASMJIT_ENUM(ErrorCode) {
 
   //! The object is not initialized.
   kErrorNotInitialized,
-
   //! The object is already initialized.
   kErrorAlreadyInitialized,
 
@@ -230,88 +229,53 @@ ASMJIT_ENUM(ErrorCode) {
   //!
   //! Returned by runtime if the \ref CodeHolder contains no code.
   kErrorNoCodeGenerated,
-
   //! Code generated is larger than allowed.
   kErrorCodeTooLarge,
 
   //! Attempt to use uninitialized label.
   kErrorInvalidLabel,
-
   //! Label index overflow - a single `Assembler` instance can hold more than
   //! 2 billion labels (2147483391 to be exact). If there is an attempt to
-  //! create more labels then this error is reported.
+  //! create more labels this error is returned.
   kErrorLabelIndexOverflow,
-
   //! Label is already bound.
   kErrorLabelAlreadyBound,
-
   //! Label is already defined (named labels).
   kErrorLabelAlreadyDefined,
-
-  //! Label name too long.
+  //! Label name is too long.
   kErrorLabelNameTooLong,
-
   //! Label must always be local if it's anonymous (without a name).
   kErrorInvalidLabelName,
-
   //! Parent id passed to `CodeHolder::newNamedLabelId()` was invalid.
   kErrorInvalidParentLabel,
-
   //! Parent id specified for a non-local (global) label.
   kErrorNonLocalLabelCantHaveParent,
 
-  //! Invalid instruction (an instruction ID is out of bounds or instruction
-  //! name is invalid).
+  //! Invalid instruction.
   kErrorInvalidInstruction,
-
-  //! Illegal instruction.
-  //!
-  //! This status code can also be returned in X64 mode if AH, BH, CH or DH
-  //! registers have been used together with a REX prefix. The instruction
-  //! is not encodable in such case.
-  //!
-  //! Example of raising `kErrorIllegalInstruction` error.
-  //!
-  //! ~~~
-  //! // Invalid address size.
-  //! a.mov(dword_ptr(eax), al);
-  //!
-  //! // Undecodable instruction - AH used with R10, however R10 can only be
-  //! // encoded by using REX prefix, which conflicts with AH.
-  //! a.mov(byte_ptr(r10), ah);
-  //! ~~~
-  //!
-  //! NOTE: In debug mode assertion is raised instead of returning an error.
-  kErrorIllegalInstruction,
-  //! Illegal register type.
-  kErrorIllegalRegType,
-
+  //! Invalid register type.
+  kErrorInvalidRegType,
   //! Invalid register's physical id.
   kErrorInvalidPhysId,
   //! Invalid register's virtual id.
   kErrorInvalidVirtId,
+  //! Invalid broadcast - Currently only related to invalid use of AVX-512 {1tox}.
+  kErrorInvalidBroadcast,
+  //! Invalid 'suppress-all-exceptions' {sae} or 'rounding-control' {rc} (AVX-512).
+  kErrorInvalidSAEOrER,
+  //! Illegal address used (not encodable).
+  kErrorInvalidAddress,
+  //! Illegal displacement used (not encodable).
+  kErrorInvalidDisplacement,
 
   //! Invalid TypeId.
   kErrorInvalidTypeId,
-
   //! Illegal use of a low 8-bit GPB register.
-  kErrorIllegalUseOfGpbHi,
+  kErrorInvalidUseOfGpbHi,
   //! Illegal use of a 64-bit GPQ register in 32-bit mode.
-  kErrorIllegalUseOfGpq,
-  //! Illegal use of an 80-bit float (TypeInfo::kF80).
-  kErrorIllegalUseOfF80,
-
-  //! Illegal (unencodable) addressing used.
-  kErrorIllegalAddressing,
-
-  //! Illegal (unencodable) displacement used.
-  //!
-  //! X86/X64 Specific
-  //! ----------------
-  //!
-  //! Short form of jump instruction has been used, but the displacement is out
-  //! of bounds.
-  kErrorIllegalDisplacement,
+  kErrorInvalidUseOfGpq,
+  //! Illegal use of an 80-bit float (TypeId::kF80).
+  kErrorInvalidUseOfF80,
 
   //! A variable has been assigned more than once to a function argument (CodeCompiler).
   kErrorOverlappedArgs,

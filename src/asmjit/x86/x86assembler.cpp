@@ -684,7 +684,7 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
                      getGlobalOptions() | getOptions();
 
 
-  const X86Inst* iData = _x86InstData + instId;
+  const X86Inst* iData = X86InstDB::instData + instId;
   const X86Inst::ExtendedData* iExtData;
 
   // Handle failure and rare cases first.
@@ -704,7 +704,7 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
     if (options & CodeEmitter::kOptionMaybeFailureCase) {
       // Unknown instruction.
       if (instId >= X86Inst::_kIdCount)
-        goto InvalidInstruction;
+        goto InvalidArgument;
 
       // Grow request, happens rarely.
       if ((size_t)(_bufferEnd - cursor) < 16) {
@@ -723,17 +723,17 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
 #endif // !ASMJIT_DISABLE_VALIDATION
 
     // Now it's safe to get extended-data.
-    iExtData = iData->getExtendedDataPtr();
+    iExtData = iData->getExtDataPtr();
 
     // Handle LOCK prefix.
     if (options & X86Inst::kOptionLock) {
       if (!iExtData->isLockable())
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       EMIT_BYTE(0xF0);
     }
   }
   else {
-    iExtData = iData->getExtendedDataPtr();
+    iExtData = iData->getExtDataPtr();
   }
 
   // --------------------------------------------------------------------------
@@ -794,7 +794,7 @@ CaseX86M_Bx_MulDiv:
         // [AX] <- [AX] div|mul r8.
         if (isign3 == ENC_OPS2(Reg, Reg)) {
           if (ASMJIT_UNLIKELY(!x86::isGpw(o0, X86Gp::kIdAx) || !x86::isGpb(o1)))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           rbReg = o1.getId();
           FIXUP_GPB(o1, rbReg);
@@ -804,7 +804,7 @@ CaseX86M_Bx_MulDiv:
         // [AX] <- [AX] div|mul m8.
         if (isign3 == ENC_OPS2(Reg, Mem)) {
           if (ASMJIT_UNLIKELY(!x86::isGpw(o0, X86Gp::kIdAx)))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           rmMem = x86OpMem(o1);
           goto EmitX86M;
@@ -813,7 +813,7 @@ CaseX86M_Bx_MulDiv:
         // [?DX:?AX] <- [?DX:?AX] div|mul r16|r32|r64
         if (isign3 == ENC_OPS3(Reg, Reg, Reg)) {
           if (ASMJIT_UNLIKELY(o0.getSize() != o1.getSize()))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
           rbReg = o2.getId();
 
           opCode++;
@@ -824,7 +824,7 @@ CaseX86M_Bx_MulDiv:
         // [?DX:?AX] <- [?DX:?AX] div|mul m16|m32|m64
         if (isign3 == ENC_OPS3(Reg, Reg, Mem)) {
           if (ASMJIT_UNLIKELY(o0.getSize() != o1.getSize()))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
           rmMem = x86OpMem(o2);
 
           opCode++;
@@ -832,7 +832,7 @@ CaseX86M_Bx_MulDiv:
           goto EmitX86M;
         }
 
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       }
 
       ASMJIT_FALLTHROUGH;
@@ -853,7 +853,7 @@ CaseX86M_Bx_MulDiv:
 
       if (isign3 == ENC_OPS1(Mem)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
         rmMem = x86OpMem(o0);
 
         opCode += o0.getSize() != 1;
@@ -888,7 +888,7 @@ CaseX86M_Bx_MulDiv:
     case X86Inst::kEncodingX86Arith:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         opReg = o0.getId();
         rbReg = o1.getId();
@@ -973,7 +973,7 @@ CaseX86M_Bx_MulDiv:
               if (instId == X86Inst::kIdAnd)
                 regSize = 4;
               else if (!Utils::isInt32(imVal))
-                goto IllegalInstruction;
+                goto InvalidInstruction;
             }
             ADD_REX_W_BY_SIZE(regSize);
           }
@@ -998,7 +998,7 @@ CaseX86M_Bx_MulDiv:
         uint32_t memSize = o0.getSize();
 
         if (ASMJIT_UNLIKELY(memSize == 0))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(memSize, 4);
@@ -1015,7 +1015,7 @@ CaseX86M_Bx_MulDiv:
     case X86Inst::kEncodingX86Bswap:
       if (isign3 == ENC_OPS1(Reg)) {
         if (ASMJIT_UNLIKELY(o0.getSize() < 4))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         opReg = o0.getId();
         ADD_REX_W_BY_SIZE(o0.getSize());
@@ -1053,7 +1053,7 @@ CaseX86M_Bx_MulDiv:
 
       if (isign3 == ENC_OPS2(Mem, Imm)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         rmMem = x86OpMem(o0);
         goto EmitX86M;
@@ -1108,13 +1108,13 @@ CaseX86M_Bx_MulDiv:
       // Convert explicit to implicit.
       if (isign3 & (0x7 << 6)) {
         if (!x86::isGp(o2) || o2.getId() != X86Gp::kIdAx)
-          goto IllegalInstruction;
+          goto InvalidInstruction;
         isign3 &= 0x3F;
       }
 
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         rbReg = o0.getId();
         opReg = o1.getId();
@@ -1170,7 +1170,7 @@ CaseX86M_Bx_MulDiv:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
         rmMem = x86OpMem(o1);
         if (o1.getSize() == 0)
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         // This seems to be the only exception of encoding 66F2 PP prefix.
         if (o1.getSize() == 2) EMIT_BYTE(0x66);
@@ -1234,7 +1234,7 @@ CaseX86M_Bx_MulDiv:
           goto CaseX86M_Bx_MulDiv;
 
         if (o0.getSize() != o1.getSize())
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         opReg = o0.getId();
         rbReg = o1.getId();
@@ -1379,11 +1379,11 @@ CaseX86M_Bx_MulDiv:
       }
       else if (isign3 == ENC_OPS2(Reg, Label)) {
         if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdCx))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
         label = _code->getLabelEntry(static_cast<const Label&>(o1));
       }
       else {
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       }
 
       if (ASMJIT_UNLIKELY(!label))
@@ -1399,7 +1399,7 @@ CaseX86M_Bx_MulDiv:
         // Bound label.
         intptr_t offs = label->getOffset() - (intptr_t)(cursor - _bufferData) - 1;
         if (ASMJIT_UNLIKELY(!Utils::isInt8(offs)))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         EMIT_BYTE(offs);
         goto EmitDone;
@@ -1511,7 +1511,7 @@ CaseX86M_Bx_MulDiv:
               if (size0 == 8 && size1 == 4)
                 size0 = 4; // Zero extend, don't promote to 64-bit.
               else
-                goto IllegalInstruction;
+                goto InvalidInstruction;
             }
 
             if (size0 == 1) {
@@ -1565,7 +1565,7 @@ CaseX86M_Bx_MulDiv:
         else {
           // ?? <- GP
           if (!x86::isGp(o1))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           // SEG <- GP
           if (x86::isSeg(o0)) {
@@ -1588,7 +1588,7 @@ CaseX86M_Bx_MulDiv:
           }
         }
 
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       }
 
       if (isign3 == ENC_OPS2(Reg, Mem)) {
@@ -1650,7 +1650,6 @@ CaseX86M_Bx_MulDiv:
 
           // Handle a special form 'mov [ptr64], al|ax|eax|rax' that doesn't use MOD.
           if (!rmMem->hasBaseOrIndex() && o1.getId() == X86Gp::kIdAx) {
-            // TODO: Suspicious.
             opCode += 0xA2;
             imVal = rmMem->getOffset();
             imLen = getGpSize();
@@ -1706,7 +1705,7 @@ CaseX86M_Bx_MulDiv:
         uint32_t memSize = o0.getSize();
 
         if (ASMJIT_UNLIKELY(memSize == 0))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(memSize, 4);
@@ -1751,7 +1750,7 @@ CaseX86M_Bx_MulDiv:
         if (x86::isSeg(o0)) {
           uint32_t segment = o0.getId();
           if (ASMJIT_UNLIKELY(segment >= X86Seg::kIdCount))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           if (segment >= X86Seg::kIdFs)
             EMIT_BYTE(0x0F);
@@ -1779,7 +1778,7 @@ CaseX86M_Bx_MulDiv:
         if (x86::isSeg(o0)) {
           uint32_t segment = o0.getId();
           if (ASMJIT_UNLIKELY(segment == X86Seg::kIdCs || segment >= X86Seg::kIdCount))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           if (segment >= X86Seg::kIdFs)
             EMIT_BYTE(0x0F);
@@ -1793,7 +1792,7 @@ CaseX86Pop_Gp:
           // and POP only allow 2 bytes or native size. On 64-bit we simply
           // PUSH/POP 64-bit register even if 32-bit register was given.
           if (ASMJIT_UNLIKELY(o0.getSize() < 2))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           opCode = iExtData->getSecondaryOpCode();
           opReg = o0.getId();
@@ -1805,7 +1804,7 @@ CaseX86Pop_Gp:
 
       if (isign3 == ENC_OPS1(Mem)) {
         if (ASMJIT_UNLIKELY(o0.getSize() != 2 && o0.getSize() != getGpSize()))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         ADD_66H_P_BY_SIZE(o0.getSize());
         rmMem = x86OpMem(o0);
@@ -1853,7 +1852,7 @@ CaseX86Pop_Gp:
 
         if (isign3 == ENC_OPS2(Reg, Reg)) {
           if (ASMJIT_UNLIKELY(o1.getId() != X86Gp::kIdCx))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           opCode += 2;
           goto EmitX86R;
@@ -1877,7 +1876,7 @@ CaseX86Pop_Gp:
 
         if (isign3 == ENC_OPS2(Mem, Reg)) {
           if (ASMJIT_UNLIKELY(o1.getId() != X86Gp::kIdCx))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           opCode += 2;
           rmMem = x86OpMem(o0);
@@ -1886,7 +1885,7 @@ CaseX86Pop_Gp:
 
         if (isign3 == ENC_OPS2(Mem, Imm)) {
           if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-            goto IllegalInstruction;
+            goto InvalidInstruction;
 
           imVal = static_cast<const Imm&>(o1).getInt64() & 0xFF;
           imLen = 0;
@@ -1940,7 +1939,7 @@ CaseX86Pop_Gp:
 
       if (isign3 == ENC_OPS3(Reg, Reg, Reg)) {
         if (ASMJIT_UNLIKELY(o2.getId() != X86Gp::kIdCx))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         ADD_PREFIX_BY_SIZE(o0.getSize());
         opReg = o1.getId();
@@ -1950,7 +1949,7 @@ CaseX86Pop_Gp:
 
       if (isign3 == ENC_OPS3(Mem, Reg, Reg)) {
         if (ASMJIT_UNLIKELY(o2.getId() != X86Gp::kIdCx))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         ADD_PREFIX_BY_SIZE(o1.getSize());
         opReg = o1.getId();
@@ -1962,7 +1961,7 @@ CaseX86Pop_Gp:
     case X86Inst::kEncodingX86Test:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         rbReg = o0.getId();
         opReg = o1.getId();
@@ -2027,7 +2026,7 @@ CaseX86Pop_Gp:
 
       if (isign3 == ENC_OPS2(Mem, Imm)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(o0.getSize(), 4);
@@ -2063,7 +2062,7 @@ CaseX86Pop_Gp:
         opReg = o1.getId();
 
         if (o0.getSize() != o1.getSize())
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         if (o0.getSize() == 1) {
           FIXUP_GPB(o0, rbReg);
@@ -2136,7 +2135,7 @@ CaseFpuArith_Reg:
           goto EmitFpuOp;
         }
         else {
-          goto IllegalInstruction;
+          goto InvalidInstruction;
         }
       }
 
@@ -2236,7 +2235,7 @@ CaseFpuArith_Mem:
     case X86Inst::kEncodingFpuStsw:
       if (isign3 == ENC_OPS1(Reg)) {
         if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdAx))
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         opCode = iExtData->getSecondaryOpCode();
         goto EmitFpuOp;
@@ -2350,7 +2349,7 @@ CaseFpuArith_Mem:
     case X86Inst::kEncodingExtMovbe:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
         if (o0.getSize() == 1)
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         ADD_PREFIX_BY_SIZE(o0.getSize());
         opReg = o0.getId();
@@ -2363,7 +2362,7 @@ CaseFpuArith_Mem:
 
       if (isign3 == ENC_OPS2(Mem, Reg)) {
         if (o1.getSize() == 1)
-          goto IllegalInstruction;
+          goto InvalidInstruction;
 
         ADD_PREFIX_BY_SIZE(o1.getSize());
         opReg = o1.getId();
@@ -2489,14 +2488,14 @@ CaseExtMovd:
 
     case X86Inst::kEncodingExtRmXMM0:
       if (ASMJIT_UNLIKELY(!o2.isNone() && !x86::isXmm(o2, 0)))
-        goto IllegalInstruction;
+        goto InvalidInstruction;
 
       isign3 &= 0x3F;
       goto CaseExtRm;
 
     case X86Inst::kEncodingExtRmZDI:
       if (ASMJIT_UNLIKELY(!o2.isNone() && !x86::isGp(o2, X86Gp::kIdDi)))
-        goto IllegalInstruction;
+        goto InvalidInstruction;
 
       isign3 &= 0x3F;
       goto CaseExtRm;
@@ -2818,7 +2817,7 @@ CaseExtRm:
         goto CaseVexRm;
 
       if (ASMJIT_UNLIKELY(!x86::isGp(o2, X86Gp::kIdDi)))
-        goto IllegalInstruction;
+        goto InvalidInstruction;
 
       isign3 &= 0x3F;
       goto CaseVexRm;
@@ -2895,7 +2894,7 @@ CaseVexRvm_R:
 
     case X86Inst::kEncodingVexRvmZDX_Wx:
       if (ASMJIT_UNLIKELY(!o3.isNone() && !x86::isGp(o3, X86Gp::kIdDx)))
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       ASMJIT_FALLTHROUGH;
 
     case X86Inst::kEncodingVexRvm_Wx:
@@ -3293,7 +3292,7 @@ CaseVexRmMr_AfterRegReg:
       }
       break;
 
-    case X86Inst::kEncodingVexVmi_VexEvex_Lx:
+    case X86Inst::kEncodingVexEvexVmi_Lx:
       if (isign3 == ENC_OPS3(Reg, Mem, Imm))
         opCode |= X86Inst::kOpCode_MM_ForceEvex;
       ASMJIT_FALLTHROUGH;
@@ -3361,7 +3360,7 @@ CaseVexRmMr_AfterRegReg:
 
     case X86Inst::kEncodingVexRvrmiRvmri_Lx: {
       if (!(options & CodeEmitter::kOptionHasOp4) || !_op4.isImm())
-        goto IllegalInstruction;
+        goto InvalidInstruction;
 
       const uint32_t isign4 = isign3 + (o3.getOp() << 9);
       opCode |= x86OpCodeLBySize(o0.getSize() | o1.getSize() | o2.getSize() | o3.getSize());
@@ -3460,7 +3459,7 @@ CaseVexRmMr_AfterRegReg:
       break;
     }
   }
-  goto IllegalInstruction;
+  goto InvalidInstruction;
 
   // --------------------------------------------------------------------------
   // [Emit - X86]
@@ -3475,7 +3474,7 @@ EmitX86Op:
     uint32_t rex = x86ExtractREX(opCode, options);
     if (rex) {
       if (options & X86Inst::_kOptionInvalidRex)
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       EMIT_BYTE(rex | kX86ByteRex);
     }
   }
@@ -3499,7 +3498,7 @@ EmitX86OpWithOpReg:
     if (rex) {
       EMIT_BYTE(rex | kX86ByteRex);
       if (options & X86Inst::_kOptionInvalidRex)
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       opReg &= 0x7;
     }
   }
@@ -3524,7 +3523,7 @@ EmitX86R:
                    ((rbReg       ) >> 3) ; // REX.B (0x01).
     if (rex) {
       if (options & X86Inst::_kOptionInvalidRex)
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       EMIT_BYTE(rex | kX86ByteRex);
       opReg &= 0x07;
       rbReg &= 0x07;
@@ -3576,7 +3575,7 @@ EmitX86M:
 
     if (rex) {
       if (options & X86Inst::_kOptionInvalidRex)
-        goto IllegalInstruction;
+        goto InvalidInstruction;
       EMIT_BYTE(rex | kX86ByteRex);
       opReg &= 0x07;
     }
@@ -3726,7 +3725,7 @@ EmitModSib_LabelRip_X86:
   else {
     // ESP|RSP can't be used as INDEX in pure SIB mode, however, VSIB mode
     // allows XMM4|YMM4|ZMM4 (that's why the check is before the label).
-    if (rxReg == X86Gp::kIdSp) goto IllegalAddressing;
+    if (rxReg == X86Gp::kIdSp) goto InvalidAddress;
 
 EmitModVSib:
     rxReg &= 0x7;
@@ -3780,7 +3779,7 @@ EmitModVSib:
         goto EmitModSib_LabelRip_X86;
       }
       else {
-        goto IllegalAddressing;
+        goto InvalidAddress;
       }
     }
   }
@@ -3854,7 +3853,17 @@ EmitVexEvexR:
     opReg &= 0x7;
 
     // Handle {k} and {kz} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpExtra| X86Inst::kOptionKZ)) {
+    const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
+                                    X86Inst::kOption1ToX           |
+                                    X86Inst::kOptionKZ             |
+                                    X86Inst::kOptionSAE            |
+                                    X86Inst::kOptionER             ;
+    if (options & kAvx512Options) {
+      if (ASMJIT_UNLIKELY(options & X86Inst::kOption1ToX))
+        goto InvalidBroadcast;
+
+      // TODO: {sae} and {er}
+
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything should be zeroed. It's valid EVEX.
@@ -3952,7 +3961,16 @@ EmitVexEvexM:
     opReg &= 0x07U;
 
     // Handle {k}, {kz}, {1tox} by a single branch.
-    if (options & (CodeEmitter::kOptionHasOpExtra| X86Inst::kOption1ToX | X86Inst::kOptionKZ)) {
+    const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
+                                    X86Inst::kOption1ToX           |
+                                    X86Inst::kOptionKZ             |
+                                    X86Inst::kOptionSAE            |
+                                    X86Inst::kOptionER             ;
+    if (options & kAvx512Options) {
+      // {sae} and {er} are both invalid if memory operand is used.
+      if (ASMJIT_UNLIKELY(options & (X86Inst::kOptionSAE | X86Inst::kOptionER)))
+        goto InvalidSAEOrER;
+
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything would be zeroed. It's a valid EVEX.
@@ -4027,7 +4045,7 @@ EmitVexEvexM:
   // MOD|VSIB address without INDEX is invalid.
   if (rmInfo & kX86MemInfo_Index)
     goto EmitModVSib;
-  goto IllegalInstruction;
+  goto InvalidInstruction;
 
   // --------------------------------------------------------------------------
   // [Emit - Jump/Call to an Immediate]
@@ -4166,21 +4184,25 @@ EmitDone:
   // [Error Cases]
   // --------------------------------------------------------------------------
 
+InvalidArgument:
+  return X86Assembler_failedInstruction(this,
+    DebugUtils::errored(kErrorInvalidArgument), instId, options, o0, o1, o2, o3);
+
 InvalidInstruction:
   return X86Assembler_failedInstruction(this,
     DebugUtils::errored(kErrorInvalidInstruction), instId, options, o0, o1, o2, o3);
 
-IllegalInstruction:
+InvalidBroadcast:
   return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorIllegalInstruction), instId, options, o0, o1, o2, o3);
+    DebugUtils::errored(kErrorInvalidBroadcast), instId, options, o0, o1, o2, o3);
 
-IllegalAddressing:
+InvalidSAEOrER:
   return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorIllegalAddressing), instId, options, o0, o1, o2, o3);
+    DebugUtils::errored(kErrorInvalidSAEOrER), instId, options, o0, o1, o2, o3);
 
-IllegalDisplacement:
+InvalidAddress:
   return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorIllegalDisplacement), instId, options, o0, o1, o2, o3);
+    DebugUtils::errored(kErrorInvalidAddress), instId, options, o0, o1, o2, o3);
 
 InvalidLabel:
   return X86Assembler_failedInstruction(this,

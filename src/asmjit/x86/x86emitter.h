@@ -339,13 +339,13 @@ struct X86EmitterBaseT {
   //! Suppress all exceptions (AVX512+).
   ASMJIT_INLINE This& sae() noexcept { THIS()->addOptions(X86Inst::kOptionSAE); return *THIS(); }
   //! Static rounding mode {rn} (round-to-nearest even) and {sae} (AVX512+).
-  ASMJIT_INLINE This& rn_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRN_SAE); return *THIS(); }
+  ASMJIT_INLINE This& rn_sae() noexcept { THIS()->addOptions(X86Inst::kOptionER | X86Inst::kOptionRN_SAE); return *THIS(); }
   //! Static rounding mode {rd} (round-down, toward -inf) and {sae} (AVX512+).
-  ASMJIT_INLINE This& rd_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRD_SAE); return *THIS(); }
+  ASMJIT_INLINE This& rd_sae() noexcept { THIS()->addOptions(X86Inst::kOptionER | X86Inst::kOptionRD_SAE); return *THIS(); }
   //! Static rounding mode {ru} (round-up, toward +inf) and {sae} (AVX512+).
-  ASMJIT_INLINE This& ru_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRU_SAE); return *THIS(); }
+  ASMJIT_INLINE This& ru_sae() noexcept { THIS()->addOptions(X86Inst::kOptionER | X86Inst::kOptionRU_SAE); return *THIS(); }
   //! Static rounding mode {rz} (round-toward-zero, truncate) and {sae} (AVX512+).
-  ASMJIT_INLINE This& rz_sae() noexcept { THIS()->addOptions(X86Inst::kOptionRC | X86Inst::kOptionRZ_SAE); return *THIS(); }
+  ASMJIT_INLINE This& rz_sae() noexcept { THIS()->addOptions(X86Inst::kOptionER | X86Inst::kOptionRZ_SAE); return *THIS(); }
 
   // --------------------------------------------------------------------------
   // [General Purpose and Non-SIMD Instructions]

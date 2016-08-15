@@ -65,9 +65,9 @@ Supported Environments
 
 ### Backends
 
-  * **ARM** (work-in-progress).
   * **X86** (tested by Travis-CI and AppVeyor).
   * **X64** (tested by Travis-CI and AppVeyor).
+  * **ARM** (work-in-progress).
 
 Project Organization
 --------------------
@@ -231,7 +231,7 @@ X86Mem i = ptr(ADDR);                 // i = [0x1234]
 X86Mem j = ptr(ADDR, rbx);            // j = [0x1234 + rbx]
 X86Mem k = ptr(ADDR, rbx, 2);         // k = [0x1234 + rbx << 2]
 
-// LABEL - Will be emitted to use RIP (64-bit) or absolute address (32-bit).
+// LABEL - Will be encoded as RIP (64-bit) or absolute address (32-bit).
 Label L = ...;
 X86Mem m = ptr(L);                    // m = [L]
 X86Mem n = ptr(L, rbx);               // n = [L + rbx]

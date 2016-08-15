@@ -1841,7 +1841,7 @@ _NextGroup:
 
         RA_DECLARE();
         if (opCount) {
-          const X86Inst::ExtendedData& extendedData = _x86InstData[instId].getExtendedData();
+          const X86Inst::ExtendedData& extendedData = X86Inst::getInst(instId).getExtData();
           const X86SpecialInst* special = nullptr;
 
           // Collect instruction flags and merge all 'TiedReg's.

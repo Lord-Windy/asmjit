@@ -291,9 +291,9 @@ const AVX512Features = {
   "AVX512F"   : true,
   "AVX512DQ"  : true,
   "AVX512BW"  : true,
-  "AVX512CD"  : true,
-  "AVX512ER"  : true,
-  "AVX512PF"  : true,
+  "AVX512CDI" : true,
+  "AVX512ERI" : true,
+  "AVX512PFI" : true,
   "AVX512IFMA": true,
   "AVX512VBMI": true
 };
@@ -345,7 +345,7 @@ function AVX512Flags(insts) {
         masking = "k_";
 
       if (inst.rnd)
-        er_sae = "erc";
+        er_sae = "er";
       else if (inst.sae)
         er_sae = "sae"
     }
@@ -360,10 +360,10 @@ function AVX512Flags(insts) {
     exclusive: exclusive,
     feature  : avx512 === "F" ? "F_" : avx512,
     tupleType: tupleType ? tupleType : "0",
-    masking  : masking,
+    masking  : masking.toUpperCase(),
     vl       : vl ? vl : "0",
-    er_sae   : er_sae ? er_sae : "0",
-    broadcast: broadcast ? "B" : "0"
+    er_sae   : er_sae ? er_sae.toUpperCase() : "0",
+    broadcast: broadcast
   };
 }
 
@@ -718,16 +718,9 @@ class ISignature extends Array {
 
   mergeWith(other) {
     var ok = this.x86 === other.x86 && this.x64 === other.x64;
-    if (!ok && this.x86 && this.x64 && !other.x86 && other.x64)
-      ok = true;
+    if (!ok && this.x86 && this.x64 && !other.x86 && other.x64) ok = true;
 
-    if (!ok)
-      return false;
-
-    //if (this.x86 === false && this.x64 === true && other.x86 === true && other.x64 === false) return false;
-    //if (this.x86 === true && this.x64 === false && other.x86 === false && other.x64 === true) return false;
-
-    if (this.implicit !== other.implicit)
+    if (!ok || this.implicit !== other.implicit)
       return false;
 
     const len = this.length;
@@ -981,14 +974,9 @@ class X86Generator {
       eflags        : eflags.join(""),
       writeIndex    : "0",
       writeSize     : "0",
-      simdDstSize   : "0",
-      simdSrcSize   : "0",
       signatures    : this.signaturesFromInsts(insts),
       nameIndex     : -1,
-      extendedData  : "",
-      extendedIndex : "",
-      signatureIndex: -1,
-      signatureCount: -1
+      extendedIndex : ""
     };
   }
   */
@@ -1005,26 +993,16 @@ class X86Generator {
       "\\s*EF\\(([A-Z_]+)\\)\\s*," +        // [07] EFLAGS.
       "([^,]+)," +                          // [08] Write-Index.
       "([^,]+)," +                          // [09] Write-Size.
-      "([^,]+)," +                          // [10] SIMD Dst-Size.
-      "([^,]+)," +                          // [11] SIMD Src-Size.
-      "([^,]+)," +                          // [12] SignatureTableStart (auto-generated).
-      "([^,]+)," +                          // [13] SignatureTableCount (auto-generated).
-      "([^\\)]+)\\)",                       // [14] ExtendedIndex (auto-generated).
+      "([^\\)]+)," +                        // [10] NameIndex (auto-generated).
+      "([^\\)]+)\\)",                       // [11] ExtIndex  (auto-generated).
       "g");
 
     var id = 0;
     var m;
 
-    function processOpcode(o) {
-      return o;
-    }
-
     while (m = re.exec(data)) {
-      // Extract instruction ID and Name.
-      var enum_ = kX86InstPrefix + m[1];
-      var name = m[2];
-
-      // Extract data that goes to the secondary table (X86InstExtendedInfo).
+      var enum_       = kX86InstPrefix + m[1];
+      var name        = m[2];
       var encoding    = m[3].trim();
       var opcode0     = m[4].trim();
       var opcode1     = m[5].trim();
@@ -1032,13 +1010,12 @@ class X86Generator {
       var eflags      = m[7];
       var writeIndex  = Utils.trimLeft(m[8]);
       var writeSize   = Utils.trimLeft(m[9]);
-      var simdDstSize = Utils.trimLeft(m[10]);
-      var simdSrcSize = Utils.trimLeft(m[11]);
+
+      // opcode1 = "0";
+      //if (iflags.indexOf("|A512") !== -1)
+      //  iflags = iflags.substr(0, iflags.indexOf("|A512")).trim();
 
 /*
-      opcode0 = processOpcode(opcode0);
-      opcode1 = processOpcode(opcode1);
-
       if (iflags.indexOf("A512(") !== -1) {
         var x = iflags.indexOf("A512(") + 12;
         opcode0 = opcode0.replace(",_  ", "," + Utils.padLeft(iflags.substr(x, 3), 3));
@@ -1056,17 +1033,17 @@ class X86Generator {
         if (avx) {
           var avxstr = "A512(" + Utils.padLeft(avx.feature  , 4) + "," +
                                  Utils.padLeft(avx.vl       , 1) + "," +
-                                 Utils.padLeft(avx.tupleType, 3) + "," +
                                  Utils.padLeft(avx.masking  , 2) + "," +
                                  Utils.padLeft(avx.er_sae   , 3) + "," +
                                  Utils.padLeft(avx.broadcast, 1) + ")";
-          console.log(`INSTRUCTION '${Utils.padLeft(name, 15)}' ${avxstr}`);
-          iflags = Utils.padLeft(iflags, 12) + "|" + avxstr;
-        }
-        */
+          if (iflags.indexOf("A512") !== -1)
+            iflags = iflags.substr(0, iflags.indexOf("A512")) + avxstr;
+          //console.log(`INSTRUCTION '${Utils.padLeft(name, 15)}' ${avxstr}`);
+          //iflags = Utils.padLeft(iflags, 12) + "|" + avxstr;
+        }*/
       }
-      const signatures = insts ? this.signaturesFromInsts(insts) : new SignatureArray();
 
+      const signatures = insts ? this.signaturesFromInsts(insts) : new SignatureArray();
       const inst = {
         id            : id,           // Instruction id.
         name          : name,         // Instruction name.
@@ -1078,16 +1055,12 @@ class X86Generator {
         eflags        : eflags,
         writeIndex    : writeIndex,
         writeSize     : writeSize,
-        simdDstSize   : simdDstSize,
-        simdSrcSize   : simdSrcSize,
-        signatures    : signatures,   // Rows containing operands' combinations.
+        signatures    : signatures,   // Rows containing instruction signatures.
         nameIndex     : -1,           // Instruction name-index.
-        extendedData  : "",
         extendedIndex : "",
         signatureIndex: -1,
         signatureCount: -1
       }
-
 
       this.instMap[name] = inst;
       this.instArray.push(inst);
@@ -1104,7 +1077,7 @@ class X86Generator {
 
     // Generate new tables.
     const nameData = this.generateNameData();
-    const signaturesData = this.generateSignaturesData();
+    const signatureData = this.generateSignatureData();
     const extendedData = this.generateExtendedData();
     const instData = this.generateInstData();
 
@@ -1115,7 +1088,7 @@ class X86Generator {
 
     data = Utils.inject(data,
       "// ${X86InstSignatureData:Begin}\n",
-      "// ${X86InstSignatureData:End}\n", signaturesData);
+      "// ${X86InstSignatureData:End}\n", signatureData);
 
     data = Utils.inject(data,
       "// ${X86InstExtendedData:Begin}\n",
@@ -1154,47 +1127,10 @@ class X86Generator {
         instAlpha[aIndex] = inst.enum;
     }
 
-    function formatInstNameIndex(indent, justify) {
-      var i;
-      var s = "";
-      var line = "";
-
-      if (!justify) justify = 0;
-
-      for (i = 0; i < instArray; i++) {
-        const inst = instArray[i];
-        if (inst === undefined)
-          throw new Error(`Database - no instruction #${i}`);
-      }
-
-      for (i = 0; i < instArray.length; i++) {
-        const inst = instArray[i];
-        if (inst === undefined)
-          throw new Error(`Database - no instruction #${i}`);
-
-        const item = String(inst.nameIndex) + ((i !== instArray.length - 1) ? "," : "");
-        const newl = line + (line ? " " : indent) + item;
-
-        if (newl.length <= justify) {
-          line = newl;
-          continue;
-        }
-        else {
-          s += line + "\n";
-          line = indent + item;
-        }
-      }
-
-      s += line + "\n";
-      return s;
-    }
-
     var s = "";
-
     s += kDisclaimerStart;
-    s += "static const char _x86InstNameData[] =\n" + instNames.format(kIndent, kJustify) + "\n";
-    s += "static const uint16_t _x86InstNameIndex[] = {\n" + formatInstNameIndex(kIndent, kJustify) + "};\n\n";
-
+    s += `const char X86InstDB::nameData[] =\n${instNames.format(kIndent, kJustify)}\n`;
+    s += `\n`;
     s += `enum X86InstAlphaIndex {\n`;
     s += `  kX86InstAlphaIndexFirst   = 'a',\n`;
     s += `  kX86InstAlphaIndexLast    = 'z',\n`;
@@ -1213,11 +1149,11 @@ class X86Generator {
     s += `};\n`;
     s += kDisclaimerEnd;
 
-    this.sizeStats.InstructionNames = instNames.getSize() + instArray.length * 2 + instAlpha.length * 2;
+    this.sizeStats.InstructionNames = instNames.getSize() + instAlpha.length * 2;
     return s;
   }
 
-  generateSignaturesData() {
+  generateSignatureData() {
     const instArray = this.instArray;
 
     const opMap = Object.create(null);
@@ -1343,11 +1279,11 @@ class X86Generator {
 
     s += kDisclaimerStart;
     s += "#define ISIGNATURE(count, x86, x64, implicit, o0, o1, o2, o3, o4, o5) \\\n";
-    s += "  { count, (x86 ? uint8_t(X86Inst::kArchMaskX86) : uint8_t(0)) | \\\n";
-    s += "           (x64 ? uint8_t(X86Inst::kArchMaskX64) : uint8_t(0)) , \\\n";
-    s += "    implicit, \\\n";
-    s += "    0, \\\n";
-    s += "    o0, o1, o2, o3, o4, o5 \\\n";
+    s += "  { count, (x86 ? uint8_t(X86Inst::kArchMaskX86) : uint8_t(0)) |      \\\n";
+    s += "           (x64 ? uint8_t(X86Inst::kArchMaskX64) : uint8_t(0)) ,      \\\n";
+    s += "    implicit,                                                         \\\n";
+    s += "    0,                                                                \\\n";
+    s += "    o0, o1, o2, o3, o4, o5                                            \\\n";
     s += "  }\n";
     s += makeCxxArrayWithComment(signatureArr, "static const X86Inst::ISignature _x86InstISignatureData[]");
     s += "#undef ISIGNATURE\n";
@@ -1382,19 +1318,19 @@ class X86Generator {
       const eflagsOut   = decToHex(getEFlagsMask(inst.eflags, "WXU"), 2);
       const writeIndex  = inst.writeIndex;
       const writeSize   = inst.writeSize;
-      const simdDstSize = inst.simdDstSize;
-      const simdSrcSize = inst.simdSrcSize;
+      const signIndex   = inst.signatureIndex;
+      const signCount   = inst.signatureCount;
 
       var extData = Utils.padLeft(encoding   , 24) + ", " +
                     Utils.padLeft(writeIndex ,  3) + ", " +
                     Utils.padLeft(writeSize  ,  3) + ", " +
-                    Utils.padLeft(simdDstSize,  3) + ", " +
-                    Utils.padLeft(simdSrcSize,  3) + ", " +
                     eflagsIn                       + ", " +
                     eflagsOut                      + ", " +
+                    Utils.padLeft(signIndex  ,  3) + ", " +
+                    Utils.padLeft(signCount  ,  2) + ", " +
                     "0"                            + ", " +
                     Utils.padLeft(iflags     , 38) + ", " +
-                    Utils.padLeft(opcode1    , 26);
+                    Utils.padLeft(opcode1    , 26) ;
       var extIndex = -1;
 
       if (hasOwn.call(extendedMap, extData)) {
@@ -1406,14 +1342,13 @@ class X86Generator {
         extendedMap[extData] = extIndex;
       }
 
-      inst.extendedData = extData;
       inst.extendedIndex = extIndex;
     }
 
     var s = "";
 
     s += kDisclaimerStart;
-    s += "const X86Inst::ExtendedData _x86InstExtendedData[] = {\n";
+    s += "const X86Inst::ExtendedData X86InstDB::iExtData[] = {\n";
     for (i = 0; i < extendedData.length; i++) {
       s += `${kIndent}{ ${extendedData[i]} }`;
       s += (i === extendedData.length - 1) ? "\n" : ",\n";
@@ -1440,13 +1375,10 @@ class X86Generator {
         Utils.padLeft(inst.opcode1       , 26) + ", " +
         Utils.padLeft(inst.iflags        , 38) + ", " +
         "EF(" + inst.eflags + "), " +
-        Utils.padLeft(inst.writeIndex    , 1) + ", " +
-        Utils.padLeft(inst.writeSize     , 1) + ", " +
-        Utils.padLeft(inst.simdDstSize   , 2) + ", " +
-        Utils.padLeft(inst.simdSrcSize   , 2) + ", " +
-        Utils.padLeft(inst.signatureIndex, 3) + ", " +
-        Utils.padLeft(inst.signatureCount, 2) + ", " +
-        Utils.padLeft(inst.extendedIndex , 3) + ")";
+        Utils.padLeft(inst.writeIndex    ,  1) + ", " +
+        Utils.padLeft(inst.writeSize     ,  1) + ", " +
+        Utils.padLeft(inst.nameIndex     ,  4) + ", " +
+        Utils.padLeft(inst.extendedIndex ,  3) + ")";
       s += (i === instArray.length - 1) ? "\n" : ",\n";
     }
 
@@ -1488,8 +1420,6 @@ class X86Generator {
             "EF(" + inst.eflags + "), " +
             Utils.padLeft(inst.writeIndex    , 2) + ", " +
             Utils.padLeft(inst.writeSize     , 2) + ", " +
-            Utils.padLeft(inst.simdDstSize   , 2) + ", " +
-            Utils.padLeft(inst.simdSrcSize   , 2) + ", " +
             Utils.padLeft(inst.signatureIndex, 3) + ", " +
             Utils.padLeft(inst.signatureCount, 2) + ", " +
             Utils.padLeft("0", 3) + "),\n";
@@ -1856,5 +1786,4 @@ function main() {
   }
   */
 }
-
 main();

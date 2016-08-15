@@ -811,7 +811,8 @@ public:
 
 //! Sentinel (CodeBuilder).
 //!
-//! Sentinel is a marker that is completely ignored by the code builder.
+//! Sentinel is a marker that is completely ignored by the code builder. It's
+//! used to remember a position in a code as it never gets removed by any pass.
 class CBSentinel : public CBNode {
 public:
   ASMJIT_NONCOPYABLE(CBSentinel)
@@ -821,11 +822,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Create a new `CBSentinel` instance.
-  ASMJIT_INLINE CBSentinel(CodeBuilder* cb) noexcept : CBNode(cb, kNodeSentinel) {
-    // TODO: This shouldn't be here.
-    orFlags(kFlagIsRet);
-  }
-
+  ASMJIT_INLINE CBSentinel(CodeBuilder* cb) noexcept : CBNode(cb, kNodeSentinel) {}
   //! Destroy the `CBSentinel` instance (NEVER CALLED).
   ASMJIT_INLINE ~CBSentinel() noexcept {}
 };

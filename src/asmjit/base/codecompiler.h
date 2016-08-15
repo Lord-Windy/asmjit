@@ -274,6 +274,7 @@ public:
     : CBLabel(cb),
       _exitNode(nullptr),
       _decl(),
+      _frame(),
       _end(nullptr),
       _args(nullptr),
       _funcHints(Utils::mask(kFuncHintNaked)),
@@ -401,7 +402,7 @@ public:
   ASMJIT_INLINE void mergeCallStackSize(uint32_t s) noexcept { if (_callStackSize < s) _callStackSize = s; }
 
   // --------------------------------------------------------------------------
-  // [Hints]
+  // [Flags]
   // --------------------------------------------------------------------------
 
   //! Set function hint.
@@ -466,8 +467,7 @@ public:
   // --------------------------------------------------------------------------
 
   FuncDecl _decl;                        //!< Function declaration.
-  // TODO: Not used yet.
-  // FuncFrame _frame;                      //!< Function frame.
+  FuncFrame _frame;                      //!< Function frame-info and layout.
 
   CBLabel* _exitNode;                    //!< Function exit.
   CBSentinel* _end;                      //!< Function end.

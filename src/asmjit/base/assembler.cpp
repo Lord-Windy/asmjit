@@ -197,7 +197,7 @@ Error Assembler::bind(const Label& label) {
         if (Utils::isInt8(patchedValue))
           _bufferData[offset] = static_cast<uint8_t>(patchedValue & 0xFF);
         else
-          error = DebugUtils::errored(kErrorIllegalDisplacement);
+          error = DebugUtils::errored(kErrorInvalidDisplacement);
       }
     }
 

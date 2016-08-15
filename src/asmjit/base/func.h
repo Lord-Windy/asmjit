@@ -148,13 +148,13 @@ struct CallConv {
   //! registers first, and then assigns stack. The Win64 algorithm does register
   //! shadowing as defined by `WIN64` calling convention - it applies to 64-bit
   //! calling conventions only.
-  enum Algorithm {
+  ASMJIT_ENUM(Algorithm) {
     kAlgorithmDefault    = 0,            //!< Default algorithm (cross-platform).
     kAlgorithmWin64      = 1             //!< WIN64 specific algorithm.
   };
 
   //! Calling convention flags.
-  enum Flags {
+  ASMJIT_ENUM(Flags) {
     kFlagCalleePopsStack = 0x0001,       //!< Callee is responsible for cleaning up the stack.
     kFlagPassFloatsByVec = 0x0002,       //!< Pass F32 and F64 arguments by VEC128 register.
     kFlagVectorCall      = 0x0004,       //!< This is a '__vectorcall' calling convention.
@@ -162,7 +162,7 @@ struct CallConv {
   };
 
   //! Internal limits of CallConv.
-  enum Limits {
+  ASMJIT_ENUM(Limits) {
     kNumRegKinds         = 4,            //!< Number of RegKinds handled by CallConv.
     kNumRegArgsPerKind   = 8             //!< Number of maximum arguments passed in register per RegKind.
   };
@@ -297,23 +297,72 @@ struct CallConv {
 //! calculate the optimal layout of the function that can be then passed to an
 //! architecture-specific emitter.
 struct FuncFrame {
-  enum Flags {
+  //! FuncFrame flags.
+  //!
+  //! These flags are designed in a way that all are initially false, and user
+  //! or finalizer sets them when necessary. Architecture-specific flags are
+  //! prefixed with the architecture name.
+  ASMJIT_ENUM(Flags) {
+    kFlagPreserveFP       = 0x00000002U, //!< Preserve frame pointer (EBP|RBP).
+    kFlagHasCalls         = 0x00000001U, //!< Function calls other functions (is not leaf).
+    kFlagCompact          = 0x00008000U, //!< Use smaller, but possibly slower prolog/epilog.
+
+    kX86FlagEmms          = 0x00010000U  //!< Emit EMMS instruction in epilog (X86).
   };
 
   //! FuncFrame is bound to the same limits as \ref CallConv.
-  enum Limits {
+  ASMJIT_ENUM(Limits) {
     kNumRegKinds = CallConv::kNumRegKinds
   };
 
-  uint8_t _naturalStackAlignment;        //!< Natural stack alignment as defined by OS/ABI.
-  uint8_t _requiredStackAlignment;       //!< Required stack alignment to spill / store data.
+  // --------------------------------------------------------------------------
+  // [Init / Reset]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE void reset() noexcept { ::memset(this, 0, sizeof(*this)); }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get FuncFrame flags.
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
+  //! Check if a FuncFrame flag is set.
+  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
+
+  //! Get if the function is naked - it doesn't preserve frame pointer (EBP|ESP).
+  ASMJIT_INLINE bool isNaked() const noexcept { return (_flags & kFlagPreserveFP) == 0; }
+  //! Get if the function prolog and epilog should be compacted (as small as possible).
+  ASMJIT_INLINE bool isCompact() const noexcept { return (_flags & kFlagCompact) != 0; }
+
+  //! Get if manual stack alignment is required.
+  //!
+  //! It means that the stack alignment required by the function (to spill its
+  //! registers, for example) is higher than natural alignment guaranteed by
+  //! the calling convention and/or ABI.
+  ASMJIT_INLINE bool isManualAlignmentRequied() const noexcept {
+    // NOTE: Don't return true when final stack alignment is 8. In 32-bit mode
+    // we don't care about that, and there is no 64-bit ABI that uses less than
+    // 128-bit stack alignment.
+    return _finalStackAlignment > _naturalStackAlignment &&
+           _finalStackAlignment >= 16;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  uint32_t _flags;                       //!< FuncFrame flags.
 
   uint32_t _stackDataSize;               //!< Stack size requested by the function for its data.
-  uint32_t _stackDataAlignment;          //!< Minimum alignment of the stack requested by the function.
+  uint8_t _stackDataAlignment;           //!< Minimum alignment of the stack requested by the function.
+  uint8_t _naturalStackAlignment;        //!< Natural stack alignment as defined by OS/ABI.
   uint32_t _savedMask[kNumRegKinds];     //!< Registers which must be saved/restored in prolog/epilog.
 
-  uint16_t _savedGpSize;                 //!< Stack required to save GP regs.
-  uint16_t _savedVecSize;                //!< Stack required to save VEC regs.
+  uint32_t _finalStackSize;              //!< Final stack size (sum of everything).
+  uint8_t _finalStackAlignment;          //!< Final stack alignment of the function (required).
+  uint16_t _finalGpStackSize;            //!< Final stack size required to save GP regs.
+  uint16_t _finalVecStackSize;           //!< Final stack size required to save VEC regs.
 };
 
 // ============================================================================

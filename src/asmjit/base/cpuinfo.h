@@ -118,9 +118,9 @@ public:
     kX86FeatureERMS,                     //!< CPU has ERMS (enhanced REP MOVSB/STOSB).
     kX86FeatureFSGSBASE,                 //!< CPU has FSGSBASE.
     kX86FeatureAVX512F,                  //!< CPU has AVX-512F (foundation).
-    kX86FeatureAVX512CD,                 //!< CPU has AVX-512CD (conflict detection).
-    kX86FeatureAVX512PF,                 //!< CPU has AVX-512PF (prefetch instructions).
-    kX86FeatureAVX512ER,                 //!< CPU has AVX-512ER (exponential and reciprocal instructions).
+    kX86FeatureAVX512CDI,                //!< CPU has AVX-512CDI (conflict detection instructions).
+    kX86FeatureAVX512PFI,                //!< CPU has AVX-512PFI (prefetch instructions).
+    kX86FeatureAVX512ERI,                //!< CPU has AVX-512ERI (exponential and reciprocal instructions).
     kX86FeatureAVX512DQ,                 //!< CPU has AVX-512DQ (DWORD/QWORD).
     kX86FeatureAVX512BW,                 //!< CPU has AVX-512BW (BYTE/WORD).
     kX86FeatureAVX512VL,                 //!< CPU has AVX VL (vector length extensions).

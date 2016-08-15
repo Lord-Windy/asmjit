@@ -1578,7 +1578,7 @@ struct X86Inst {
     kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
 
     kOptionSAE            = 0x00020000U, //!< EVEX 'suppress-all-exceptions' {sae}.
-    kOptionRC             = 0x00040000U, //!< EVEX 'rounding-control' {rc} and {sae}.
+    kOptionER             = 0x00040000U, //!< EVEX 'rounding-control' {rc} and {sae}.
 
     kOption1ToX           = 0x00100000U, //!< EVEX broadcast the first element to all {1tox}.
     kOptionRN_SAE         = 0x00000000U, //!< EVEX 'round-to-nearest' (even)      {rn-sae} (bits 00).
@@ -1707,7 +1707,7 @@ struct X86Inst {
     kEncodingVexVm_Wx,                   //!< VEX|EVEX [VM] (propagates VEX|EVEX.W if GPQ used).
     kEncodingVexVmi,                     //!< VEX|EVEX [VMI].
     kEncodingVexVmi_Lx,                  //!< VEX|EVEX [VMI] (propagates VEX|EVEX.L if YMM used).
-    kEncodingVexVmi_VexEvex_Lx,          //!< VEX|EVEX [VMI] (special, used by vpsrldq and vpslldq)
+    kEncodingVexEvexVmi_Lx,              //!< VEX|EVEX [VMI] (special, used by vpsrldq and vpslldq)
     kEncodingVexRvrmRvmr,                //!< VEX|EVEX [RVRM|RVMR].
     kEncodingVexRvrmRvmr_Lx,             //!< VEX|EVEX [RVRM|RVMR] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRvrmiRvmri_Lx,           //!< VEX|EVEX [RVRMI|RVMRI] (propagates VEX|EVEX.L if YMM used).
@@ -1769,17 +1769,19 @@ struct X86Inst {
 
     kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
     kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0z..k7z}.
-    kInstFlagEvexB        = 0x00080000U, //!< Supports broadcast b32|b64.
-    kInstFlagEvexSAE      = 0x00100000U, //!< Supports 'suppress-all-exceptions' {sae}.
-    kInstFlagEvexRC       = 0x00200000U, //!< Supports 'rounding-control' {rc} with implicit {sae},
-    kInstFlagEvexVL       = 0x00400000U, //!< Supports access to XMM|YMM registers (AVX512-VL).
+    kInstFlagEvexB0       = 0x00000000U, //!< No broadcast (used by instruction tables).
+    kInstFlagEvexB4       = 0x00080000U, //!< Supports broadcast 'b32'.
+    kInstFlagEvexB8       = 0x00100000U, //!< Supports broadcast 'b64'.
+    kInstFlagEvexSAE      = 0x00200000U, //!< Supports 'suppress-all-exceptions' {sae}.
+    kInstFlagEvexER       = 0x00400000U, //!< Supports 'embedded-rounding-control' {rc} with implicit {sae},
+    kInstFlagEvexVL       = 0x00800000U, //!< Supports access to XMM|YMM registers (AVX512-VL).
 
     kInstFlagEvexSet_Shift= 24,
     kInstFlagEvexSet_Mask = 0x0F000000U, //!< AVX-512 feature set required to execute the instruction.
     kInstFlagEvexSet_F_   = 0x00000000U, //!< Supported by AVX512-F (no extra requirements).
-    kInstFlagEvexSet_CD   = 0x01000000U, //!< Supported by AVX512-CD.
-    kInstFlagEvexSet_PF   = 0x02000000U, //!< Supported by AVX512-PF.
-    kInstFlagEvexSet_ER   = 0x03000000U, //!< Supported by AVX512-ER.
+    kInstFlagEvexSet_CDI  = 0x01000000U, //!< Supported by AVX512-CDI.
+    kInstFlagEvexSet_PFI  = 0x02000000U, //!< Supported by AVX512-PFI.
+    kInstFlagEvexSet_ERI  = 0x03000000U, //!< Supported by AVX512-ERI.
     kInstFlagEvexSet_DQ   = 0x04000000U, //!< Supported by AVX512-DQ.
     kInstFlagEvexSet_BW   = 0x05000000U, //!< Supported by AVX512-BW.
     kInstFlagEvexSet_IFMA = 0x06000000U, //!< Supported by AVX512-IFMA.
@@ -2342,14 +2344,15 @@ struct X86Inst {
     // [Members]
     // ------------------------------------------------------------------------
 
-    uint8_t _encoding;                   //!< Instruction encoding.
-    uint8_t _writeIndex;                 //!< First dst byte of a WRITE operation (default 0).
-    uint8_t _writeSize;                  //!< number of bytes to be written by a WRITE operation.
-    uint8_t _simdDstSize;                //!< Size of SIMD destination element.
-    uint8_t _simdSrcSize;                //!< Size of SIMD source element(s) (broadcast).
-    uint8_t _eflagsIn;                   //!< EFLAGS read by the instruction.
-    uint8_t _eflagsOut;                  //!< EFLAGS modified by the instruction.
-    uint8_t _reserved;                   //!< \internal
+    uint32_t _encoding        : 8;       //!< Instruction encoding.
+    uint32_t _writeIndex      : 8;       //!< First DST byte of a WRITE operation (default 0).
+    uint32_t _writeSize       : 8;       //!< number of bytes to be written in DST.
+    uint32_t _eflagsIn        : 8;       //!< EFLAGS read by the instruction.
+
+    uint32_t _eflagsOut       : 8;       //!< EFLAGS modified by the instruction.
+    uint32_t _iSignatureIndex : 9;       //!< First `ISignature` entry in the database.
+    uint32_t _iSignatureCount : 4;       //!< Number of relevant `ISignature` entries.
+    uint32_t _reserved        : 11;      //!< \internal
 
     uint32_t _instFlags;                 //!< Instruction flags.
     uint32_t _secondaryOpCode;           //!< Instruction's secondary opcode.
@@ -2359,23 +2362,36 @@ struct X86Inst {
   // [Accessors]
   // --------------------------------------------------------------------------
 
+  //! Get index to `X86InstDB::nameData` of this instruction.
+  //!
+  //! NOTE: If AsmJit was compiled with `ASMJIT_DISABLE_TEXT` then this will
+  //! always return zero.
+  ASMJIT_INLINE uint32_t getNameIndex() const noexcept { return _nameIndex; }
+  //! Get instruction's name (null terminated).
+  //!
+  //! NOTE: If AsmJit was compiled with `ASMJIT_DISABLE_TEXT` then this will
+  //! return an empty string (null terminated, but zero length).
+  ASMJIT_INLINE const char* getName() const noexcept;
+
+  //! Get index to `X86InstDB::iExtData` of this instruction.
+  ASMJIT_INLINE uint32_t getExtIndex() const noexcept { return _extIndex; }
   //! Get \ref ExtendedData& of the instruction.
-  ASMJIT_INLINE const ExtendedData& getExtendedData() const noexcept;
+  ASMJIT_INLINE const ExtendedData& getExtData() const noexcept;
   //! Get \ref ExtendedData* of the instruction.
-  ASMJIT_INLINE const ExtendedData* getExtendedDataPtr() const noexcept;
+  ASMJIT_INLINE const ExtendedData* getExtDataPtr() const noexcept;
 
   //! Get instruction encoding, see \ref Encoding.
-  ASMJIT_INLINE uint32_t getEncoding() const noexcept { return getExtendedData().getEncoding(); }
+  ASMJIT_INLINE uint32_t getEncoding() const noexcept { return getExtData().getEncoding(); }
 
   //! Get the primary instruction opcode, see \ref OpCodeBits.
   ASMJIT_INLINE uint32_t getPrimaryOpCode() const noexcept { return _primaryOpCode; }
   //! Get the secondary instruction opcode, see \ref OpCodeBits.
-  ASMJIT_INLINE uint32_t getSecondaryOpCode() const noexcept { return getExtendedData().getSecondaryOpCode(); }
+  ASMJIT_INLINE uint32_t getSecondaryOpCode() const noexcept { return getExtData().getSecondaryOpCode(); }
 
   //! Get whether the instruction has flag `flag`, see \ref InstFlags.
   ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (getFlags() & flag) != 0; }
   //! Get instruction flags, see \ref InstFlags.
-  ASMJIT_INLINE uint32_t getFlags() const noexcept { return getExtendedData().getFlags(); }
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return getExtData().getFlags(); }
 
   // --------------------------------------------------------------------------
   // [Get]
@@ -2455,27 +2471,26 @@ struct X86Inst {
   // --------------------------------------------------------------------------
 
   uint32_t _primaryOpCode;               //!< Instruction's primary opcode.
-  uint32_t _signatureTableIndex : 9;     //!< First `ISignature` entry in the database.
-  uint32_t _signatureTableCount : 4;     //!< Number of relevant `ISignature` entries.
-  uint32_t _extendedIndex : 10;          //!< Index to the `ExtendedData` table.
-  uint32_t _reserved : 9;                //!< Reserved for future use.
+  uint32_t _nameIndex : 14;              //!< Instruction's name index.
+  uint32_t _extIndex  : 10;              //!< Index to the `ExtendedData` table.
+  uint32_t _reserved  : 8;               //!< Reserved for future use.
 };
 
-//! \internal
-//! X86/X64 instruction data.
-ASMJIT_VARAPI const X86Inst _x86InstData[];
-
-//! \internal
-//! X86/X64 instruction extended data, accessible through `X86Inst`.
-ASMJIT_VARAPI const X86Inst::ExtendedData _x86InstExtendedData[];
+//! X86 instruction data under a single namespace.
+struct X86InstDB {
+  ASMJIT_API static const X86Inst instData[];
+  ASMJIT_API static const X86Inst::ExtendedData iExtData[];
+  ASMJIT_API static const char nameData[];
+};
 
 ASMJIT_INLINE const X86Inst& X86Inst::getInst(uint32_t instId) noexcept {
   ASMJIT_ASSERT(instId < X86Inst::_kIdCount);
-  return _x86InstData[instId];
+  return X86InstDB::instData[instId];
 }
 
-ASMJIT_INLINE const X86Inst::ExtendedData& X86Inst::getExtendedData() const noexcept { return _x86InstExtendedData[_extendedIndex]; }
-ASMJIT_INLINE const X86Inst::ExtendedData* X86Inst::getExtendedDataPtr() const noexcept { return &_x86InstExtendedData[_extendedIndex]; }
+ASMJIT_INLINE const char* X86Inst::getName() const noexcept { return &X86InstDB::nameData[_nameIndex]; }
+ASMJIT_INLINE const X86Inst::ExtendedData& X86Inst::getExtData() const noexcept { return X86InstDB::iExtData[_extIndex]; }
+ASMJIT_INLINE const X86Inst::ExtendedData* X86Inst::getExtDataPtr() const noexcept { return &X86InstDB::iExtData[_extIndex]; }
 
 // ============================================================================
 // [asmjit::X86Util]
@@ -2484,8 +2499,8 @@ ASMJIT_INLINE const X86Inst::ExtendedData* X86Inst::getExtendedDataPtr() const n
 struct X86Util {
   //! Pack a shuffle constant to be used with multimedia instructions (2 values).
   //!
-  //! \param a Position of the first component [0, 1], inclusive.
-  //! \param b Position of the second component [0, 1], inclusive.
+  //! \param a Position of the first  component [0, 1].
+  //! \param b Position of the second component [0, 1].
   //!
   //! Shuffle constants can be used to encode an immediate for these instructions:
   //!   - `shufpd`
@@ -2497,10 +2512,10 @@ struct X86Util {
 
   //! Pack a shuffle constant to be used with multimedia instructions (4 values).
   //!
-  //! \param a Position of the first component [0, 3], inclusive.
-  //! \param b Position of the second component [0, 3], inclusive.
-  //! \param c Position of the third component [0, 3], inclusive.
-  //! \param d Position of the fourth component [0, 3], inclusive.
+  //! \param a Position of the first  component [0, 3].
+  //! \param b Position of the second component [0, 3].
+  //! \param c Position of the third  component [0, 3].
+  //! \param d Position of the fourth component [0, 3].
   //!
   //! Shuffle constants can be used to encode an immediate for these instructions:
   //!   - `pshufw()`
