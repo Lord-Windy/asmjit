@@ -49,10 +49,6 @@ struct TiedReg {
     kWDecide     = 0x00000020U,          //!< RA can decide between reg/mem write.
     kXDecide     = 0x00000030U,          //!< RA can decide between reg/mem read-write.
 
-    kRConv       = 0x00000040U,          //!< Variable is converted to other type/class on the input.
-    kWConv       = 0x00000080U,          //!< Variable is converted from other type/class on the output.
-    kXConv       = 0x000000C0U,          //!< Combination of `kRConv` and `kWConv`.
-
     kRFunc       = 0x00000100U,          //!< Function argument passed in register.
     kWFunc       = 0x00000200U,          //!< Function return value passed into register.
     kXFunc       = 0x00000300U,          //!< Function argument and return value.
@@ -74,10 +70,10 @@ struct TiedReg {
   };
 
   // --------------------------------------------------------------------------
-  // [Setup]
+  // [Init / Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE void setup(VirtReg* vreg, uint32_t flags = 0, uint32_t inRegs = 0, uint32_t allocableRegs = 0) noexcept {
+  ASMJIT_INLINE void init(VirtReg* vreg, uint32_t flags = 0, uint32_t inRegs = 0, uint32_t allocableRegs = 0) noexcept {
     this->vreg = vreg;
     this->flags = flags;
     this->refCount = 0;
@@ -547,7 +543,6 @@ public:
   ZoneList<CBNode*> _jccList;             //!< Jump nodes.
 
   ZoneVector<VirtReg*> _contextVd;       //!< All variables used by the current function.
-
   RACell* _memVarCells;                  //!< Memory used to spill variables.
   RACell* _memStackCells;                //!< Memory used to allocate memory on the stack.
 

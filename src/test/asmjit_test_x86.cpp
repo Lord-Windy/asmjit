@@ -61,7 +61,7 @@ public:
   }
 
   static void add(ZoneVector<X86Test*>& tests) {
-    for (unsigned int i = 0; i <= 6; i++) {
+    for (unsigned int i = 0; i <= 8; i++) {
       for (unsigned int j = 0; j <= 4; j++) {
         tests.append(new X86Test_AlignBase(i, j, false));
         tests.append(new X86Test_AlignBase(i, j, true));
@@ -78,9 +78,12 @@ public:
       case 4: c.addFunc(FuncSignature4<int, int, int, int, int>(CallConv::kIdHost)); break;
       case 5: c.addFunc(FuncSignature5<int, int, int, int, int, int>(CallConv::kIdHost)); break;
       case 6: c.addFunc(FuncSignature6<int, int, int, int, int, int, int>(CallConv::kIdHost)); break;
+      case 7: c.addFunc(FuncSignature7<int, int, int, int, int, int, int, int>(CallConv::kIdHost)); break;
+      case 8: c.addFunc(FuncSignature8<int, int, int, int, int, int, int, int, int>(CallConv::kIdHost)); break;
     }
 
-    c.getFunc()->setHint(kFuncHintNaked, _naked);
+    if (!_naked)
+      c.getFunc()->addFrameFlags(FuncFrame::kFlagPreserveFP);
 
     X86Gp gpVar = c.newIntPtr("gpVar");
     X86Gp gpSum = c.newInt32("gpSum");
@@ -92,7 +95,7 @@ public:
       uint32_t varIndex = 0;
       uint32_t physId = 0;
       uint32_t regMask = 0x1;
-      uint32_t preservedMask = c.getFunc()->getDecl()->_callConv.getPreservedMask(Reg::kKindGp);
+      uint32_t preservedMask = c.getFunc()->getDecl()->_callConv.getPreservedRegs(Reg::kKindGp);
 
       do {
         if ((preservedMask & regMask) != 0 && (physId != X86Gp::kIdSp && physId != X86Gp::kIdBp)) {
@@ -108,7 +111,7 @@ public:
       } while (varIndex < _numVars && physId < gpCount);
     }
 
-    // Do a sum of arguments to verify possible relocation when misaligned.
+    // Do a sum of arguments to verify a possible relocation when misaligned.
     if (_numArgs) {
       c.xor_(gpSum, gpSum);
       for (uint32_t argIndex = 0; argIndex < _numArgs; argIndex++) {
@@ -139,6 +142,8 @@ public:
     typedef int (*Func4)(int, int, int, int);
     typedef int (*Func5)(int, int, int, int, int);
     typedef int (*Func6)(int, int, int, int, int, int);
+    typedef int (*Func7)(int, int, int, int, int, int, int);
+    typedef int (*Func8)(int, int, int, int, int, int, int, int);
 
     unsigned int resultRet = 0;
     unsigned int expectRet = 0;
@@ -171,6 +176,14 @@ public:
       case 6:
         resultRet = ptr_cast<Func6>(_func)(1, 2, 3, 4, 5, 6);
         expectRet = 1 + 2 + 3 + 4 + 5 + 6;
+        break;
+      case 7:
+        resultRet = ptr_cast<Func7>(_func)(1, 2, 3, 4, 5, 6, 7);
+        expectRet = 1 + 2 + 3 + 4 + 5 + 6 + 7;
+        break;
+      case 8:
+        resultRet = ptr_cast<Func8>(_func)(1, 2, 3, 4, 5, 6, 7, 8);
+        expectRet = 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8;
         break;
     }
 
@@ -3407,7 +3420,7 @@ int main(int argc, char* argv[]) {
   X86TestSuite testSuite;
   CmdLine cmd(argc, argv);
 
-  if (cmd.hasArg("--always-print-log"))
+  //if (cmd.hasArg("--always-print-log"))
     testSuite._alwaysPrintLog = true;
 
   return testSuite.run();

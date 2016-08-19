@@ -99,7 +99,7 @@ struct VirtReg {
   }
 
   //! Get variable state, only used by `RAPass`.
-  ASMJIT_INLINE uint32_t getState() const { return _state; }
+  ASMJIT_INLINE uint32_t getState() const noexcept { return _state; }
   //! Set variable state, only used by `RAPass`.
   ASMJIT_INLINE void setState(uint32_t state) {
     ASMJIT_ASSERT(state <= 0xFF);
@@ -107,7 +107,7 @@ struct VirtReg {
   }
 
   //! Get register index.
-  ASMJIT_INLINE uint32_t getPhysId() const { return _physId; }
+  ASMJIT_INLINE uint32_t getPhysId() const noexcept { return _physId; }
   //! Set register index.
   ASMJIT_INLINE void setPhysId(uint32_t physId) {
     ASMJIT_ASSERT(physId <= kInvalidReg);
@@ -123,28 +123,28 @@ struct VirtReg {
   //! Add a home register index to the home registers mask.
   ASMJIT_INLINE void addHomeId(uint32_t physId) { _homeMask |= Utils::mask(physId); }
 
+  ASMJIT_INLINE bool isFixed() const noexcept { return static_cast<bool>(_isFixed); }
+
   //! Get whether the VirtReg is only memory allocated on the stack.
-  ASMJIT_INLINE bool isStack() const { return static_cast<bool>(_isStack); }
-  //! Get whether the variable is a function argument passed through memory.
-  ASMJIT_INLINE bool isMemArg() const { return static_cast<bool>(_isMemArg); }
+  ASMJIT_INLINE bool isStack() const noexcept { return static_cast<bool>(_isStack); }
 
   //! Get whether to save variable when it's unused (spill).
-  ASMJIT_INLINE bool saveOnUnuse() const { return static_cast<bool>(_saveOnUnuse); }
+  ASMJIT_INLINE bool saveOnUnuse() const noexcept { return static_cast<bool>(_saveOnUnuse); }
 
   //! Get whether the variable was changed.
-  ASMJIT_INLINE bool isModified() const { return static_cast<bool>(_modified); }
+  ASMJIT_INLINE bool isModified() const noexcept { return static_cast<bool>(_modified); }
   //! Set whether the variable was changed.
-  ASMJIT_INLINE void setModified(bool modified) { _modified = modified; }
+  ASMJIT_INLINE void setModified(bool modified) noexcept { _modified = modified; }
 
   //! Get home memory offset.
-  ASMJIT_INLINE int32_t getMemOffset() const { return _memOffset; }
+  ASMJIT_INLINE int32_t getMemOffset() const noexcept { return _memOffset; }
   //! Set home memory offset.
-  ASMJIT_INLINE void setMemOffset(int32_t offset) { _memOffset = offset; }
+  ASMJIT_INLINE void setMemOffset(int32_t offset) noexcept { _memOffset = offset; }
 
   //! Get home memory cell.
-  ASMJIT_INLINE RACell* getMemCell() const { return _memCell; }
+  ASMJIT_INLINE RACell* getMemCell() const noexcept { return _memCell; }
   //! Set home memory cell.
-  ASMJIT_INLINE void setMemCell(RACell* cell) { _memCell = cell; }
+  ASMJIT_INLINE void setMemCell(RACell* cell) noexcept { _memCell = cell; }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -157,8 +157,8 @@ struct VirtReg {
   uint8_t _typeId;                       //!< Type-id.
   uint8_t _alignment;                    //!< Register's natural alignment (for spilling).
   uint8_t _priority;                     //!< Allocation priority (hint for RAPass that can be ignored).
+  uint8_t _isFixed : 1;                  //!< True if this is a fixed register, never reallocated.
   uint8_t _isStack : 1;                  //!< True if the virtual register is only used as a stack.
-  uint8_t _isMemArg : 1;                 //!< If the variable is a function argument passed through memory.
   uint8_t _isMaterialized : 1;           //!< Register is constant that is easily created by a single instruction.
   uint8_t _saveOnUnuse : 1;              //!< Save on unuse (at end of the variable scope).
 
@@ -277,26 +277,9 @@ public:
       _frame(),
       _end(nullptr),
       _args(nullptr),
-      _funcHints(Utils::mask(kFuncHintNaked)),
-      _funcFlags(0),
-      _naturalStackAlignment(0),
-      _requiredStackAlignment(0),
-      _argStackSize(0),
-      _memStackSize(0),
-      _callStackSize(0) {
+      _isFinished(false) {
 
     _type = kNodeFunc;
-    _saveRestoreRegs[0] = 0;
-    _saveRestoreRegs[1] = 0;
-    _saveRestoreRegs[2] = 0;
-    _saveRestoreRegs[3] = 0;
-
-    _alignStackSize = 0;
-    _alignedMemStackSize = 0;
-    _pushPopStackSize = 0;
-    _moveStackSize = 0;
-    _extraStackSize = 0;
-
     _stackFrameRegIndex = kInvalidReg;
     _isStackFrameRegPreserved = false;
 
@@ -344,107 +327,8 @@ public:
     _args[i] = nullptr;
   }
 
-  //! Get function hints.
-  ASMJIT_INLINE uint32_t getFuncHints() const noexcept { return _funcHints; }
-  //! Get function flags.
-  ASMJIT_INLINE uint32_t getFuncFlags() const noexcept { return _funcFlags; }
-
-  //! Get whether the _funcFlags has `flag`
-  ASMJIT_INLINE bool hasFuncFlag(uint32_t flag) const noexcept { return (_funcFlags & flag) != 0; }
-  //! Set function `flag`.
-  ASMJIT_INLINE void addFuncFlags(uint32_t flags) noexcept { _funcFlags |= flags; }
-  //! Clear function `flag`.
-  ASMJIT_INLINE void clearFuncFlags(uint32_t flags) noexcept { _funcFlags &= ~flags; }
-
-  //! Get whether the function is naked.
-  ASMJIT_INLINE bool isNaked() const noexcept { return hasFuncFlag(kFuncFlagIsNaked); }
-  //! Get whether the function is also a caller.
-  ASMJIT_INLINE bool isCaller() const noexcept { return hasFuncFlag(kFuncFlagIsCaller); }
-  //! Get whether the required stack alignment is lower than expected one,
-  //! thus it has to be aligned manually.
-  ASMJIT_INLINE bool isStackMisaligned() const noexcept { return hasFuncFlag(kFuncFlagIsStackMisaligned); }
-  //! Get whether the stack pointer is adjusted inside function prolog/epilog.
-  ASMJIT_INLINE bool isStackAdjusted() const noexcept { return hasFuncFlag(kFuncFlagIsStackAdjusted); }
-
-  //! Get whether the function is finished.
-  ASMJIT_INLINE bool isFinished() const noexcept { return hasFuncFlag(kFuncFlagIsFinished); }
-
-  //! Get expected stack alignment.
-  ASMJIT_INLINE uint32_t getNaturalStackAlignment() const noexcept { return _naturalStackAlignment; }
-  //! Set expected stack alignment.
-  ASMJIT_INLINE void setNaturalStackAlignment(uint32_t alignment) noexcept { _naturalStackAlignment = alignment; }
-
-  //! Get required stack alignment.
-  ASMJIT_INLINE uint32_t getRequiredStackAlignment() const noexcept { return _requiredStackAlignment; }
-  //! Set required stack alignment.
-  ASMJIT_INLINE void setRequiredStackAlignment(uint32_t alignment) noexcept { _requiredStackAlignment = alignment; }
-
-  //! Update required stack alignment so it's not lower than expected
-  //! stack alignment.
-  ASMJIT_INLINE void updateRequiredStackAlignment() noexcept {
-    if (_requiredStackAlignment <= _naturalStackAlignment) {
-      _requiredStackAlignment = _naturalStackAlignment;
-      clearFuncFlags(kFuncFlagIsStackMisaligned);
-    }
-    else {
-      addFuncFlags(kFuncFlagIsStackMisaligned);
-    }
-  }
-
-  //! Get stack size used by function arguments.
-  ASMJIT_INLINE uint32_t getArgStackSize() const noexcept { return _argStackSize; }
-  //! Get stack size used by variables and memory allocated on the stack.
-  ASMJIT_INLINE uint32_t getMemStackSize() const noexcept { return _memStackSize; }
-
-  //! Get stack size used by function calls.
-  ASMJIT_INLINE uint32_t getCallStackSize() const noexcept { return _callStackSize; }
-  //! Merge stack size used by function call with `s`.
-  ASMJIT_INLINE void mergeCallStackSize(uint32_t s) noexcept { if (_callStackSize < s) _callStackSize = s; }
-
-  // --------------------------------------------------------------------------
-  // [Flags]
-  // --------------------------------------------------------------------------
-
-  //! Set function hint.
-  ASMJIT_INLINE void setHint(uint32_t hint, uint32_t value) noexcept {
-    ASMJIT_ASSERT(hint <= 31);
-    ASMJIT_ASSERT(value <= 1);
-
-    _funcHints &= ~(1     << hint);
-    _funcHints |=  (value << hint);
-  }
-
-  //! Get function hint.
-  ASMJIT_INLINE uint32_t getHint(uint32_t hint) const noexcept {
-    ASMJIT_ASSERT(hint <= 31);
-    return (_funcHints >> hint) & 0x1;
-  }
-
-  //! Get registers which have to be saved in prolog/epilog.
-  ASMJIT_INLINE uint32_t getSaveRestoreRegs(uint32_t kind) noexcept { return _saveRestoreRegs[kind]; }
-
-  //! Get stack size needed to align stack back to the nature alignment.
-  ASMJIT_INLINE uint32_t getAlignStackSize() const noexcept { return _alignStackSize; }
-  //! Set stack size needed to align stack back to the nature alignment.
-  ASMJIT_INLINE void setAlignStackSize(uint32_t s) noexcept { _alignStackSize = s; }
-
-  //! Get aligned stack size used by variables and memory allocated on the stack.
-  ASMJIT_INLINE uint32_t getAlignedMemStackSize() const noexcept { return _alignedMemStackSize; }
-
-  //! Get stack size used by push/pop sequences in prolog/epilog.
-  ASMJIT_INLINE uint32_t getPushPopStackSize() const noexcept { return _pushPopStackSize; }
-  //! Set stack size used by push/pop sequences in prolog/epilog.
-  ASMJIT_INLINE void setPushPopStackSize(uint32_t s) noexcept { _pushPopStackSize = s; }
-
-  //! Get stack size used by mov sequences in prolog/epilog.
-  ASMJIT_INLINE uint32_t getMoveStackSize() const noexcept { return _moveStackSize; }
-  //! Set stack size used by mov sequences in prolog/epilog.
-  ASMJIT_INLINE void setMoveStackSize(uint32_t s) noexcept { _moveStackSize = s; }
-
-  //! Get extra stack size.
-  ASMJIT_INLINE uint32_t getExtraStackSize() const noexcept { return _extraStackSize; }
-  //! Set extra stack size.
-  ASMJIT_INLINE void setExtraStackSize(uint32_t s) noexcept { _extraStackSize  = s; }
+  ASMJIT_INLINE uint32_t getFrameFlags() const noexcept { return _frame.getFlags(); }
+  ASMJIT_INLINE void addFrameFlags(uint32_t flags) noexcept { _frame.addFlags(flags); }
 
   //! Get whether the function has stack frame register (only when the stack is misaligned).
   //!
@@ -474,32 +358,8 @@ public:
 
   VirtReg** _args;                       //!< Arguments array as `VirtReg`.
 
-  uint32_t _funcHints;                   //!< Function hints;
-  uint32_t _funcFlags;                   //!< Function flags.
-
-  uint8_t _naturalStackAlignment;        //!< Natural stack alignment (OS/ABI).
-  uint8_t _requiredStackAlignment;       //!< Required stack alignment.
-  uint32_t _argStackSize;                //!< Stack size needed for function arguments.
-  uint32_t _memStackSize;                //!< Stack size needed for all variables and memory allocated on the stack.
-  uint32_t _callStackSize;               //!< Stack size needed to call other functions.
-
-  //! Registers which must be saved/restored in prolog/epilog.
-  uint32_t _saveRestoreRegs[4];
-
-  //! Stack size needed to align function back to the nature alignment.
-  uint32_t _alignStackSize;
-  //! Like `_memStackSize`, but aligned.
-  uint32_t _alignedMemStackSize;
-
-  //! Stack required for push/pop in prolog/epilog (X86/X64 specific).
-  uint32_t _pushPopStackSize;
-  //! Stack required for movs in prolog/epilog (X86/X64 specific).
-  uint32_t _moveStackSize;
-
-  //! Stack required to put extra data (for example function arguments
-  //! when manually aligning to requested alignment).
-  uint32_t _extraStackSize;
-
+  //! Function was finished by `Compiler::endFunc()`.
+  uint8_t _isFinished;
   //! Stack frame register.
   uint8_t _stackFrameRegIndex;
   //! Whether the stack frame register is preserved.
@@ -507,7 +367,6 @@ public:
   //! Gp registers indexes that can be used to copy function arguments
   //! to a new location in case we are doing manual stack alignment.
   uint8_t _stackFrameCopyGpIndex[6];
-
 };
 
 // ============================================================================

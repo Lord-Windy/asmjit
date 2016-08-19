@@ -234,13 +234,8 @@ CCFunc* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
     return nullptr;
   }
 
-  // Function arguments stack size. Since function requires _argStackSize to be
-  // set, we have to copy it from FuncDecl.
-  func->_argStackSize = func->_decl.getArgStackSize();
-
-  // Expected/Required stack alignment.
-  func->_naturalStackAlignment = _codeInfo.getStackAlignment();
-  func->_requiredStackAlignment = 0;
+  // Function frame.
+  func->_frame.setNaturalStackAlignment(_codeInfo.getStackAlignment());
 
   // Allocate space for function arguments.
   func->_args = nullptr;
@@ -284,8 +279,8 @@ CBSentinel* X86Compiler::endFunc() {
     _localConstPool = nullptr;
   }
 
-  // Finalize.
-  func->addFuncFlags(kFuncFlagIsFinished);
+  // Mark as finished.
+  func->_isFinished = true;
   _func = nullptr;
 
   setCursor(func->getEnd());

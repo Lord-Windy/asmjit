@@ -221,9 +221,9 @@ struct CallConv {
   ASMJIT_INLINE const uint8_t* getPassedOrder(uint32_t regKind) const noexcept {
   }
 
-  ASMJIT_INLINE uint32_t getPassedMask(uint32_t regKind) const noexcept {
+  ASMJIT_INLINE uint32_t getPassedRegs(uint32_t regKind) const noexcept {
     ASMJIT_ASSERT(regKind < kNumRegKinds);
-    return _passedMask[regKind];
+    return _passedRegs[regKind];
   }
 
   ASMJIT_INLINE void _setPassedPacked(uint32_t regKind, uint32_t p0, uint32_t p1) noexcept {
@@ -238,7 +238,7 @@ struct CallConv {
 
     _setPassedPacked(regKind, ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF),
                               ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF));
-    _passedMask[regKind] = 0;
+    _passedRegs[regKind] = 0;
   }
 
   ASMJIT_INLINE void setPassedOrder(uint32_t regKind, uint32_t a0, uint32_t a1 = 0xFF, uint32_t a2 = 0xFF, uint32_t a3 = 0xFF, uint32_t a4 = 0xFF, uint32_t a5 = 0xFF, uint32_t a6 = 0xFF, uint32_t a7 = 0xFF) noexcept {
@@ -250,7 +250,7 @@ struct CallConv {
     // NOTE: This should always be called with all arguments known at compile
     // time, so even if it looks scary it should be translated to a single
     // instruction.
-    _passedMask[regKind] = (a0 != 0xFF ? 1U << a0 : 0U) |
+    _passedRegs[regKind] = (a0 != 0xFF ? 1U << a0 : 0U) |
                            (a1 != 0xFF ? 1U << a1 : 0U) |
                            (a2 != 0xFF ? 1U << a2 : 0U) |
                            (a3 != 0xFF ? 1U << a3 : 0U) |
@@ -260,14 +260,15 @@ struct CallConv {
                            (a7 != 0xFF ? 1U << a7 : 0U) ;
   }
 
-  ASMJIT_INLINE uint32_t getPreservedMask(uint32_t regKind) const noexcept {
+  ASMJIT_INLINE uint32_t getPreservedRegs(uint32_t regKind) const noexcept {
     ASMJIT_ASSERT(regKind < kNumRegKinds);
-    return _preservedMask[regKind];
+    return _preservedRegs[regKind];
   }
 
-  ASMJIT_INLINE void setPreservedMask(uint32_t regKind, uint32_t mask) noexcept {
+
+  ASMJIT_INLINE void setPreservedRegs(uint32_t regKind, uint32_t regs) noexcept {
     ASMJIT_ASSERT(regKind < kNumRegKinds);
-    _preservedMask[regKind] = mask;
+    _preservedRegs[regKind] = regs;
   }
 
   // --------------------------------------------------------------------------
@@ -280,8 +281,8 @@ struct CallConv {
   uint16_t _redZoneSize;                 //!< Red zone size (AMD64 == 128 bytes).
   uint16_t _spillZoneSize;               //!< Spill zone size (WIN64 == 32 bytes).
 
-  uint32_t _preservedMask[kNumRegKinds]; //!< Mask of all preserved registers, per kind.
-  uint32_t _passedMask[kNumRegKinds];    //!< Mask of all passed registers, per kind.
+  uint32_t _preservedRegs[kNumRegKinds]; //!< Mask of all preserved registers, per kind.
+  uint32_t _passedRegs[kNumRegKinds];    //!< Mask of all passed registers, per kind.
   RegOrder _passedOrder[kNumRegKinds];   //!< Passed registers' order, per kind.
 };
 
@@ -289,13 +290,12 @@ struct CallConv {
 // [asmjit::FuncFrame]
 // ============================================================================
 
-//! Function frame.
+//! Function frame (definition).
 //!
 //! This structure can be used to create a function frame in a cross-platform
 //! way. It contains information about the function's stack to be used and
 //! registers to be saved and restored. Based on this information in can
-//! calculate the optimal layout of the function that can be then passed to an
-//! architecture-specific emitter.
+//! calculate the optimal layout of a function as \ref FuncLayout.
 struct FuncFrame {
   //! FuncFrame flags.
   //!
@@ -307,10 +307,127 @@ struct FuncFrame {
     kFlagHasCalls         = 0x00000001U, //!< Function calls other functions (is not leaf).
     kFlagCompact          = 0x00008000U, //!< Use smaller, but possibly slower prolog/epilog.
 
-    kX86FlagEmms          = 0x00010000U  //!< Emit EMMS instruction in epilog (X86).
+    kX86FlagAlignedVecSR  = 0x00010000U, //!< Use aligned save/restore of VEC regs.
+    kX86FlagMmxCleanup    = 0x00020000U, //!< Emit EMMS instruction in epilog (X86).
+    kX86FlagAvxCleanup    = 0x00040000U  //!< Emit VZEROUPPER instruction in epilog (X86).
   };
 
   //! FuncFrame is bound to the same limits as \ref CallConv.
+  ASMJIT_ENUM(Limits) {
+    kNumRegKinds = CallConv::kNumRegKinds
+  };
+
+  // --------------------------------------------------------------------------
+  // [Init / Reset]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE void reset() noexcept {
+    ::memset(this, 0, sizeof(*this));
+    _stackArgsRegId = kInvalidReg;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get FuncFrame flags, see \ref Flags.
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
+  //! Check if a FuncFrame `flag` is set, see \ref Flags.
+  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
+  //! Add `flags` to FuncFrame, see \ref Flags.
+  ASMJIT_INLINE void addFlags(uint32_t flags) noexcept { _flags |= flags; }
+  //! Clear FuncFrame `flags`, see \ref Flags.
+  ASMJIT_INLINE void clearFlags(uint32_t flags) noexcept { _flags &= ~flags; }
+
+  //! Get if the function is naked - it doesn't preserve frame pointer (EBP|ESP).
+  ASMJIT_INLINE bool isNaked() const noexcept { return (_flags & kFlagPreserveFP) == 0; }
+  //! Get if the function prolog and epilog should be compacted (as small as possible).
+  ASMJIT_INLINE bool isCompact() const noexcept { return (_flags & kFlagCompact) != 0; }
+
+  //! Get which registers (by `kind`) are saved/restored in prolog/epilog, respectively.
+  ASMJIT_INLINE uint32_t getDirtyRegs(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    return _dirtyRegs[kind];
+  }
+
+  //! Set which registers (by `kind`) are saved/restored in prolog/epilog, respectively.
+  ASMJIT_INLINE void setDirtyRegs(uint32_t kind, uint32_t regs) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    _dirtyRegs[kind] = regs;
+  }
+
+  //! Add registers (by `kind`) to saved/restored registers.
+  ASMJIT_INLINE void addDirtyRegs(uint32_t kind, uint32_t regs) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    _dirtyRegs[kind] |= regs;
+  }
+
+  //! Get stack-frame size used by the function.
+  ASMJIT_INLINE uint32_t getStackFrameSize() const noexcept { return _stackFrameSize; }
+  //! Get call-frame size used by the function.
+  ASMJIT_INLINE uint32_t getCallFrameSize() const noexcept { return _callFrameSize; }
+
+  //! Get minimum stack-frame alignment required by the function.
+  ASMJIT_INLINE uint32_t getStackFrameAlignment() const noexcept { return _stackFrameAlignment; }
+  //! Get minimum call-frame alignment required by the function.
+  ASMJIT_INLINE uint32_t getCallFrameAlignment() const noexcept { return _callFrameAlignment; }
+  //! Get a natural alignment as defined by CallConv or ABI.
+  ASMJIT_INLINE uint32_t getNaturalStackAlignment() const noexcept { return _naturalStackAlignment; }
+
+  ASMJIT_INLINE void setStackFrameSize(uint32_t size) noexcept { _stackFrameSize = size; }
+  ASMJIT_INLINE void setCallFrameSize(uint32_t size) noexcept { _callFrameSize = size; }
+
+  ASMJIT_INLINE void setStackFrameAlignment(uint32_t value) noexcept {
+    ASMJIT_ASSERT(value < 256);
+    _stackFrameAlignment = static_cast<uint8_t>(value);
+  }
+
+  ASMJIT_INLINE void setCallFrameAlignment(uint32_t value) noexcept {
+    ASMJIT_ASSERT(value < 256);
+    _callFrameAlignment = static_cast<uint8_t>(value);
+  }
+
+  ASMJIT_INLINE void mergeStackFrameSize(uint32_t size) noexcept { _stackFrameSize = Utils::iMax<uint32_t>(_stackFrameSize, size); }
+  ASMJIT_INLINE void mergeCallFrameSize(uint32_t size) noexcept { _callFrameSize = Utils::iMax<uint32_t>(_callFrameSize, size); }
+
+  ASMJIT_INLINE void mergeStackFrameAlignment(uint32_t value) noexcept {
+    ASMJIT_ASSERT(value < 256);
+    _stackFrameAlignment = static_cast<uint8_t>(Utils::iMax<uint32_t>(_stackFrameAlignment, value));
+  }
+
+  ASMJIT_INLINE void mergeCallFrameAlignment(uint32_t value) noexcept {
+    ASMJIT_ASSERT(value < 256);
+    _callFrameAlignment = static_cast<uint8_t>(Utils::iMax<uint32_t>(_callFrameAlignment, value));
+  }
+
+  ASMJIT_INLINE void setNaturalStackAlignment(uint32_t value) noexcept {
+    ASMJIT_ASSERT(value < 256);
+    _naturalStackAlignment = static_cast<uint8_t>(value);
+  }
+
+  ASMJIT_INLINE bool hasStackArgsRegId() const noexcept { return _stackArgsRegId != kInvalidReg; }
+  ASMJIT_INLINE uint32_t getStackArgsRegId() const noexcept { return _stackArgsRegId; }
+  ASMJIT_INLINE void setStackArgsRegId(uint32_t regId) { _stackArgsRegId = regId; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  uint32_t _flags;                       //!< FuncFrame flags.
+  uint32_t _dirtyRegs[kNumRegKinds];     //!< Registers used by the function.
+
+  uint8_t _stackFrameAlignment;          //!< Minimum alignment of stack-frame.
+  uint8_t _callFrameAlignment;           //!< Minimum alignment of call-frame.
+  uint8_t _naturalStackAlignment;        //!< Natural stack alignment as defined by OS/ABI.
+  uint8_t _stackArgsRegId;               //!< Register that holds base-address to arguments passed by stack.
+
+  uint32_t _stackFrameSize;              //!< Size of a stack-frame used by the function.
+  uint32_t _callFrameSize;               //!< Size of a call-frame (not part of _stackFrameSize).
+};
+
+//! Function layout (calculated from \ref FuncFrame).
+struct FuncLayout {
+  //! FuncLayout is bound to the same limits as \ref CallConv.
   ASMJIT_ENUM(Limits) {
     kNumRegKinds = CallConv::kNumRegKinds
   };
@@ -325,115 +442,65 @@ struct FuncFrame {
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get FuncFrame flags.
-  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
-  //! Check if a FuncFrame flag is set.
-  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
+  ASMJIT_INLINE bool hasPreservedFP() const noexcept { return static_cast<bool>(_preservedFP); }
+  ASMJIT_INLINE bool hasDynamicAlignment() const noexcept { return static_cast<bool>(_dynamicAlignment); }
+  ASMJIT_INLINE bool hasX86MmxCleanup() const noexcept { return static_cast<bool>(_x86MmxCleanup); }
+  ASMJIT_INLINE bool hasX86AvxCleanup() const noexcept { return static_cast<bool>(_x86AvxCleanup); }
 
-  //! Get if the function is naked - it doesn't preserve frame pointer (EBP|ESP).
-  ASMJIT_INLINE bool isNaked() const noexcept { return (_flags & kFlagPreserveFP) == 0; }
-  //! Get if the function prolog and epilog should be compacted (as small as possible).
-  ASMJIT_INLINE bool isCompact() const noexcept { return (_flags & kFlagCompact) != 0; }
-
-  //! Get if manual stack alignment is required.
-  //!
-  //! It means that the stack alignment required by the function (to spill its
-  //! registers, for example) is higher than natural alignment guaranteed by
-  //! the calling convention and/or ABI.
-  ASMJIT_INLINE bool isManualAlignmentRequied() const noexcept {
-    // NOTE: Don't return true when final stack alignment is 8. In 32-bit mode
-    // we don't care about that, and there is no 64-bit ABI that uses less than
-    // 128-bit stack alignment.
-    return _finalStackAlignment > _naturalStackAlignment &&
-           _finalStackAlignment >= 16;
+  ASMJIT_INLINE uint32_t getSavedRegs(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    return _savedRegs[kind];
   }
+
+  //! Get stack size.
+  ASMJIT_INLINE uint32_t getStackSize() const noexcept { return _stackSize; }
+  //! Get stack alignment.
+  ASMJIT_INLINE uint32_t getStackAlignment() const noexcept { return _stackAlignment; }
+  //! Get the offset needed to access the function's stack (it skips call-stack).
+  ASMJIT_INLINE uint32_t getStackBaseOffset() const noexcept { return _stackBaseOffset; }
+
+  //! Get stack size required to save GP registers.
+  ASMJIT_INLINE uint32_t getGpStackSize() const noexcept { return _gpStackSize; }
+  //! Get stack size required to save VEC registers.
+  ASMJIT_INLINE uint32_t getVecStackSize() const noexcept { return _vecStackSize; }
+
+  ASMJIT_INLINE uint32_t getGpStackOffset() const noexcept { return _gpStackOffset; }
+  ASMJIT_INLINE uint32_t getVecStackOffset() const noexcept { return _vecStackOffset; }
+
+  ASMJIT_INLINE uint32_t getStackArgsRegId() const noexcept { return _stackArgsRegId; }
+  ASMJIT_INLINE uint32_t getStackArgsOffset() const noexcept { return _stackArgsOffset; }
+
+  ASMJIT_INLINE bool hasStackAdjustment() const noexcept { return _stackAdjustment != 0; }
+  ASMJIT_INLINE uint32_t getStackAdjustment() const noexcept { return _stackAdjustment; }
+
+  ASMJIT_INLINE bool hasCalleeStackCleanup() const noexcept { return _calleeStackCleanup != 0; }
+  ASMJIT_INLINE uint32_t getCalleeStackCleanup() const noexcept { return _calleeStackCleanup; }
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  uint32_t _flags;                       //!< FuncFrame flags.
+  uint32_t _savedRegs[kNumRegKinds];     //!< Registers that will be saved/restored in prolog/epilog
 
-  uint32_t _stackDataSize;               //!< Stack size requested by the function for its data.
-  uint8_t _stackDataAlignment;           //!< Minimum alignment of the stack requested by the function.
-  uint8_t _naturalStackAlignment;        //!< Natural stack alignment as defined by OS/ABI.
-  uint32_t _savedMask[kNumRegKinds];     //!< Registers which must be saved/restored in prolog/epilog.
+  uint32_t _preservedFP : 1;             //!< Function preserves frame-pointer.
+  uint32_t _dynamicAlignment : 1;        //!< Function dynamically aligns stack.
+  uint32_t _x86MmxCleanup : 1;           //!< Emit 'emms' in epilog (X86 specific).
+  uint32_t _x86AvxCleanup : 1;           //!< Emit 'vzeroupper' in epilog (X86 specific).
 
-  uint32_t _finalStackSize;              //!< Final stack size (sum of everything).
-  uint8_t _finalStackAlignment;          //!< Final stack alignment of the function (required).
-  uint16_t _finalGpStackSize;            //!< Final stack size required to save GP regs.
-  uint16_t _finalVecStackSize;           //!< Final stack size required to save VEC regs.
-};
+  uint32_t _stackSize;                   //!< Stack size (sum of function's stack and call stack).
+  uint32_t _stackBaseOffset;             //!< Stack offset (non-zero if kFlagHasCalls is set).
+  uint32_t _stackAdjustment;             //!< Stack adjustment in prolog/epilog.
+  uint32_t _stackArgsOffset;             //!< Offset to the first argument passed by stack of _stackArgsRegId.
 
-// ============================================================================
-// [asmjit::FuncHint]
-// ============================================================================
+  uint8_t _stackAlignment;               //!< Final stack alignment of the functions.
+  uint8_t _stackBaseRegId;               //!< GP register that holds address of base stack address (call-frame).
+  uint8_t _stackArgsRegId;               //!< GP register that holds address the first argument passed by stack.
 
-//! Function hints.
-ASMJIT_ENUM(FuncHint) {
-  //! Generate a naked function by omitting its prolog and epilog (default true).
-  //!
-  //! Naked functions should always result in less code required for function's
-  //! prolog and epilog. In addition, on X86/64 naked functions save one register
-  //! (ebp or rbp), which can be used by the function instead.
-  kFuncHintNaked = 0,
-
-  //! Generate a compact function prolog/epilog if possible (default true).
-  //!
-  //! X86/X64 Specific
-  //! ----------------
-  //!
-  //! Use shorter, but possible slower prolog/epilog sequence to save/restore
-  //! registers. At the moment this only enables emitting `leave` in function's
-  //! epilog to make the code shorter, however, the counterpart `enter` is not
-  //! used in function's prolog for performance reasons.
-  kFuncHintCompact = 1,
-
-  //! Emit `emms` instruction in the function's epilog.
-  kFuncHintX86Emms = 17
-};
-
-// ============================================================================
-// [asmjit::FuncFlags]
-// ============================================================================
-
-//! Function flags.
-ASMJIT_ENUM(FuncFlags) {
-  //! Whether the function is using naked (minimal) prolog / epilog.
-  kFuncFlagIsNaked = 0x00000001,
-
-  //! Whether an another function is called from this function.
-  kFuncFlagIsCaller = 0x00000002,
-
-  //! Whether the stack is not aligned to the required stack alignment,
-  //! thus it has to be aligned manually.
-  kFuncFlagIsStackMisaligned = 0x00000004,
-
-  //! Whether the stack pointer is adjusted by the stack size needed
-  //! to save registers and function variables.
-  //!
-  //! X86/X64 Specific
-  //! ----------------
-  //!
-  //! Stack pointer (ESP/RSP) is adjusted by 'sub' instruction in prolog and by
-  //! 'add' instruction in epilog (only if function is not naked). If function
-  //! needs to perform manual stack alignment more instructions are used to
-  //! adjust the stack (like "and zsp, -Alignment").
-  kFuncFlagIsStackAdjusted = 0x00000008,
-
-  //! Whether the function is finished using `CodeCompiler::endFunc()`.
-  kFuncFlagIsFinished = 0x80000000,
-
-  //! Whether to emit `leave` instead of two instructions in case that the
-  //! function saves and restores the frame pointer.
-  kFuncFlagX86Leave = 0x00010000,
-
-  //! Whether it's required to move arguments to a new stack location,
-  //! because of manual aligning.
-  kFuncFlagX86MoveArgs = 0x00040000,
-
-  //! Whether to emit `emms` instruction in epilog (auto-detected).
-  kFuncFlagX86Emms = 0x01000000
+  uint16_t _calleeStackCleanup;          //!< How many bytes the callee should add to the stack (X86 STDCALL).
+  uint16_t _gpStackSize;                 //!< Stack size required to save GP regs.
+  uint16_t _vecStackSize;                //!< Stack size required to save VEC regs.
+  uint32_t _gpStackOffset;               //!< Offset where saved GP regs are stored.
+  uint32_t _vecStackOffset;              //!< Offset where saved GP regs are stored.
 };
 
 // ============================================================================
@@ -524,8 +591,8 @@ struct FuncInOut {
   }
 
   //! Initialize this in/out by a given `typeId` and `offset`.
-  ASMJIT_INLINE void initStack(uint32_t typeId, uint32_t offset) noexcept {
-    _value = (typeId << kTypeIdShift) | (offset << kStackOffsetShift) | kIsByStack;
+  ASMJIT_INLINE void initStack(uint32_t typeId, uint32_t stackOffset) noexcept {
+    _value = (typeId << kTypeIdShift) | (stackOffset << kStackOffsetShift) | kIsByStack;
   }
 
   //! Reset FuncInOut to uninitialized state.
@@ -658,9 +725,7 @@ struct FuncSignatureX : public FuncSignature {
   }
 
   //! Set the return type to `retType`.
-  ASMJIT_INLINE void setRet(uint32_t retType) noexcept {
-    _ret = retType;
-  }
+  ASMJIT_INLINE void setRet(uint32_t retType) noexcept { _ret = retType; }
   //! Set the return type based on `T`.
   template<typename T>
   ASMJIT_INLINE void setRetT() noexcept { setRet(TypeIdOf<T>::kTypeId); }
@@ -824,7 +889,12 @@ struct FuncDecl {
 
   //! Get the function's calling convention, see `CallConv`.
   ASMJIT_INLINE const CallConv& getCallConv() const noexcept { return _callConv; }
+
+  //! Get CallConv flags, see \ref CallConv::Flags.
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _callConv.getFlags(); }
+  //! Check if a CallConv `flag` is set, see \ref CallConv::Flags.
   ASMJIT_INLINE bool hasFlag(uint32_t ccFlag) const noexcept { return _callConv.hasFlag(ccFlag); }
+
 
   // --------------------------------------------------------------------------
   // [Accessors - Arguments and Return]
@@ -867,9 +937,15 @@ struct FuncDecl {
   //! Get stack size needed for function arguments passed on the stack.
   ASMJIT_INLINE uint32_t getArgStackSize() const noexcept { return _argStackSize; }
 
-  ASMJIT_INLINE uint32_t getUsedMask(uint32_t kind) const noexcept {
+  ASMJIT_INLINE uint32_t getRedZoneSize() const noexcept { return _callConv.getRedZoneSize(); }
+  ASMJIT_INLINE uint32_t getSpillZoneSize() const noexcept { return _callConv.getSpillZoneSize(); }
+
+  ASMJIT_INLINE uint32_t getPassedRegs(uint32_t kind) const noexcept { return _callConv.getPassedRegs(kind); }
+  ASMJIT_INLINE uint32_t getPreservedRegs(uint32_t kind) const noexcept { return _callConv.getPreservedRegs(kind); }
+
+  ASMJIT_INLINE uint32_t getUsedRegs(uint32_t kind) const noexcept {
     ASMJIT_ASSERT(kind < CallConv::kNumRegKinds);
-    return _usedMask[kind];
+    return _usedRegs[kind];
   }
 
   // --------------------------------------------------------------------------
@@ -881,7 +957,7 @@ struct FuncDecl {
   uint8_t _argCount;                     //!< Number of arguments.
   uint8_t _retCount;                     //!< Number of return values.
 
-  uint32_t _usedMask[CallConv::kNumRegKinds];
+  uint32_t _usedRegs[CallConv::kNumRegKinds];
   uint32_t _argStackSize;                //!< Stack arguments' size (aligned).
 
   //! Function arguments (LO & HI) mapped to physical registers and stack.

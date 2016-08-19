@@ -156,13 +156,9 @@ Error X86Formatter::formatOperand(StringBuilder& out, uint32_t logOptions, const
       }
       else {
         X86Reg baseReg = X86Reg::fromTypeAndId(m.getBaseType(), m.getBaseId());
-        if (m.isRegHome()) {
-          out.appendString("&");
-          formatOperand(out, logOptions, baseReg);
-        }
-        else {
-          formatOperand(out, logOptions, baseReg);
-        }
+        if (m.isArgHome()) out.appendString("$");
+        if (m.isRegHome()) out.appendString("&");
+        formatOperand(out, logOptions, baseReg);
       }
     }
 

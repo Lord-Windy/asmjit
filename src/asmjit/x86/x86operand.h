@@ -66,7 +66,7 @@ public:
   //! X86/X64 memory-operand flags layout:
   //!   * index shift       [1:0] index shift (0..3)
   //!   * Segment override  [4:2] see \ref X86Seg::Id
-  //!   * virt-reg home bit [7:7] defined by \ref Mem.
+  //!   * CodeCompiler bits [7:6] defined by \ref Mem.
   ASMJIT_ENUM(MemFlags) {
     kMemShiftBits     = 0x3,
     kMemShiftIndex    = 0,
@@ -300,11 +300,11 @@ public:
 #define ASMJIT_DEFINE_REG_MEM(NAME, SIZE) \
   /*! Cast a virtual register to a memory operand. */ \
   ASMJIT_INLINE X86Mem NAME(int32_t disp = 0) const noexcept { \
-    return X86Mem(*this, disp, SIZE, Mem::kFlagIsRegHome); \
+    return X86Mem(*this, disp, SIZE, Mem::kFlagRegHome); \
   } \
   /*! \overload */ \
   ASMJIT_INLINE X86Mem NAME(const X86Gp& index, uint32_t shift = 0, int32_t disp = 0) const noexcept { \
-    return X86Mem(*this, reinterpret_cast<const Reg&>(index), shift, disp, SIZE, Mem::kFlagIsRegHome); \
+    return X86Mem(*this, reinterpret_cast<const Reg&>(index), shift, disp, SIZE, Mem::kFlagRegHome); \
   }
 
   ASMJIT_DEFINE_REG_MEM(m, getSize())

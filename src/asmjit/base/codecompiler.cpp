@@ -139,7 +139,7 @@ VirtReg* CodeCompiler::newVirtReg(uint32_t typeId, uint32_t signature, const cha
     return nullptr;
 
   VirtReg* vreg;
-  if (_vRegArray.willGrow(1) != kErrorOk || !(vreg = _vRegZone.allocT<VirtReg>()))
+  if (_vRegArray.willGrow(1) != kErrorOk || !(vreg = _vRegZone.allocZeroedT<VirtReg>()))
     return nullptr;
 
   vreg->_id = Operand::packId(static_cast<uint32_t>(index));
@@ -155,20 +155,11 @@ VirtReg* CodeCompiler::newVirtReg(uint32_t typeId, uint32_t signature, const cha
   vreg->_typeId = typeId;
   vreg->_alignment = static_cast<uint8_t>(Utils::iMin<uint32_t>(vreg->_size, 64));
   vreg->_priority = 10;
-  vreg->_isStack = false;
-  vreg->_isMemArg = false;
-  vreg->_isMaterialized = false;
-  vreg->_saveOnUnuse = false;
 
   // The following are only used by `RAPass`.
   vreg->_raId = kInvalidValue;
-  vreg->_memOffset = 0;
-  vreg->_homeMask = 0;
   vreg->_state = VirtReg::kStateNone;
   vreg->_physId = kInvalidReg;
-  vreg->_modified = false;
-  vreg->_memCell = nullptr;
-  vreg->_tied = nullptr;
 
   _vRegArray.appendUnsafe(vreg);
   return vreg;
@@ -237,7 +228,7 @@ Error CodeCompiler::_newStack(Mem& out, uint32_t size, uint32_t alignment, const
   vreg->_alignment = static_cast<uint8_t>(alignment);
 
   // Set the memory operand to GPD/GPQ and its id to VirtReg.
-  out = Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagIsRegHome);
+  out = Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagRegHome);
   return kErrorOk;
 }
 

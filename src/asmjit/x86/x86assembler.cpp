@@ -3852,13 +3852,14 @@ EmitVexEvexR:
                  (x86ExtractLLMM(opCode, options));      // [........|.LL.....|Vvvvv..R|RBBmmmmm].
     opReg &= 0x7;
 
-    // Handle {k} and {kz} by a single branch.
+    // Handle AVX512 options by a single branch.
     const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
                                     X86Inst::kOption1ToX           |
                                     X86Inst::kOptionKZ             |
                                     X86Inst::kOptionSAE            |
                                     X86Inst::kOptionER             ;
     if (options & kAvx512Options) {
+      // Using memory broadcast without a memory operand is invalid.
       if (ASMJIT_UNLIKELY(options & X86Inst::kOption1ToX))
         goto InvalidBroadcast;
 
@@ -3904,7 +3905,7 @@ EmitVexEvexR:
       // Clear 'FORCE-VEX3' bit and all high bits.
       x  = (x & (0x4 ^ 0xFFFF)) << 8;                    // [00000000|WvvvvLpp|R0B0m0mm|00000000].
                                                          //            ____    _ _
-      x ^= xorMsk;                                       // [_OPCODE_|WvvvvLpp|R1Bmmmmm|VEX3_XOP].
+      x ^= xorMsk;                                       // [_OPCODE_|WvvvvLpp|R1Bmmmmm|VEX3|XOP].
       EMIT_DWORD(x);
 
       rbReg &= 0x7;
@@ -3960,7 +3961,7 @@ EmitVexEvexM:
                  (x86ExtractLLMM(opCode, options));      // [........|.LL.X...|Vvvvv..R|RXBmmmmm].
     opReg &= 0x07U;
 
-    // Handle {k}, {kz}, {1tox} by a single branch.
+    // Handle AVX512 options by a single branch.
     const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
                                     X86Inst::kOption1ToX           |
                                     X86Inst::kOptionKZ             |

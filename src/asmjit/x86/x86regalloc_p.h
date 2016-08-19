@@ -324,19 +324,16 @@ public:
   // [Emit]
   // --------------------------------------------------------------------------
 
-  Error emitLoad(VirtReg* vreg, uint32_t physId, const char* reason) noexcept;
-  Error emitSave(VirtReg* vreg, uint32_t physId, const char* reason) noexcept;
+  Error emitLoad(VirtReg* vreg, uint32_t id, const char* reason) noexcept;
+  Error emitSave(VirtReg* vreg, uint32_t id, const char* reason) noexcept;
   Error emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) noexcept;
   Error emitRegOp(Operand_& dst, Operand_& src, uint32_t typeId) noexcept;
-  Error emitCvtOp(VirtReg* dst, uint32_t dstPhysId, VirtReg* src, uint32_t srcPhysId) noexcept;
+  Error emitCvtOp(VirtReg* dst, uint32_t dstId, VirtReg* src, uint32_t srcId) noexcept;
   Error emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aId, uint32_t bId, const char* reason) noexcept;
 
   Error emitImmToReg(uint32_t dstTypeId, uint32_t dstPhysId, const Imm* src) noexcept;
   Error emitImmToStack(uint32_t dstTypeId, const X86Mem* dst, const Imm* src) noexcept;
   Error emitRegToStack(uint32_t dstTypeId, const X86Mem* dst, uint32_t srcTypeId, uint32_t srcPhysId) noexcept;
-
-  Error emitPushSequence(uint32_t regMask) noexcept;
-  Error emitPopSequence(uint32_t regMask) noexcept;
 
   // --------------------------------------------------------------------------
   // [Register Management]
@@ -649,7 +646,7 @@ public:
     return X86Mem(Init,
       cc()->_nativeGpReg.getRegType(), vreg->getId(),
       Reg::kRegNone, kInvalidValue,
-      0, 0, Mem::kFlagIsRegHome);
+      0, 0, Mem::kFlagRegHome);
   }
 
   // --------------------------------------------------------------------------
@@ -686,29 +683,15 @@ public:
   //! Clobbered registers (for the whole function).
   X86RegMask _clobberedRegs;
 
-  //! Memory cell where is stored address used to restore manually
-  //! aligned stack.
-  RACell* _stackFrameCell;
-
   //! Global allocable registers mask.
   uint32_t _gaRegs[X86Reg::_kKindRACount];
 
   uint8_t _useAVX;
 
-  //! Function arguments base pointer (register).
-  uint8_t _argBaseReg;
   //! Function variables base pointer (register).
   uint8_t _varBaseReg;
-
-  //! Function arguments base offset.
-  int32_t _argBaseOffset;
   //! Function variables base offset.
   int32_t _varBaseOffset;
-
-  //! Function arguments displacement.
-  int32_t _argActualDisp;
-  //! Function variables displacement.
-  int32_t _varActualDisp;
 
   //! Temporary string builder used for logging.
   StringBuilderTmp<256> _stringBuilder;

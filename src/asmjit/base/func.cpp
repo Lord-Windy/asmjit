@@ -76,7 +76,7 @@ Error CallConv::init(uint32_t ccId) noexcept {
 
       case kIdX86CDecl:
 X86CallConv:
-        setPreservedMask(kKindGp, Utils::mask(kBx, kSp, kBp, kSi, kDi));
+        setPreservedRegs(kKindGp, Utils::mask(kBx, kSp, kBp, kSi, kDi));
         break;
 
       case kIdX86Win64:
@@ -85,8 +85,8 @@ X86CallConv:
         setSpillZoneSize(32);
         setPassedOrder(kKindGp, kCx, kDx, 8, 9);
         setPassedOrder(kKindXyz, 0, 1, 2, 3);
-        setPreservedMask(kKindGp, Utils::mask(kBx, kSp, kBp, kSi, kDi, 12, 13, 14, 15));
-        setPreservedMask(kKindXyz, Utils::mask(6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
+        setPreservedRegs(kKindGp, Utils::mask(kBx, kSp, kBp, kSi, kDi, 12, 13, 14, 15));
+        setPreservedRegs(kKindXyz, Utils::mask(6, 7, 8, 9, 10, 11, 12, 13, 14, 15));
         break;
 
       case kIdX86Unix64:
@@ -94,7 +94,7 @@ X86CallConv:
         setRedZoneSize(128);
         setPassedOrder(kKindGp, kDi, kSi, kDx, kCx, 8, 9);
         setPassedOrder(kKindXyz, 0, 1, 2, 3, 4, 5, 6, 7);
-        setPreservedMask(kKindGp, Utils::mask(kBx, kSp, kBp, 12, 13, 14, 15));
+        setPreservedRegs(kKindGp, Utils::mask(kBx, kSp, kBp, 12, 13, 14, 15));
         break;
 
       default:
@@ -240,7 +240,7 @@ Error FuncDecl::init(const FuncSignature& sign) {
             ? X86Reg::kRegGpd
             : X86Reg::kRegGpq;
           arg.assignToReg(regType, regId);
-          _usedMask[X86Reg::kKindGp] |= Utils::mask(regId);
+          _usedRegs[X86Reg::kKindGp] |= Utils::mask(regId);
           gpzPos++;
         }
         else {
@@ -260,7 +260,7 @@ Error FuncDecl::init(const FuncSignature& sign) {
 
         if (regId != kInvalidReg) {
           arg.initReg(typeId, x86VecTypeIdToRegType(typeId), regId);
-          _usedMask[X86Reg::kKindXyz] |= Utils::mask(regId);
+          _usedRegs[X86Reg::kKindXyz] |= Utils::mask(regId);
           xyzPos++;
         }
         else {
@@ -286,8 +286,9 @@ Error FuncDecl::init(const FuncSignature& sign) {
           uint32_t regType = (size <= 4 && !TypeId::isMmx(typeId))
             ? X86Reg::kRegGpd
             : X86Reg::kRegGpq;
+
           arg.assignToReg(regType, regId);
-          _usedMask[X86Reg::kKindGp] |= Utils::mask(regId);
+          _usedRegs[X86Reg::kKindGp] |= Utils::mask(regId);
         }
         else {
           arg.assignToStack(stackOffset);
@@ -301,8 +302,9 @@ Error FuncDecl::init(const FuncSignature& sign) {
         if (regId != kInvalidReg && (TypeId::isFloat(typeId) || cc.hasFlag(CallConv::kFlagVectorCall))) {
           uint32_t regType = x86VecTypeIdToRegType(typeId);
           uint32_t regId = cc._passedOrder[X86Reg::kKindXyz].id[i];
+
           arg.assignToReg(regType, regId);
-          _usedMask[X86Reg::kKindXyz] |= Utils::mask(regId);
+          _usedRegs[X86Reg::kKindXyz] |= Utils::mask(regId);
         }
         else {
           arg.assignToStack(stackOffset);

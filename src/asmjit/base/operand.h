@@ -595,6 +595,9 @@ public:
   //! Clone the register operand.
   ASMJIT_INLINE Reg clone() const noexcept { return Reg(*this); }
 
+  //! Create a new register based on `signature` and `id`.
+  static ASMJIT_INLINE Reg fromSignature(uint32_t signature, uint32_t id) noexcept { return Reg(Init, signature, id); }
+
   //! Set the register id to `id`.
   ASMJIT_INLINE void setId(uint32_t id) noexcept { _reg.id = id; }
 
@@ -622,6 +625,11 @@ public:                                                                        \
                                                                                \
   /*! Clone the register operand. */                                           \
   ASMJIT_INLINE REG clone() const ASMJIT_NOEXCEPT { return REG(*this); }       \
+                                                                               \
+  /*! Create a new register from signature and id. */                          \
+  static ASMJIT_INLINE REG fromSignature(uint32_t signature, uint32_t id) ASMJIT_NOEXCEPT { \
+    return REG(Init, signature, id);                                           \
+  }                                                                            \
                                                                                \
   ASMJIT_INLINE REG& operator=(const REG& other) ASMJIT_NOEXCEPT { copyFrom(other); return *this; } \
   ASMJIT_INLINE bool operator==(const REG& other) const ASMJIT_NOEXCEPT { return  isEqual(other); } \
@@ -676,11 +684,15 @@ class Mem : public Operand {
 public:
   //! Memory operand flags.
   ASMJIT_ENUM(Flags) {
-    //! Memory operand BASE register is virtual-register's home location, not
-    //! the BASE register itself. This flag is designed for \ref CodeCompiler,
-    //! which should lower such operands and clear the flag before it gets
-    //! used by \ref Assembler.
-    kFlagIsRegHome = 0x80
+    //! This memory operand represents a function argument's stack location.
+    //!
+    //! This flag is used exclusively by \ref CodeCompiler.
+    kFlagArgHome = 0x40,
+
+    //! This memory operand represents a virtual register's home-slot.
+    //!
+    //! This flag is used exclusively by \ref CodeCompiler.
+    kFlagRegHome = 0x80
   };
 
   //! Helper constants to pack BASE and INDEX register types into `MemData::baseIndexType`.
@@ -740,11 +752,14 @@ public:
     _init_packed_d2_d3(0, 0);
   }
 
-  //! Get if this `Mem` is a home of a virtual register or if it's stack-allocated
-  //! memory, used by \ref CodeCompiler.
-  ASMJIT_INLINE bool isRegHome() const noexcept { return (_mem.flags & kFlagIsRegHome) != 0; }
-  //! Clear the reg-home bit, called by the \ref CodeCompiler to finalize the operand.
-  ASMJIT_INLINE void clearRegHome() noexcept { _mem.flags &= ~kFlagIsRegHome; }
+  ASMJIT_INLINE bool isArgHome() const noexcept { return (_mem.flags & kFlagArgHome) != 0; }
+  ASMJIT_INLINE bool isRegHome() const noexcept { return (_mem.flags & kFlagRegHome) != 0; }
+
+  ASMJIT_INLINE void markArgHome() noexcept { _mem.flags |= kFlagArgHome; }
+  ASMJIT_INLINE void markRegHome() noexcept { _mem.flags |= kFlagRegHome; }
+
+  ASMJIT_INLINE void clearArgHome() noexcept { _mem.flags &= ~kFlagArgHome; }
+  ASMJIT_INLINE void clearRegHome() noexcept { _mem.flags &= ~kFlagRegHome; }
 
   //! Get if the memory operand has a BASE register or label specified.
   ASMJIT_INLINE bool hasBase() const noexcept { return getBaseType() != 0; }

@@ -201,6 +201,13 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(Label);
   INFO("");
 
+  INFO("Size of Func:");
+  DUMP_TYPE(CallConv);
+  DUMP_TYPE(FuncFrame);
+  DUMP_TYPE(FuncInOut);
+  DUMP_TYPE(FuncSignature);
+  DUMP_TYPE(FuncDecl);
+
   INFO("Size of CodeBuilder:");
   DUMP_TYPE(CodeBuilder);
   DUMP_TYPE(CBNode);
@@ -218,9 +225,6 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(CCFunc);
   DUMP_TYPE(CCFuncRet);
   DUMP_TYPE(CCFuncCall);
-  DUMP_TYPE(FuncDecl);
-  DUMP_TYPE(FuncInOut);
-  DUMP_TYPE(FuncSignature);
   INFO("");
 #endif // !ASMJIT_DISABLE_COMPILER
 

@@ -489,6 +489,12 @@ struct Utils {
     return (X)( ((U)x + (U)(alignment - 1)) & ~(static_cast<U>(alignment) - 1) );
   }
 
+  //! Get delta required to align `base` to `alignment`.
+  template<typename X, typename Y>
+  static ASMJIT_INLINE X alignDiff(X base, Y alignment) noexcept {
+    return alignTo(base, alignment) - base;
+  }
+
   template<typename T>
   static ASMJIT_INLINE T alignToPowerOf2(T base) noexcept {
     // Implementation is from "Hacker's Delight" by Henry S. Warren, Jr.
@@ -514,12 +520,6 @@ struct Utils {
 #endif // _MSC_VER
 
     return base + 1;
-  }
-
-  //! Get delta required to align `base` to `alignment`.
-  template<typename T>
-  static ASMJIT_INLINE T alignDiff(T base, T alignment) noexcept {
-    return alignTo(base, alignment) - base;
   }
 
   // --------------------------------------------------------------------------
