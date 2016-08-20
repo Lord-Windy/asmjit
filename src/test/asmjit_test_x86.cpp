@@ -99,7 +99,7 @@ public:
 
       do {
         if ((preservedMask & regMask) != 0 && (physId != X86Gp::kIdSp && physId != X86Gp::kIdBp)) {
-          X86Gp tmp = c.newInt32("tmp");
+          X86Gp tmp = c.newInt32("gpTmp%u", physId);
           c.alloc(tmp, physId);
           c.xor_(tmp, tmp);
           c.spill(tmp);
@@ -3420,7 +3420,7 @@ int main(int argc, char* argv[]) {
   X86TestSuite testSuite;
   CmdLine cmd(argc, argv);
 
-  //if (cmd.hasArg("--always-print-log"))
+  if (cmd.hasArg("--always-print-log"))
     testSuite._alwaysPrintLog = true;
 
   return testSuite.run();

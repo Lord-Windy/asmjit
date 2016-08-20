@@ -2150,7 +2150,7 @@ _NextGroup:
             // register that holds the base address to all arguments passed by
             // stack and then insert nodes that copy these arguments to registers.
             if (!saReg.isValid()) {
-              saReg = cc()->newGpz("$$args");
+              saReg = cc()->newGpz("__args");
               if (!saReg.isValid()) goto NoMem;
 
               VirtReg* saBase = cc()->getVirtReg(saReg);
@@ -3102,7 +3102,7 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
           aTied->flags |= TiedReg::kRDone;
           addTiedDone(C);
 
-          // Doublehit, two registers allocated by a single swap.
+          // Double-hit, two registers allocated by a single xchg.
           if (bTied && bTied->inPhysId == aPhysId) {
             bTied->flags |= TiedReg::kRDone;
             addTiedDone(C);
@@ -4421,10 +4421,9 @@ static Error X86RAPass_insertProlog(X86RAPass* self, FuncLayout& layout) {
   // Emit: 'lea saReg, [zsp + gpSize * (1 + numGpSaved)]'.
   uint32_t stackArgsRegId = layout.getStackArgsRegId();
   if (stackArgsRegId != kInvalidReg && stackArgsRegId != X86Gp::kIdSp) {
-    if (!(layout.hasPreservedFP() && stackArgsRegId == X86Gp::kIdBp)) {
-      saReg.setId(stackArgsRegId);
+    saReg.setId(stackArgsRegId);
+    if (!(layout.hasPreservedFP() && stackArgsRegId == X86Gp::kIdBp))
       ASMJIT_PROPAGATE(cc->mov(saReg, zsp));
-    }
   }
 
   // Emit: 'and zsp, StackAlignment'
@@ -4472,7 +4471,6 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
 
   X86Gp zsp   = cc->zsp(); // ESP|RSP register.
   X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
-  X86Gp saReg = cc->zsp(); // Stack-arguments base register.
 
   // Don't emit 'pop ebp|rbp' in the pop sequence, this case is handled separately.
   if (layout.hasPreservedFP()) {
