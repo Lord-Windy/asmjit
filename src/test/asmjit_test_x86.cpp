@@ -51,20 +51,23 @@ public:
 
 class X86Test_AlignBase : public X86Test {
 public:
-  X86Test_AlignBase(uint32_t numArgs, uint32_t numVars, bool naked) :
+  X86Test_AlignBase(uint32_t numArgs, uint32_t numVars, uint32_t alignment, bool naked) :
     _numArgs(numArgs),
     _numVars(numVars),
+    _alignment(alignment),
     _naked(naked) {
 
-    _name.setFormat("[Align] NumArgs=%u NumVars=%u Naked=%c",
-      numArgs, numVars, naked ? 'Y' : 'N');
+    _name.setFormat("[Align] NumArgs=%u NumVars=%u Alignment=%u Naked=%c",
+      numArgs, numVars, alignment, naked ? 'Y' : 'N');
   }
 
   static void add(ZoneVector<X86Test*>& tests) {
-    for (unsigned int i = 0; i <= 8; i++) {
-      for (unsigned int j = 0; j <= 4; j++) {
-        tests.append(new X86Test_AlignBase(i, j, false));
-        tests.append(new X86Test_AlignBase(i, j, true));
+    for (uint32_t i = 0; i <= 8; i++) {
+      for (uint32_t j = 0; j <= 4; j++) {
+        for (uint32_t a = 16; a <= 32; a += 16) {
+          tests.append(new X86Test_AlignBase(i, j, a, false));
+          tests.append(new X86Test_AlignBase(i, j, a, true));
+        }
       }
     }
   }
@@ -87,7 +90,7 @@ public:
 
     X86Gp gpVar = c.newIntPtr("gpVar");
     X86Gp gpSum = c.newInt32("gpSum");
-    X86Xmm xmmVar = c.newXmm("xmmVar");
+    X86Mem stack = c.newStack(_alignment, _alignment);
 
     // Alloc, use and spill preserved registers.
     if (_numVars) {
@@ -123,8 +126,8 @@ public:
     }
 
     // Check alignment of xmmVar (has to be 16).
-    c.lea(gpVar, xmmVar.m());
-    c.shl(gpVar.r32(), 28);
+    c.lea(gpVar, stack);
+    c.and_(gpVar, _alignment - 1);
 
     // Add a sum of arguments to check whether they are correct.
     if (_numArgs)
@@ -193,8 +196,9 @@ public:
     return resultRet == expectRet;
   }
 
-  unsigned int _numArgs;
-  unsigned int _numVars;
+  uint32_t _numArgs;
+  uint32_t _numVars;
+  uint32_t _alignment;
 
   bool _naked;
 };

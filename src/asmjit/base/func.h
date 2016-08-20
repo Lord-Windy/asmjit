@@ -443,6 +443,8 @@ struct FuncLayout {
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE bool hasPreservedFP() const noexcept { return static_cast<bool>(_preservedFP); }
+  ASMJIT_INLINE bool hasDsaSlotUsed() const noexcept { return static_cast<bool>(_dsaSlotUsed); }
+  ASMJIT_INLINE bool hasAlignedVecSR() const noexcept { return static_cast<bool>(_alignedVecSR); }
   ASMJIT_INLINE bool hasDynamicAlignment() const noexcept { return static_cast<bool>(_dynamicAlignment); }
   ASMJIT_INLINE bool hasX86MmxCleanup() const noexcept { return static_cast<bool>(_x86MmxCleanup); }
   ASMJIT_INLINE bool hasX86AvxCleanup() const noexcept { return static_cast<bool>(_x86AvxCleanup); }
@@ -483,6 +485,8 @@ struct FuncLayout {
   uint32_t _savedRegs[kNumRegKinds];     //!< Registers that will be saved/restored in prolog/epilog
 
   uint32_t _preservedFP : 1;             //!< Function preserves frame-pointer.
+  uint32_t _dsaSlotUsed : 1;             //!< True if `_dsaSlot` contains a valid mem offset.
+  uint32_t _alignedVecSR : 1;            //!< Use instructions that perform aligned ops to save/restore XMM regs.
   uint32_t _dynamicAlignment : 1;        //!< Function dynamically aligns stack.
   uint32_t _x86MmxCleanup : 1;           //!< Emit 'emms' in epilog (X86 specific).
   uint32_t _x86AvxCleanup : 1;           //!< Emit 'vzeroupper' in epilog (X86 specific).
@@ -496,6 +500,7 @@ struct FuncLayout {
   uint8_t _stackBaseRegId;               //!< GP register that holds address of base stack address (call-frame).
   uint8_t _stackArgsRegId;               //!< GP register that holds address the first argument passed by stack.
 
+  uint32_t _dsaSlot;                     //!< Memory slot where the prolog inserter stores previous (unaligned) ESP.
   uint16_t _calleeStackCleanup;          //!< How many bytes the callee should add to the stack (X86 STDCALL).
   uint16_t _gpStackSize;                 //!< Stack size required to save GP regs.
   uint16_t _vecStackSize;                //!< Stack size required to save VEC regs.

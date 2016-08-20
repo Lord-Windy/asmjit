@@ -264,20 +264,7 @@ Error RAPass::resolveCellOffsets() {
   uint32_t pos2  = pos4  + _mem4ByteVarsUsed  * 4 ;
   uint32_t pos1  = pos2  + _mem2ByteVarsUsed  * 2 ;
 
-  uint32_t stackPos = pos1 + _mem1ByteVarsUsed;
-
-  uint32_t gapAlignment = stackAlignment;
-  uint32_t gapSize = 0;
-
-  // TODO: Not used!
-  if (gapAlignment)
-    Utils::alignDiff(stackPos, gapAlignment);
-  stackPos += gapSize;
-
-  uint32_t gapPos = stackPos;
-  uint32_t allTotal = stackPos;
-
-  // Vars - Allocated according to alignment/width.
+  // Assign home slots.
   while (varCell) {
     uint32_t size = varCell->size;
     uint32_t offset = 0;
@@ -299,34 +286,21 @@ Error RAPass::resolveCellOffsets() {
     varCell = varCell->next;
   }
 
-  // Stack - Allocated according to alignment/width.
+  // Assign stack slots.
+  uint32_t stackPos = pos1 + _mem1ByteVarsUsed;
   while (stackCell) {
     uint32_t size = stackCell->size;
     uint32_t alignment = stackCell->alignment;
-    uint32_t offset;
+    ASMJIT_ASSERT(Utils::isPowerOf2(alignment));
 
-    // Try to fill the gap between variables/stack first.
-    if (size <= gapSize && alignment <= gapAlignment) {
-      offset = gapPos;
-
-      gapSize -= size;
-      gapPos -= size;
-
-      if (alignment < gapAlignment)
-        gapAlignment = alignment;
-    }
-    else {
-      offset = stackPos;
-
-      stackPos += size;
-      allTotal += size;
-    }
-
-    stackCell->offset = offset;
+    stackPos = Utils::alignTo(stackPos, alignment);
+    stackCell->offset = stackPos;
     stackCell = stackCell->next;
+
+    stackPos += size;
   }
 
-  _memAllTotal = allTotal;
+  _memAllTotal = stackPos;
   return kErrorOk;
 }
 

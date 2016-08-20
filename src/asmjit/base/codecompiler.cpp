@@ -215,6 +215,9 @@ Error CodeCompiler::_newStack(Mem& out, uint32_t size, uint32_t alignment, const
     return setLastError(DebugUtils::errored(kErrorInvalidArgument));
 
   if (alignment == 0) alignment = 1;
+  if (!Utils::isPowerOf2(alignment))
+    return setLastError(DebugUtils::errored(kErrorInvalidArgument));
+
   if (alignment > 64) alignment = 64;
 
   VirtReg* vreg = newVirtReg(0, 0, name);
