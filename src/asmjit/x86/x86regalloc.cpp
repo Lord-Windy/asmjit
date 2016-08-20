@@ -4401,22 +4401,20 @@ static Error X86RAPass_insertProlog(X86RAPass* self, FuncLayout& layout) {
 
   uint32_t gpSize = cc->getGpSize();
   uint32_t gpSaved = layout.getSavedRegs(X86Reg::kKindGp);
-  uint32_t gpSavedCount = Utils::bitCount(gpSaved);
 
-  X86Gp zsp   = cc->zsp(); // ESP|RSP register.
+  X86Gp zsp = cc->zsp();   // ESP|RSP register.
+  X86Gp zbp = cc->zsp();   // EBP|RBP register.
+  zbp.setId(X86Gp::kIdBp);
+
   X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
   X86Gp saReg = cc->zsp(); // Stack-arguments base register.
 
   // Emit: 'push zbp'
   //       'mov  zbp, zsp'.
   if (layout.hasPreservedFP()) {
-    regId = X86Gp::kIdBp;
-
-    gpSaved &= ~Utils::mask(regId);
-    gpReg.setId(regId);
-
-    ASMJIT_PROPAGATE(cc->push(gpReg));
-    ASMJIT_PROPAGATE(cc->mov(gpReg, zsp));
+    gpSaved &= ~Utils::mask(X86Gp::kIdBp);
+    ASMJIT_PROPAGATE(cc->push(zbp));
+    ASMJIT_PROPAGATE(cc->mov(zbp, zsp));
   }
 
   // Emit: 'push gp' sequence.
@@ -4478,18 +4476,15 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
 
   uint32_t gpSize = cc->getGpSize();
   uint32_t gpSaved = layout.getSavedRegs(X86Reg::kKindGp);
-  uint32_t gpSavedCount = Utils::bitCount(gpSaved);
 
-  X86Gp zsp   = cc->zsp(); // ESP|RSP register.
+  X86Gp zsp = cc->zsp();   // ESP|RSP register.
+  X86Gp zbp = cc->zsp();   // EBP|RBP register.
+  zbp.setId(X86Gp::kIdBp);
+
   X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
 
   // Don't emit 'pop zbp' in the pop sequence, this case is handled separately.
-  if (layout.hasPreservedFP()) {
-    regId = X86Gp::kIdBp;
-
-    gpSaved &= ~Utils::mask(regId);
-    gpReg.setId(regId);
-  }
+  if (layout.hasPreservedFP()) gpSaved &= ~Utils::mask(X86Gp::kIdBp);
 
   // Emit 'movaps|movups xmm0..15, [zsp + X]'.
   uint32_t xmmSaved = layout.getSavedRegs(X86Reg::kKindXyz);
@@ -4508,28 +4503,28 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
     }
   }
 
-  // Emit 'emms'.
-  if (layout.hasX86MmxCleanup())
-    ASMJIT_PROPAGATE(cc->emms());
+  // Emit 'emms' and 'vzeroupper'.
+  if (layout.hasX86MmxCleanup()) ASMJIT_PROPAGATE(cc->emms());
+  if (layout.hasX86AvxCleanup()) ASMJIT_PROPAGATE(cc->vzeroupper());
 
-  // Emit 'vzeroupper'.
-  if (layout.hasX86AvxCleanup())
-    ASMJIT_PROPAGATE(cc->vzeroupper());
-
-  if (layout.hasDynamicAlignment()) {
-    // Emit 'mov zsp, [zsp + StackAdjustment]'.
-    if (layout.hasDsaSlotUsed()) {
+  if (layout.hasPreservedFP()) {
+    // Emit 'mov zsp, zbp' or 'lea zsp, [zbp - x]'
+    int32_t count = static_cast<int32_t>(layout.getGpStackSize() - gpSize);
+    if (!count)
+      ASMJIT_PROPAGATE(cc->mov(zsp, zbp));
+    else
+      ASMJIT_PROPAGATE(cc->lea(zsp, x86::ptr(zbp, -count)));
+  }
+  else {
+    if (layout.hasDynamicAlignment() && layout.hasDsaSlotUsed()) {
+      // Emit 'mov zsp, [zsp + DsaSlot]'.
       X86Mem saMem = x86::ptr(zsp, layout._dsaSlot);
       ASMJIT_PROPAGATE(cc->mov(zsp, saMem));
     }
-  }
-  else if (layout.hasStackAdjustment()) {
-    // Emit 'add zsp, StackAdjustment'.
-    bool emitAdjustment = true;
-    if (layout.hasPreservedFP() && !gpSaved) emitAdjustment = false;
-
-    if (emitAdjustment)
+    else if (layout.hasStackAdjustment()) {
+      // Emit 'add zsp, StackAdjustment'.
       ASMJIT_PROPAGATE(cc->add(zsp, static_cast<int32_t>(layout.getStackAdjustment())));
+    }
   }
 
   // Emit 'pop gp' sequence.
@@ -4547,13 +4542,8 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
     } while (regId != 0);
   }
 
-  // Emit 'mov zsp, zbp'
-  //      'pop zbp'.
-  if (layout.hasPreservedFP()) {
-    gpReg.setId(X86Gp::kIdBp);
-    ASMJIT_PROPAGATE(cc->mov(zsp, gpReg));
-    ASMJIT_PROPAGATE(cc->pop(gpReg));
-  }
+  // Emit 'pop zbp'.
+  if (layout.hasPreservedFP()) ASMJIT_PROPAGATE(cc->pop(zbp));
 
   // Emit 'ret' or 'ret x'.
   if (layout.hasCalleeStackCleanup())
