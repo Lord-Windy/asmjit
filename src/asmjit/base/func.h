@@ -220,7 +220,7 @@ struct CallConv {
 
   ASMJIT_INLINE const uint8_t* getPassedOrder(uint32_t kind) const noexcept {
     ASMJIT_ASSERT(kind < kNumRegKinds);
-    return _passedOrder[kind];
+    return _passedOrder[kind].id;
   }
 
   ASMJIT_INLINE uint32_t getPassedRegs(uint32_t kind) const noexcept {
