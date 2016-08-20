@@ -4230,7 +4230,7 @@ static Error X86RAPass_calculateFuncLayout(X86RAPass* self, CCFunc* func, FuncLa
   for (kind = 0; kind < CallConv::kNumRegKinds; kind++)
     layout._savedRegs[kind] = frame.getDirtyRegs(kind) & decl.getPreservedRegs(kind);
 
-  // Include EBP/RBP if the function preserves the frame-pointer.
+  // Include EBP|RBP if the function preserves the frame-pointer.
   if (!frame.isNaked()) {
     layout._preservedFP = true;
     layout._savedRegs[X86Reg::kKindGp] |= Utils::mask(X86Gp::kIdBp);
@@ -4437,14 +4437,12 @@ static Error X86RAPass_insertProlog(X86RAPass* self, FuncLayout& layout) {
   }
 
   // Emit: 'and zsp, StackAlignment'.
-  if (layout.hasDynamicAlignment()) {
+  if (layout.hasDynamicAlignment())
     ASMJIT_PROPAGATE(cc->and_(zsp, -static_cast<int32_t>(layout.getStackAlignment())));
-  }
 
   // Emit: 'sub zsp, StackAdjustment'.
-  if (layout.hasStackAdjustment()) {
+  if (layout.hasStackAdjustment())
     ASMJIT_PROPAGATE(cc->sub(zsp, layout.getStackAdjustment()));
-  }
 
   // Emit: 'mov [zsp + dsaSlot], saReg'.
   if (layout.hasDynamicAlignment() && layout.hasDsaSlotUsed()) {
@@ -4485,7 +4483,7 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
   X86Gp zsp   = cc->zsp(); // ESP|RSP register.
   X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
 
-  // Don't emit 'pop ebp|rbp' in the pop sequence, this case is handled separately.
+  // Don't emit 'pop zbp' in the pop sequence, this case is handled separately.
   if (layout.hasPreservedFP()) {
     regId = X86Gp::kIdBp;
 
@@ -4511,14 +4509,12 @@ static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
   }
 
   // Emit 'emms'.
-  if (layout.hasX86MmxCleanup()) {
+  if (layout.hasX86MmxCleanup())
     ASMJIT_PROPAGATE(cc->emms());
-  }
 
   // Emit 'vzeroupper'.
-  if (layout.hasX86AvxCleanup()) {
+  if (layout.hasX86AvxCleanup())
     ASMJIT_PROPAGATE(cc->vzeroupper());
-  }
 
   if (layout.hasDynamicAlignment()) {
     // Emit 'mov zsp, [zsp + StackAdjustment]'.

@@ -218,57 +218,59 @@ struct CallConv {
   //! Set size of 'SpillZone'.
   ASMJIT_INLINE void setSpillZoneSize(uint32_t size) noexcept { _spillZoneSize = static_cast<uint16_t>(size); }
 
-  ASMJIT_INLINE const uint8_t* getPassedOrder(uint32_t regKind) const noexcept {
+  ASMJIT_INLINE const uint8_t* getPassedOrder(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    return _passedOrder[kind];
   }
 
-  ASMJIT_INLINE uint32_t getPassedRegs(uint32_t regKind) const noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
-    return _passedRegs[regKind];
+  ASMJIT_INLINE uint32_t getPassedRegs(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    return _passedRegs[kind];
   }
 
-  ASMJIT_INLINE void _setPassedPacked(uint32_t regKind, uint32_t p0, uint32_t p1) noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
+  ASMJIT_INLINE void _setPassedPacked(uint32_t kind, uint32_t p0, uint32_t p1) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
 
-    reinterpret_cast<uint32_t*>(_passedOrder[regKind].id)[0] = p0;
-    reinterpret_cast<uint32_t*>(_passedOrder[regKind].id)[1] = p1;
+    reinterpret_cast<uint32_t*>(_passedOrder[kind].id)[0] = p0;
+    reinterpret_cast<uint32_t*>(_passedOrder[kind].id)[1] = p1;
   }
 
-  ASMJIT_INLINE void setPassedToNone(uint32_t regKind) noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
+  ASMJIT_INLINE void setPassedToNone(uint32_t kind) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
 
-    _setPassedPacked(regKind, ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF),
-                              ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF));
-    _passedRegs[regKind] = 0;
+    _setPassedPacked(kind, ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF),
+                           ASMJIT_PACK32_4x8(0xFF, 0xFF, 0xFF, 0xFF));
+    _passedRegs[kind] = 0;
   }
 
-  ASMJIT_INLINE void setPassedOrder(uint32_t regKind, uint32_t a0, uint32_t a1 = 0xFF, uint32_t a2 = 0xFF, uint32_t a3 = 0xFF, uint32_t a4 = 0xFF, uint32_t a5 = 0xFF, uint32_t a6 = 0xFF, uint32_t a7 = 0xFF) noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
+  ASMJIT_INLINE void setPassedOrder(uint32_t kind, uint32_t a0, uint32_t a1 = 0xFF, uint32_t a2 = 0xFF, uint32_t a3 = 0xFF, uint32_t a4 = 0xFF, uint32_t a5 = 0xFF, uint32_t a6 = 0xFF, uint32_t a7 = 0xFF) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
 
-    _setPassedPacked(regKind, ASMJIT_PACK32_4x8(a0, a1, a2, a3),
+    _setPassedPacked(kind, ASMJIT_PACK32_4x8(a0, a1, a2, a3),
                               ASMJIT_PACK32_4x8(a4, a5, a6, a7));
 
     // NOTE: This should always be called with all arguments known at compile
     // time, so even if it looks scary it should be translated to a single
     // instruction.
-    _passedRegs[regKind] = (a0 != 0xFF ? 1U << a0 : 0U) |
-                           (a1 != 0xFF ? 1U << a1 : 0U) |
-                           (a2 != 0xFF ? 1U << a2 : 0U) |
-                           (a3 != 0xFF ? 1U << a3 : 0U) |
-                           (a4 != 0xFF ? 1U << a4 : 0U) |
-                           (a5 != 0xFF ? 1U << a5 : 0U) |
-                           (a6 != 0xFF ? 1U << a6 : 0U) |
-                           (a7 != 0xFF ? 1U << a7 : 0U) ;
+    _passedRegs[kind] = (a0 != 0xFF ? 1U << a0 : 0U) |
+                        (a1 != 0xFF ? 1U << a1 : 0U) |
+                        (a2 != 0xFF ? 1U << a2 : 0U) |
+                        (a3 != 0xFF ? 1U << a3 : 0U) |
+                        (a4 != 0xFF ? 1U << a4 : 0U) |
+                        (a5 != 0xFF ? 1U << a5 : 0U) |
+                        (a6 != 0xFF ? 1U << a6 : 0U) |
+                        (a7 != 0xFF ? 1U << a7 : 0U) ;
   }
 
-  ASMJIT_INLINE uint32_t getPreservedRegs(uint32_t regKind) const noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
-    return _preservedRegs[regKind];
+  ASMJIT_INLINE uint32_t getPreservedRegs(uint32_t kind) const noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    return _preservedRegs[kind];
   }
 
 
-  ASMJIT_INLINE void setPreservedRegs(uint32_t regKind, uint32_t regs) noexcept {
-    ASMJIT_ASSERT(regKind < kNumRegKinds);
-    _preservedRegs[regKind] = regs;
+  ASMJIT_INLINE void setPreservedRegs(uint32_t kind, uint32_t regs) noexcept {
+    ASMJIT_ASSERT(kind < kNumRegKinds);
+    _preservedRegs[kind] = regs;
   }
 
   // --------------------------------------------------------------------------

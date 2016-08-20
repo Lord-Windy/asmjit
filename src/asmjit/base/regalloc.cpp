@@ -291,7 +291,7 @@ Error RAPass::resolveCellOffsets() {
   while (stackCell) {
     uint32_t size = stackCell->size;
     uint32_t alignment = stackCell->alignment;
-    ASMJIT_ASSERT(Utils::isPowerOf2(alignment));
+    ASMJIT_ASSERT(alignment != 0 && Utils::isPowerOf2(alignment));
 
     stackPos = Utils::alignTo(stackPos, alignment);
     stackCell->offset = stackPos;
