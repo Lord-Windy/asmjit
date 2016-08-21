@@ -289,7 +289,7 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   layout.reset();
 
   uint32_t kind;
-  uint32_t gpSize = decl.getCallConv().getArchType() == Arch::kTypeX86 ? 4 : 8;
+  uint32_t gpSize = (decl.getCallConv().getArchType() == Arch::kTypeX86) ? 4 : 8;
 
   // Calculate a bit-mask of all registers that must be saved & restored.
   for (kind = 0; kind < CallConv::kNumRegKinds; kind++)

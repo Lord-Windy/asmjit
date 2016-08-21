@@ -65,18 +65,16 @@ Error FuncDecl::init(const FuncSignature& sign) {
   uint32_t ccId = sign.getCallConv();
   CallConv& cc = _callConv;
 
-  uint32_t archType = cc.getArchType();
   uint32_t argCount = sign.getArgCount();
-
-  if (argCount > kFuncArgCount)
+  if (ASMJIT_UNLIKELY(argCount > kFuncArgCount))
     return DebugUtils::errored(kErrorInvalidArgument);
 
   ASMJIT_PROPAGATE(cc.init(ccId));
 
-  uint32_t gpSize = (archType == Arch::kTypeX86) ? 4 : 8;
+  uint32_t gpSize = (cc.getArchType() == Arch::kTypeX86) ? 4 : 8;
   uint32_t deabstractDelta = TypeId::deabstractDeltaOfSize(gpSize);
-  const uint8_t* args = sign.getArgs();
 
+  const uint8_t* args = sign.getArgs();
   for (uint32_t i = 0; i < static_cast<int32_t>(argCount); i++) {
     FuncInOut& arg = _args[i];
     arg.initTypeId(TypeId::deabstract(args[i], deabstractDelta));
