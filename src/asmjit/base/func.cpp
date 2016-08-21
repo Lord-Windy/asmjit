@@ -108,17 +108,17 @@ Error FuncDecl::init(const FuncSignature& sign) {
 // [asmjit::FuncUtils]
 // ============================================================================
 
-Error FuncLayout::init(const FuncDecl& decl, const FuncFrame& frame) noexcept {
+Error FuncLayout::init(const FuncDecl& decl, const FuncFrameInfo& ffi) noexcept {
   uint32_t ccId = decl.getCallConv().getId();
 
 #if defined(ASMJIT_BUILD_X86)
   if (CallConv_isX86(ccId))
-    return X86FuncUtils::initFuncLayout(*this, decl, frame);
+    return X86FuncUtils::initFuncLayout(*this, decl, ffi);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
   if (CallConv_isArm(ccId))
-    return ArmFuncUtils::initFuncLayout(*this, decl, frame);
+    return ArmFuncUtils::initFuncLayout(*this, decl, ffi);
 #endif // ASMJIT_BUILD_ARM
 
   return DebugUtils::errored(kErrorInvalidArgument);

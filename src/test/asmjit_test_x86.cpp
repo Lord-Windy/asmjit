@@ -86,7 +86,7 @@ public:
     }
 
     if (!_naked)
-      c.getFunc()->addFrameFlags(FuncFrame::kFlagPreserveFP);
+      c.getFunc()->getFrameInfo().enablePreservedFP();
 
     X86Gp gpVar = c.newIntPtr("gpVar");
     X86Gp gpSum = c.newInt32("gpSum");

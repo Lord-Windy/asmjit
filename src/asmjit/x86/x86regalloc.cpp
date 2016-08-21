@@ -1347,15 +1347,15 @@ static void X86RAPass_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
 // ============================================================================
 
 static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
-  FuncDecl& decl = func->_decl;
-  FuncFrame& frame = func->_frame;
+  const FuncDecl& decl = func->getDecl();
+  FuncFrameInfo& ffi = func->getFrameInfo();
 
   // Select some register which will contain the base address of function
   // arguments and return address. The algorithm tries to select registers
   // which are saved or not preserved by default, if not successful it picks
   // any other register and adds it to `_savedRegs`.
   uint32_t stackArgsRegId;
-  if (frame.hasPreservedFP()) {
+  if (ffi.hasPreservedFP()) {
     stackArgsRegId = X86Gp::kIdBp;
   }
   else {
@@ -1380,7 +1380,7 @@ static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
     ASMJIT_ASSERT(stackArgsRegId < self->cc()->getGpCount());
   }
 
-  frame.setStackArgsRegId(stackArgsRegId);
+  ffi.setStackArgsRegId(stackArgsRegId);
 }
 
 //! \internal
@@ -1587,7 +1587,7 @@ Error X86RAPass::fetch() {
   // Global allocable registers.
   uint32_t* gaRegs = _gaRegs;
 
-  if (func->_frame.hasPreservedFP())
+  if (func->getFrameInfo().hasPreservedFP())
     gaRegs[X86Reg::kKindGp] &= ~Utils::mask(X86Gp::kIdBp);
 
   // Allowed index registers (GP/XMM/YMM).
@@ -1732,7 +1732,7 @@ _NextGroup:
           uint32_t remain[X86Reg::_kKindRACount];
           CCHint* cur = node;
 
-          remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->_frame.hasPreservedFP();
+          remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->getFrameInfo().hasPreservedFP();
           remain[X86Reg::kKindMm ] = _regCount.getMm();
           remain[X86Reg::kKindK  ] = _regCount.getK();
           remain[X86Reg::kKindXyz] = _regCount.getXyz();
@@ -2156,9 +2156,9 @@ _NextGroup:
               VirtReg* saBase = cc()->getVirtReg(saReg);
               RA_INSERT(saBase, tied, TiedReg::kWReg, 0);
 
-              if (func->_frame.hasPreservedFP())
+              if (func->getFrameInfo().hasPreservedFP())
                 saBase->_isFixed = true;
-              tied->setOutPhysId(func->_frame.getStackArgsRegId());
+              tied->setOutPhysId(func->getFrameInfo().getStackArgsRegId());
             }
 
             // Argument passed by stack is handled after the prolog.
@@ -2170,9 +2170,9 @@ _NextGroup:
           }
         }
 
-        // If saReg is not needed, clear it also from FuncFrame.
+        // If saReg is not needed, clear it also from FuncFrameInfo.
         if (!saReg.isValid())
-          func->_frame.setStackArgsRegId(kInvalidReg);
+          func->getFrameInfo().setStackArgsRegId(kInvalidReg);
 
         RA_FINALIZE(node_);
         next = node_->getNext();
@@ -2246,10 +2246,10 @@ _NextGroup:
         Operand_* args = node->_args;
         Operand_* rets = node->_ret;
 
-        func->_frame.addFlags(FuncFrame::kFlagHasCalls);
-        func->_frame.mergeCallFrameSize(node->_decl.getArgStackSize());
+        func->getFrameInfo().enableCalls();
+        func->getFrameInfo().mergeCallFrameSize(node->_decl.getArgStackSize());
         // TODO: Each function frame should also define its stack arguments' alignment.
-        // func->_frame.mergeCallFrameAlignment();
+        // func->getFrameInfo().mergeCallFrameAlignment();
         X86RAPass_queryUsedArgs(this, node, decl, node->_usedArgs);
 
         uint32_t i;
@@ -4197,21 +4197,21 @@ static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uin
 
 //! \internal
 static Error X86RAPass_prepareFuncFrame(X86RAPass* self, CCFunc* func) {
-  FuncDecl& decl = func->_decl;
-  FuncFrame& frame = func->_frame;
+  FuncDecl& decl = func->getDecl();
+  FuncFrameInfo& ffi = func->getFrameInfo();
 
   X86RegMask& clobberedRegs = self->_clobberedRegs;
   uint32_t gpSize = self->cc()->getGpSize();
 
   // Initialize dirty registers.
-  frame.setDirtyRegs(X86Reg::kKindGp , clobberedRegs.get(X86Reg::kKindGp ));
-  frame.setDirtyRegs(X86Reg::kKindMm , clobberedRegs.get(X86Reg::kKindMm ));
-  frame.setDirtyRegs(X86Reg::kKindK  , clobberedRegs.get(X86Reg::kKindK  ));
-  frame.setDirtyRegs(X86Reg::kKindXyz, clobberedRegs.get(X86Reg::kKindXyz));
+  ffi.setDirtyRegs(X86Reg::kKindGp , clobberedRegs.get(X86Reg::kKindGp ));
+  ffi.setDirtyRegs(X86Reg::kKindMm , clobberedRegs.get(X86Reg::kKindMm ));
+  ffi.setDirtyRegs(X86Reg::kKindK  , clobberedRegs.get(X86Reg::kKindK  ));
+  ffi.setDirtyRegs(X86Reg::kKindXyz, clobberedRegs.get(X86Reg::kKindXyz));
 
   // Initialize stack size & alignment.
-  frame.setStackFrameSize(self->_memAllTotal);
-  frame.setStackFrameAlignment(self->_memMaxAlign);
+  ffi.setStackFrameSize(self->_memAllTotal);
+  ffi.setStackFrameAlignment(self->_memMaxAlign);
 
   return kErrorOk;
 }
@@ -4569,7 +4569,7 @@ _Done:
     ASMJIT_PROPAGATE(X86RAPass_prepareFuncFrame(this, func));
 
     FuncLayout layout;
-    ASMJIT_PROPAGATE(layout.init(func->getDecl(), func->getFrame()));
+    ASMJIT_PROPAGATE(layout.init(func->getDecl(), func->getFrameInfo()));
 
     _varBaseRegId = layout._stackBaseRegId;
     _varBaseOffset = layout._stackBaseOffset;
@@ -4580,7 +4580,7 @@ _Done:
     ASMJIT_PROPAGATE(FuncUtils::insertProlog(this->cc(), layout));
 
     cc->_setCursor(func->getExitNode());
-    ASMJIT_PROPAGATE(FuncUtils::insertProlog(this->cc(), layout));
+    ASMJIT_PROPAGATE(FuncUtils::insertEpilog(this->cc(), layout));
   }
 
   ASMJIT_TLOG("[T] ======= Translate (End)\n");

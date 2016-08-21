@@ -260,7 +260,7 @@ struct CallConv {
     ASMJIT_ASSERT(kind < kNumRegKinds);
 
     _setPassedPacked(kind, ASMJIT_PACK32_4x8(a0, a1, a2, a3),
-                              ASMJIT_PACK32_4x8(a4, a5, a6, a7));
+                           ASMJIT_PACK32_4x8(a4, a5, a6, a7));
 
     // NOTE: This should always be called with all arguments known at compile
     // time, so even if it looks scary it should be translated to a single
@@ -292,7 +292,7 @@ struct CallConv {
 
   uint8_t _id;                           //!< Calling convention id, see \ref Id.
   uint8_t _archType;                     //!< Architecture type (see \ref Arch::Type).
-  uint8_t _algorithm;                    //!< Algorithm to create FuncFrame.
+  uint8_t _algorithm;                    //!< Calling convention algorithm.
   uint8_t _flags;                        //!< Calling convention flags.
 
   uint16_t _redZoneSize;                 //!< Red zone size (AMD64 == 128 bytes).
@@ -304,34 +304,315 @@ struct CallConv {
 };
 
 // ============================================================================
-// [asmjit::FuncFrame]
+// [asmjit::FuncArgIndex]
 // ============================================================================
 
-//! Function frame (definition).
+//! Function argument index (lo/hi).
+ASMJIT_ENUM(FuncArgIndex) {
+  //! Maximum number of function arguments supported by AsmJit.
+  kFuncArgCount = 16,
+  //! Extended maximum number of arguments (used internally).
+  kFuncArgCountLoHi = kFuncArgCount * 2,
+
+  //! Index to the LO part of function argument (default).
+  //!
+  //! This value is typically omitted and added only if there is HI argument
+  //! accessed.
+  kFuncArgLo = 0,
+
+  //! Index to the HI part of function argument.
+  //!
+  //! HI part of function argument depends on target architecture. On x86 it's
+  //! typically used to transfer 64-bit integers (they form a pair of 32-bit
+  //! integers).
+  kFuncArgHi = kFuncArgCount
+};
+
+// ============================================================================
+// [asmjit::FuncRet]
+// ============================================================================
+
+//! Function return value (lo/hi) specification.
+ASMJIT_ENUM(FuncRet) {
+  //! Index to the LO part of function return value.
+  kFuncRetLo = 0,
+  //! Index to the HI part of function return value.
+  kFuncRetHi = 1
+};
+
+// ============================================================================
+// [asmjit::FuncSignature]
+// ============================================================================
+
+//! Function signature.
+//!
+//! Contains information about function return type, count of arguments and
+//! their TypeIds. Function signature is a low level structure which doesn't
+//! contain platform specific or calling convention specific information.
+struct FuncSignature {
+  enum {
+    kNoVarArgs = 0xFF                    //!< Doesn't have variable number of arguments (`...`).
+  };
+
+  // --------------------------------------------------------------------------
+  // [Setup]
+  // --------------------------------------------------------------------------
+
+  //! Setup the prototype.
+  ASMJIT_INLINE void setup(
+    uint32_t ccId,
+    uint32_t ret,
+    const uint8_t* args, uint32_t argCount) noexcept {
+
+    ASMJIT_ASSERT(ccId <= 0xFF);
+    ASMJIT_ASSERT(argCount <= 0xFF);
+
+    _callConv = static_cast<uint8_t>(ccId);
+    _argCount = static_cast<uint8_t>(argCount);
+    _vaIndex = kNoVarArgs;
+    _ret = ret;
+    _args = args;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get the function's calling convention.
+  ASMJIT_INLINE uint32_t getCallConv() const noexcept { return _callConv; }
+
+  //! Get if the function has variable number of arguments (...).
+  ASMJIT_INLINE bool hasVarArgs() const noexcept { _vaIndex != kNoVarArgs; }
+  //! Get the variable arguments (...) index, `kNoVarArgs` if none.
+  ASMJIT_INLINE uint32_t getVAIndex() const noexcept { return _vaIndex; }
+
+  //! Get the number of function arguments.
+  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _argCount; }
+
+  ASMJIT_INLINE bool hasRet() const noexcept { return _ret != TypeId::kVoid; }
+  //! Get the return value type.
+  ASMJIT_INLINE uint32_t getRet() const noexcept { return _ret; }
+
+  //! Get the type of the argument at index `i`.
+  ASMJIT_INLINE uint32_t getArg(uint32_t i) const noexcept {
+    ASMJIT_ASSERT(i < _argCount);
+    return _args[i];
+  }
+  //! Get the array of function arguments' types.
+  ASMJIT_INLINE const uint8_t* getArgs() const noexcept { return _args; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  uint8_t _callConv;                     //!< Calling convention id.
+  uint8_t _argCount;                     //!< Count of arguments.
+  uint8_t _vaIndex;                      //!< Index to a first vararg or `kNoVarArgs`.
+  uint8_t _ret;                          //!< TypeId of a return value.
+  const uint8_t* _args;                  //!< TypeIds of function arguments.
+};
+
+// ============================================================================
+// [asmjit::FuncSignatureT]
+// ============================================================================
+
+//! \internal
+#define T(TYPE) TypeIdOf<TYPE>::kTypeId
+
+//! Static function signature (no arguments).
+template<typename RET>
+struct FuncSignature0 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature0(uint32_t ccId = CallConv::kIdHost) noexcept {
+    setup(ccId, T(RET), nullptr, 0);
+  }
+};
+
+//! Static function signature (1 argument).
+template<typename RET, typename A0>
+struct FuncSignature1 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature1(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (2 arguments).
+template<typename RET, typename A0, typename A1>
+struct FuncSignature2 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature2(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (3 arguments).
+template<typename RET, typename A0, typename A1, typename A2>
+struct FuncSignature3 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature3(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (4 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3>
+struct FuncSignature4 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature4(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (5 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4>
+struct FuncSignature5 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature5(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (6 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5>
+struct FuncSignature6 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature6(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (7 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6>
+struct FuncSignature7 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature7(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (8 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7>
+struct FuncSignature8 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature8(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (9 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7, typename A8>
+struct FuncSignature9 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature9(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7), T(A8) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+//! Static function signature (10 arguments).
+template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7, typename A8, typename A9>
+struct FuncSignature10 : public FuncSignature {
+  ASMJIT_INLINE FuncSignature10(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7), T(A8), T(A9) };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+
+#if ASMJIT_CC_HAS_VARIADIC_TEMPLATES
+//! Static function signature (variadic).
+template<typename RET, typename... ARGS>
+struct FuncSignatureT : public FuncSignature {
+  ASMJIT_INLINE FuncSignatureT(uint32_t ccId = CallConv::kIdHost) noexcept {
+    static const uint8_t args[] = { (T(ARGS))... };
+    setup(ccId, T(RET), args, ASMJIT_ARRAY_SIZE(args));
+  }
+};
+#endif // ASMJIT_CC_HAS_VARIADIC_TEMPLATES
+
+#undef T
+
+// ============================================================================
+// [asmjit::FuncSignatureX]
+// ============================================================================
+
+//! Dynamic function signature.
+struct FuncSignatureX : public FuncSignature {
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE FuncSignatureX(uint32_t ccId = CallConv::kIdHost) noexcept {
+    setup(ccId, TypeId::kVoid, _builderArgList, 0);
+  }
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE void setCallConv(uint32_t ccId) noexcept {
+    ASMJIT_ASSERT(ccId <= 0xFF);
+    _callConv = static_cast<uint8_t>(ccId);
+  }
+
+  //! Set the return type to `retType`.
+  ASMJIT_INLINE void setRet(uint32_t retType) noexcept { _ret = retType; }
+  //! Set the return type based on `T`.
+  template<typename T>
+  ASMJIT_INLINE void setRetT() noexcept { setRet(TypeIdOf<T>::kTypeId); }
+
+  //! Set the argument at index `i` to the `type`
+  ASMJIT_INLINE void setArg(uint32_t i, uint32_t type) noexcept {
+    ASMJIT_ASSERT(i < _argCount);
+    _builderArgList[i] = type;
+  }
+  //! Set the argument at index `i` to the type based on `T`.
+  template<typename T>
+  ASMJIT_INLINE void setArgT(uint32_t i) noexcept { setArg(i, TypeIdOf<T>::kTypeId); }
+
+  //! Append an argument of `type` to the function prototype.
+  ASMJIT_INLINE void addArg(uint32_t type) noexcept {
+    ASMJIT_ASSERT(_argCount < kFuncArgCount);
+    _builderArgList[_argCount++] = static_cast<uint8_t>(type);
+  }
+  //! Append an argument of type based on `T` to the function prototype.
+  template<typename T>
+  ASMJIT_INLINE void addArgT() noexcept { addArg(TypeIdOf<T>::kTypeId); }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  uint8_t _builderArgList[kFuncArgCount];
+};
+
+// ============================================================================
+// [asmjit::FuncFrameInfo]
+// ============================================================================
+
+//! Function frame information.
 //!
 //! This structure can be used to create a function frame in a cross-platform
 //! way. It contains information about the function's stack to be used and
 //! registers to be saved and restored. Based on this information in can
 //! calculate the optimal layout of a function as \ref FuncLayout.
-struct FuncFrame {
-  //! FuncFrame flags.
+struct FuncFrameInfo {
+  //! Limits are the same as limits defined by \ref CallConv.
+  ASMJIT_ENUM(Limits) {
+    kNumRegKinds = CallConv::kNumRegKinds
+  };
+
+  //! Flags.
   //!
   //! These flags are designed in a way that all are initially false, and user
-  //! or finalizer sets them when necessary. Architecture-specific flags are
-  //! prefixed with the architecture name.
+  //! or frame-finalizer sets them when necessary. Architecture-specific flags
+  //! are prefixed with the architecture name.
   ASMJIT_ENUM(Flags) {
-    kFlagPreserveFP       = 0x00000002U, //!< Preserve frame pointer (EBP|RBP).
-    kFlagHasCalls         = 0x00000001U, //!< Function calls other functions (is not leaf).
-    kFlagCompact          = 0x00008000U, //!< Use smaller, but possibly slower prolog/epilog.
+    kFlagPreserveFP       = 0x00000001U, //!< Preserve frame pointer (EBP|RBP).
+    kFlagCompactPE        = 0x00000002U, //!< Use smaller, but possibly slower prolog/epilog.
+    kFlagHasCalls         = 0x00000004U, //!< Function calls other functions (is not leaf).
 
     kX86FlagAlignedVecSR  = 0x00010000U, //!< Use aligned save/restore of VEC regs.
     kX86FlagMmxCleanup    = 0x00020000U, //!< Emit EMMS instruction in epilog (X86).
     kX86FlagAvxCleanup    = 0x00040000U  //!< Emit VZEROUPPER instruction in epilog (X86).
-  };
-
-  //! FuncFrame is bound to the same limits as \ref CallConv.
-  ASMJIT_ENUM(Limits) {
-    kNumRegKinds = CallConv::kNumRegKinds
   };
 
   // --------------------------------------------------------------------------
@@ -347,21 +628,49 @@ struct FuncFrame {
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get FuncFrame flags, see \ref Flags.
+  //! Get frame-info flags, see \ref Flags.
   ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
-  //! Check if a FuncFrame `flag` is set, see \ref Flags.
+  //! Check if a frame-info `flag` is set, see \ref Flags.
   ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
-  //! Add `flags` to FuncFrame, see \ref Flags.
+  //! Add `flags` to the frame-info, see \ref Flags.
   ASMJIT_INLINE void addFlags(uint32_t flags) noexcept { _flags |= flags; }
-  //! Clear FuncFrame `flags`, see \ref Flags.
+  //! Clear `flags` from the frame-info, see \ref Flags.
   ASMJIT_INLINE void clearFlags(uint32_t flags) noexcept { _flags &= ~flags; }
 
-  //! Get if the function is naked - it doesn't preserve frame pointer (EBP|ESP).
+  //! Get if the function preserves frame pointer (EBP|ESP on X86).
   ASMJIT_INLINE bool hasPreservedFP() const noexcept { return (_flags & kFlagPreserveFP) != 0; }
-  //! Get if the function is naked - it doesn't preserve frame pointer (EBP|ESP).
-  ASMJIT_INLINE bool isNaked() const noexcept { return (_flags & kFlagPreserveFP) == 0; }
+  //! Enable preserved frame pointer.
+  ASMJIT_INLINE bool enablePreservedFP() noexcept { _flags |= kFlagPreserveFP; }
+  //! Disable preserved frame pointer.
+  ASMJIT_INLINE bool disablePreservedFP() noexcept { _flags &= ~kFlagPreserveFP; }
+
   //! Get if the function prolog and epilog should be compacted (as small as possible).
-  ASMJIT_INLINE bool isCompact() const noexcept { return (_flags & kFlagCompact) != 0; }
+  ASMJIT_INLINE bool hasCompactPE() const noexcept { return (_flags & kFlagCompactPE) != 0; }
+  //! Enable compact prolog/epilog.
+  ASMJIT_INLINE bool enableCompactPE() noexcept { _flags |= kFlagCompactPE; }
+  //! Disable compact prolog/epilog.
+  ASMJIT_INLINE bool disableCompactPE() noexcept { _flags &= ~kFlagCompactPE; }
+
+  //! Get if the function calls other functions.
+  ASMJIT_INLINE bool hasCalls() const noexcept { return (_flags & kFlagHasCalls) != 0; }
+  //! Set `kFlagHasCalls` to true.
+  ASMJIT_INLINE bool enableCalls() noexcept { _flags |= kFlagHasCalls; }
+  //! Set `kFlagHasCalls` to false.
+  ASMJIT_INLINE bool disableCalls() noexcept { _flags &= ~kFlagHasCalls; }
+
+  //! Get if the function contains MMX cleanup - 'emms' instruction in epilog.
+  ASMJIT_INLINE bool hasMmxCleanup() const noexcept { return (_flags & kX86FlagMmxCleanup) != 0; }
+  //! Enable MMX cleanup.
+  ASMJIT_INLINE bool enableMmxCleanup() noexcept { _flags |= kX86FlagMmxCleanup; }
+  //! Disable MMX cleanup.
+  ASMJIT_INLINE bool disableMmxCleanup() noexcept { _flags &= ~kX86FlagMmxCleanup; }
+
+  //! Get if the function contains AVX cleanup - 'vzeroupper' instruction in epilog.
+  ASMJIT_INLINE bool hasAvxCleanup() const noexcept { return (_flags & kX86FlagAvxCleanup) != 0; }
+  //! Enable AVX cleanup.
+  ASMJIT_INLINE bool enableAvxCleanup() noexcept { _flags |= kX86FlagAvxCleanup; }
+  //! Disable AVX cleanup.
+  ASMJIT_INLINE bool disableAvxCleanup() noexcept { _flags &= ~kX86FlagAvxCleanup; }
 
   //! Get which registers (by `kind`) are saved/restored in prolog/epilog, respectively.
   ASMJIT_INLINE uint32_t getDirtyRegs(uint32_t kind) const noexcept {
@@ -432,7 +741,7 @@ struct FuncFrame {
   // [Members]
   // --------------------------------------------------------------------------
 
-  uint32_t _flags;                       //!< FuncFrame flags.
+  uint32_t _flags;                       //!< Flags.
   uint32_t _dirtyRegs[kNumRegKinds];     //!< Registers used by the function.
 
   uint8_t _stackFrameAlignment;          //!< Minimum alignment of stack-frame.
@@ -442,43 +751,6 @@ struct FuncFrame {
 
   uint32_t _stackFrameSize;              //!< Size of a stack-frame used by the function.
   uint32_t _callFrameSize;               //!< Size of a call-frame (not part of _stackFrameSize).
-};
-
-// ============================================================================
-// [asmjit::FuncArgIndex]
-// ============================================================================
-
-//! Function argument index (lo/hi).
-ASMJIT_ENUM(FuncArgIndex) {
-  //! Maximum number of function arguments supported by AsmJit.
-  kFuncArgCount = 16,
-  //! Extended maximum number of arguments (used internally).
-  kFuncArgCountLoHi = kFuncArgCount * 2,
-
-  //! Index to the LO part of function argument (default).
-  //!
-  //! This value is typically omitted and added only if there is HI argument
-  //! accessed.
-  kFuncArgLo = 0,
-
-  //! Index to the HI part of function argument.
-  //!
-  //! HI part of function argument depends on target architecture. On x86 it's
-  //! typically used to transfer 64-bit integers (they form a pair of 32-bit
-  //! integers).
-  kFuncArgHi = kFuncArgCount
-};
-
-// ============================================================================
-// [asmjit::FuncRet]
-// ============================================================================
-
-//! Function return value (lo/hi) specification.
-ASMJIT_ENUM(FuncRet) {
-  //! Index to the LO part of function return value.
-  kFuncRetLo = 0,
-  //! Index to the HI part of function return value.
-  kFuncRetHi = 1
 };
 
 // ============================================================================
@@ -570,254 +842,12 @@ struct FuncInOut {
 };
 
 // ============================================================================
-// [asmjit::FuncSignature]
-// ============================================================================
-
-//! Function signature.
-//!
-//! Contains information about function return type, count of arguments and
-//! their TypeIds. Function signature is a low level structure which doesn't
-//! contain platform specific or calling convention specific information.
-struct FuncSignature {
-  enum {
-    kNoVarArgs = 0xFF                    //! Doesn't have variable number of arguments (`...`).
-  };
-
-  // --------------------------------------------------------------------------
-  // [Setup]
-  // --------------------------------------------------------------------------
-
-  //! Setup the prototype.
-  ASMJIT_INLINE void setup(
-    uint32_t ccId,
-    uint32_t ret,
-    const uint8_t* args, uint32_t argCount) noexcept {
-
-    ASMJIT_ASSERT(ccId <= 0xFF);
-    ASMJIT_ASSERT(argCount <= 0xFF);
-
-    _callConv = static_cast<uint8_t>(ccId);
-    _varArgs = kNoVarArgs;
-    _argCount = static_cast<uint8_t>(argCount);
-    _ret = ret;
-    _args = args;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
-
-  //! Get the function's calling convention.
-  ASMJIT_INLINE uint32_t getCallConv() const noexcept { return _callConv; }
-  //! Get if the function has variable number of arguments (...).
-  ASMJIT_INLINE bool hasVarArgs() const noexcept { _varArgs != kNoVarArgs; }
-  //! Get the variable arguments (...) index, `kNoVarArgs` if none.
-  ASMJIT_INLINE uint32_t getVarArgs() const noexcept { return _varArgs; }
-
-  //! Get the number of function arguments.
-  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _argCount; }
-
-  ASMJIT_INLINE bool hasRet() const noexcept { return _ret != TypeId::kVoid; }
-  //! Get the return value type.
-  ASMJIT_INLINE uint32_t getRet() const noexcept { return _ret; }
-
-  //! Get the type of the argument at index `i`.
-  ASMJIT_INLINE uint32_t getArg(uint32_t i) const noexcept {
-    ASMJIT_ASSERT(i < _argCount);
-    return _args[i];
-  }
-  //! Get the array of function arguments' types.
-  ASMJIT_INLINE const uint8_t* getArgs() const noexcept { return _args; }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  uint8_t _callConv;                     //!< Calling convention id.
-  uint8_t _varArgs;                      //!< First var args
-  uint8_t _argCount;
-  uint8_t _ret;
-  const uint8_t* _args;
-};
-
-// ============================================================================
-// [asmjit::FuncSignatureT]
-// ============================================================================
-
-//! \internal
-#define T(TYPE) TypeIdOf<TYPE>::kTypeId
-
-//! Function signature template (no arguments).
-template<typename RET>
-struct FuncSignature0 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature0(uint32_t callConv = CallConv::kIdHost) noexcept {
-    setup(callConv, T(RET), nullptr, 0);
-  }
-};
-
-//! Function signature template (1 argument).
-template<typename RET, typename A0>
-struct FuncSignature1 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature1(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (2 arguments).
-template<typename RET, typename A0, typename A1>
-struct FuncSignature2 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature2(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (3 arguments).
-template<typename RET, typename A0, typename A1, typename A2>
-struct FuncSignature3 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature3(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (4 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3>
-struct FuncSignature4 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature4(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (5 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4>
-struct FuncSignature5 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature5(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (6 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5>
-struct FuncSignature6 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature6(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (7 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6>
-struct FuncSignature7 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature7(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (8 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7>
-struct FuncSignature8 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature8(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (9 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7, typename A8>
-struct FuncSignature9 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature9(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7), T(A8) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-
-//! Function signature template (10 arguments).
-template<typename RET, typename A0, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6, typename A7, typename A8, typename A9>
-struct FuncSignature10 : public FuncSignature {
-  ASMJIT_INLINE FuncSignature10(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { T(A0), T(A1), T(A2), T(A3), T(A4), T(A5), T(A6), T(A7), T(A8), T(A9) };
-    setup(callConv, T(RET), args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-#undef T
-
-#if ASMJIT_CC_HAS_VARIADIC_TEMPLATES
-//! Function signature template.
-template<typename RET, typename... ARGS>
-struct FuncSignatureT : public FuncSignature {
-  ASMJIT_INLINE FuncSignatureT(uint32_t callConv = CallConv::kIdHost) noexcept {
-    static const uint8_t args[] = { (TypeIdOf<ARGS>::kTypeId)... };
-    setup(callConv, TypeIdOf<RET>::kTypeId, args, ASMJIT_ARRAY_SIZE(args));
-  }
-};
-#endif // ASMJIT_CC_HAS_VARIADIC_TEMPLATES
-
-// ============================================================================
-// [asmjit::FuncSignatureX]
-// ============================================================================
-
-//! Dynamic function signature.
-struct FuncSignatureX : public FuncSignature {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE FuncSignatureX(uint32_t callConv = CallConv::kIdHost) noexcept {
-    setup(callConv, TypeId::kVoid, _builderArgList, 0);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Accessors]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE void setCallConv(uint32_t callConv) noexcept {
-    ASMJIT_ASSERT(callConv <= 0xFF);
-    _callConv = static_cast<uint8_t>(callConv);
-  }
-
-  //! Set the return type to `retType`.
-  ASMJIT_INLINE void setRet(uint32_t retType) noexcept { _ret = retType; }
-  //! Set the return type based on `T`.
-  template<typename T>
-  ASMJIT_INLINE void setRetT() noexcept { setRet(TypeIdOf<T>::kTypeId); }
-
-  //! Set the argument at index `i` to the `type`
-  ASMJIT_INLINE void setArg(uint32_t i, uint32_t type) noexcept {
-    ASMJIT_ASSERT(i < _argCount);
-    _builderArgList[i] = type;
-  }
-  //! Set the argument at index `i` to the type based on `T`.
-  template<typename T>
-  ASMJIT_INLINE void setArgT(uint32_t i) noexcept { setArg(i, TypeIdOf<T>::kTypeId); }
-
-  //! Append an argument of `type` to the function prototype.
-  ASMJIT_INLINE void addArg(uint32_t type) noexcept {
-    ASMJIT_ASSERT(_argCount < kFuncArgCount);
-    _builderArgList[_argCount++] = static_cast<uint8_t>(type);
-  }
-  //! Append an argument of type based on `T` to the function prototype.
-  template<typename T>
-  ASMJIT_INLINE void addArgT() noexcept { addArg(TypeIdOf<T>::kTypeId); }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  uint8_t _builderArgList[kFuncArgCount];
-};
-
-// ============================================================================
 // [asmjit::FuncDecl]
 // ============================================================================
 
 //! Function declaration.
 struct FuncDecl {
-  //! FuncDecl is bound to the same limits as \ref CallConv.
+  //! Limits are the same as limits defined by \ref CallConv.
   ASMJIT_ENUM(Limits) {
     kNumRegKinds = CallConv::kNumRegKinds
   };
@@ -920,11 +950,11 @@ struct FuncDecl {
 //!
 //! Function layout is used directly by prolog and epilog insertion helpers. It
 //! contains only information necessary to insert proper prolog and epilog, and
-//! should be always calculated from \ref FuncDecl and \ref FuncFrame, where
-//! FuncDecl defines function's calling convention and signature, and FuncFrame
-//! specifies how much stack is used, and which registers are dirty.
+//! should be always calculated from \ref FuncDecl and \ref FuncFrameInfo, where
+//! \ref FuncDecl defines function's calling convention and signature, and \ref
+//! FuncFrameInfo specifies how much stack is used, and which registers are dirty.
 struct FuncLayout {
-  //! FuncLayout is bound to the same limits as \ref CallConv.
+  //! Limits are the same as limits defined by \ref CallConv.
   ASMJIT_ENUM(Limits) {
     kNumRegKinds = CallConv::kNumRegKinds
   };
@@ -933,7 +963,7 @@ struct FuncLayout {
   // [Init / Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API Error init(const FuncDecl& decl, const FuncFrame& frame) noexcept;
+  ASMJIT_API Error init(const FuncDecl& decl, const FuncFrameInfo& ffi) noexcept;
   ASMJIT_INLINE void reset() noexcept { ::memset(this, 0, sizeof(*this)); }
 
   // --------------------------------------------------------------------------

@@ -235,7 +235,7 @@ CCFunc* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   }
 
   // Function frame.
-  func->_frame.setNaturalStackAlignment(_codeInfo.getStackAlignment());
+  func->getFrameInfo().setNaturalStackAlignment(_codeInfo.getStackAlignment());
 
   // Allocate space for function arguments.
   func->_args = nullptr;

@@ -285,7 +285,7 @@ Error X86FuncUtils::initFuncDecl(FuncDecl& decl, const FuncSignature& sign, uint
 // [asmjit::X86FuncUtils - FuncLayout]
 // ============================================================================
 
-Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, const FuncFrame& frame) noexcept {
+Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, const FuncFrameInfo& ffi) noexcept {
   layout.reset();
 
   uint32_t kind;
@@ -293,10 +293,10 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
 
   // Calculate a bit-mask of all registers that must be saved & restored.
   for (kind = 0; kind < CallConv::kNumRegKinds; kind++)
-    layout._savedRegs[kind] = frame.getDirtyRegs(kind) & decl.getPreservedRegs(kind);
+    layout._savedRegs[kind] = ffi.getDirtyRegs(kind) & decl.getPreservedRegs(kind);
 
   // Include EBP|RBP if the function preserves the frame-pointer.
-  if (frame.hasPreservedFP()) {
+  if (ffi.hasPreservedFP()) {
     layout._preservedFP = true;
     layout._savedRegs[X86Reg::kKindGp] |= Utils::mask(X86Gp::kIdBp);
   }
@@ -308,24 +308,24 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   uint32_t stackAlignment =
     Utils::iMax<uint32_t>(
       Utils::iMax<uint32_t>(
-        frame.getStackFrameAlignment(),
-        frame.getCallFrameAlignment()),
-      frame.getNaturalStackAlignment());
+        ffi.getStackFrameAlignment(),
+        ffi.getCallFrameAlignment()),
+      ffi.getNaturalStackAlignment());
   layout._stackAlignment = static_cast<uint8_t>(stackAlignment);
 
   // Calculate if dynamic stack alignment is required. If true the function has
   // to align stack dynamically to match `_stackAlignment` and would require to
   // access its stack-based arguments through `_stackArgsRegId`.
-  bool dsa = stackAlignment > frame._naturalStackAlignment && stackAlignment >= 16;
+  bool dsa = stackAlignment > ffi._naturalStackAlignment && stackAlignment >= 16;
   layout._dynamicAlignment = dsa;
 
   // This flag describes if the prolog inserter must store the previous ESP|RSP
   // to stack so the epilog inserter can load the stack from it before returning.
-  bool dsaSlotUsed = dsa && frame.isNaked();
+  bool dsaSlotUsed = dsa && !ffi.hasPreservedFP();
   layout._dsaSlotUsed = dsaSlotUsed;
 
   // These two are identical if the function doesn't align its stack dynamically.
-  uint32_t stackArgsRegId = frame.getStackArgsRegId();
+  uint32_t stackArgsRegId = ffi.getStackArgsRegId();
   if (stackArgsRegId == kInvalidReg)
     stackArgsRegId = X86Gp::kIdSp;
 
@@ -345,27 +345,27 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   layout._vecStackSize = Utils::bitCount(layout.getSavedRegs(X86Reg::kKindXyz)) * 16 +
                          Utils::bitCount(layout.getSavedRegs(X86Reg::kKindMm )) *  8 ;
 
-  uint32_t v = 0;                                    // The beginning of the stack frame, aligned to CallFrame alignment.
-  v += frame._callFrameSize;                         // Count '_callFrameSize'  <- This is used to call functions.
-  v  = Utils::alignTo(v, stackAlignment);            // Align to function's SA
+  uint32_t v = 0;                        // The beginning of the stack frame, aligned to CallFrame alignment.
+  v += ffi._callFrameSize;               // Count '_callFrameSize'  <- This is used to call functions.
+  v  = Utils::alignTo(v, stackAlignment);// Align to function's SA
 
-  layout._stackBaseOffset = v;                       // Store '_stackBaseOffset'<- Function's own stack starts here..
-  v += frame._stackFrameSize;                        // Count '_stackFrameSize' <- Function's own stack ends here.
+  layout._stackBaseOffset = v;           // Store '_stackBaseOffset'<- Function's own stack starts here..
+  v += ffi._stackFrameSize;              // Count '_stackFrameSize' <- Function's own stack ends here.
 
   // If the function is aligned, calculate the alignment necessary to store
-  // vector registers, and set `FuncFrame::kX86FlagAlignedVecSR` to inform
+  // vector registers, and set `FuncFrameInfo::kX86FlagAlignedVecSR` to inform
   // PrologEpilog inserter that it can use instructions to perform aligned
   // stores/loads to save/restore VEC registers.
   if (stackAlignment >= 16 && layout._vecStackSize) {
-    v = Utils::alignTo(v, 16);                       // Align '_vecStackOffset'.
+    v = Utils::alignTo(v, 16);           // Align '_vecStackOffset'.
     layout._alignedVecSR = true;
   }
 
-  layout._vecStackOffset = v;                        // Store '_vecStackOffset' <- Functions VEC Save|Restore starts here.
-  v += layout._vecStackSize;                         // Count '_vecStackSize'   <- Functions VEC Save|Restore ends here.
+  layout._vecStackOffset = v;            // Store '_vecStackOffset' <- Functions VEC Save|Restore starts here.
+  v += layout._vecStackSize;             // Count '_vecStackSize'   <- Functions VEC Save|Restore ends here.
 
   if (dsaSlotUsed) {
-    layout._dsaSlot = v;                             // Store '_dsaSlot'        <- Old stack pointer is stored here.
+    layout._dsaSlot = v;                 // Store '_dsaSlot'        <- Old stack pointer is stored here.
     v += gpSize;
   }
 
@@ -378,15 +378,15 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   // the current EIP|RIP onto the stack, and misaligns it by 12 or 8 bytes
   // (depending on the architecture). So count number of bytes needed to align
   // it up to the function's CallFrame (the beginning).
-  if (v || frame.hasFlag(FuncFrame::kFlagHasCalls))
+  if (v || ffi.hasCalls())
     v += Utils::alignDiff(v + layout._gpStackSize + gpSize, stackAlignment);
 
-  layout._stackAdjustment = v;                       // Store '_stackAdjustment'<- SA used by 'add zsp, SA' and 'sub zsp, SA'.
-  layout._gpStackOffset = v;                         // Store '_gpStackOffset'  <- Functions GP Save|Restore starts here.
-  v += layout._gpStackSize;                          // Count '_gpStackSize'    <- Functions GP Save|Restore ends here.
+  layout._stackAdjustment = v;           // Store '_stackAdjustment'<- SA used by 'add zsp, SA' and 'sub zsp, SA'.
+  layout._gpStackOffset = v;             // Store '_gpStackOffset'  <- Functions GP Save|Restore starts here.
+  v += layout._gpStackSize;              // Count '_gpStackSize'    <- Functions GP Save|Restore ends here.
 
-  v += gpSize;                                       // Count 'ReturnAddress'.
-  v += decl.getSpillZoneSize();                      // Count 'SpillZoneSize'.
+  v += gpSize;                           // Count 'ReturnAddress'.
+  v += decl.getSpillZoneSize();          // Count 'SpillZoneSize'.
 
   // Calculate where function arguments start, relative to the stackArgsRegId.
   // If the register that will be used to access arguments passed by stack is
@@ -394,10 +394,10 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   // how many 'push regs' we did and adjust it based on that.
   uint32_t stackArgsOffset = v;
   if (stackArgsRegId != X86Gp::kIdSp) {
-    if (frame.hasPreservedFP())
-      stackArgsOffset = gpSize;                      // Count one 'push'.
+    if (ffi.hasPreservedFP())
+      stackArgsOffset = gpSize;
     else
-      stackArgsOffset = layout._gpStackSize;         // Count the whole 'push' sequence.
+      stackArgsOffset = layout._gpStackSize;
   }
   layout._stackArgsOffset = stackArgsOffset;
 
@@ -410,9 +410,9 @@ Error X86FuncUtils::initFuncLayout(FuncLayout& layout, const FuncDecl& decl, con
   if (decl.hasFlag(CallConv::kFlagCalleePopsStack))
     layout._calleeStackCleanup = static_cast<uint16_t>(decl.getArgStackSize());
 
-  // Initialize variables based on FuncFrame flags.
-  if (frame.hasFlag(FuncFrame::kX86FlagMmxCleanup)) layout._x86MmxCleanup = true;
-  if (frame.hasFlag(FuncFrame::kX86FlagAvxCleanup)) layout._x86AvxCleanup = true;
+  // Initialize variables based on FFI flags.
+  if (ffi.hasFlag(FuncFrameInfo::kX86FlagMmxCleanup)) layout._x86MmxCleanup = true;
+  if (ffi.hasFlag(FuncFrameInfo::kX86FlagAvxCleanup)) layout._x86AvxCleanup = true;
 
   return kErrorOk;
 }

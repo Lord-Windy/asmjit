@@ -30,7 +30,7 @@ namespace asmjit {
 struct X86FuncUtils {
   static Error initCallConv(CallConv& cc, uint32_t ccId) noexcept;
   static Error initFuncDecl(FuncDecl& decl, const FuncSignature& sign, uint32_t gpSize) noexcept;
-  static Error initFuncLayout(FuncLayout& layout, const FuncDecl& decl, const FuncFrame& frame) noexcept;
+  static Error initFuncLayout(FuncLayout& layout, const FuncDecl& decl, const FuncFrameInfo& ffi) noexcept;
 
   static Error insertProlog(X86Emitter* emitter, const FuncLayout& layout);
   static Error insertEpilog(X86Emitter* emitter, const FuncLayout& layout);

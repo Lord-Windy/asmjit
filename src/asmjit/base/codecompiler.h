@@ -274,7 +274,7 @@ public:
     : CBLabel(cb),
       _exitNode(nullptr),
       _decl(),
-      _frame(),
+      _frameInfo(),
       _end(nullptr),
       _args(nullptr),
       _isFinished(false) {
@@ -308,9 +308,9 @@ public:
   ASMJIT_INLINE const FuncDecl& getDecl() const noexcept { return _decl; }
 
   //! Get function declaration.
-  ASMJIT_INLINE FuncFrame& getFrame() noexcept { return _frame; }
+  ASMJIT_INLINE FuncFrameInfo& getFrameInfo() noexcept { return _frameInfo; }
   //! Get function declaration.
-  ASMJIT_INLINE const FuncFrame& getFrame() const noexcept { return _frame; }
+  ASMJIT_INLINE const FuncFrameInfo& getFrameInfo() const noexcept { return _frameInfo; }
 
   //! Get arguments count.
   ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl.getArgCount(); }
@@ -338,8 +338,8 @@ public:
     _args[i] = nullptr;
   }
 
-  ASMJIT_INLINE uint32_t getFrameFlags() const noexcept { return _frame.getFlags(); }
-  ASMJIT_INLINE void addFrameFlags(uint32_t flags) noexcept { _frame.addFlags(flags); }
+  ASMJIT_INLINE uint32_t getFrameFlags() const noexcept { return _frameInfo.getFlags(); }
+  ASMJIT_INLINE void addFrameFlags(uint32_t flags) noexcept { _frameInfo.addFlags(flags); }
 
   //! Get whether the function has stack frame register (only when the stack is misaligned).
   //!
@@ -362,7 +362,7 @@ public:
   // --------------------------------------------------------------------------
 
   FuncDecl _decl;                        //!< Function declaration.
-  FuncFrame _frame;                      //!< Function frame.
+  FuncFrameInfo _frameInfo;              //!< Function frame information.
 
   CBLabel* _exitNode;                    //!< Function exit.
   CBSentinel* _end;                      //!< Function end.

@@ -203,10 +203,11 @@ static void dumpSizeOf(void) {
 
   INFO("Size of Func:");
   DUMP_TYPE(CallConv);
-  DUMP_TYPE(FuncFrame);
-  DUMP_TYPE(FuncInOut);
-  DUMP_TYPE(FuncSignature);
   DUMP_TYPE(FuncDecl);
+  DUMP_TYPE(FuncFrameInfo);
+  DUMP_TYPE(FuncInOut);
+  DUMP_TYPE(FuncLayout);
+  DUMP_TYPE(FuncSignature);
 
   INFO("Size of CodeBuilder:");
   DUMP_TYPE(CodeBuilder);
