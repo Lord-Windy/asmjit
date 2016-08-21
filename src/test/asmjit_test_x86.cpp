@@ -98,7 +98,7 @@ public:
       uint32_t varIndex = 0;
       uint32_t physId = 0;
       uint32_t regMask = 0x1;
-      uint32_t preservedMask = c.getFunc()->getDecl()->_callConv.getPreservedRegs(Reg::kKindGp);
+      uint32_t preservedMask = c.getFunc()->getDecl().getPreservedRegs(Reg::kKindGp);
 
       do {
         if ((preservedMask & regMask) != 0 && (physId != X86Gp::kIdSp && physId != X86Gp::kIdBp)) {

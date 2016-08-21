@@ -522,9 +522,8 @@ public:
   //! Get array of `SectionEntry*` records.
   ASMJIT_INLINE const ZoneVector<SectionEntry*>& getSections() const noexcept { return _sections; }
 
-  // TODO: Maybe getSectionEntry() would be a better name, like getLabelEntry()?
-  //! Get a specific section based on its id.
-  ASMJIT_INLINE SectionEntry* getSection(size_t index) const noexcept { return _sections[index]; }
+  //! Get a section entry of the given index.
+  ASMJIT_INLINE SectionEntry* getSectionEntry(size_t index) const noexcept { return _sections[index]; }
 
   ASMJIT_API Error growBuffer(CodeBuffer* cb, size_t n) noexcept;
   ASMJIT_API Error reserveBuffer(CodeBuffer* cb, size_t n) noexcept;

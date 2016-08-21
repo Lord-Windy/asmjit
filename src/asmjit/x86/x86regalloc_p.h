@@ -689,7 +689,7 @@ public:
   uint8_t _useAVX;
 
   //! Function variables base pointer (register).
-  uint8_t _varBaseReg;
+  uint8_t _varBaseRegId;
   //! Function variables base offset.
   int32_t _varBaseOffset;
 

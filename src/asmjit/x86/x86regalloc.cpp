@@ -383,7 +383,7 @@ Error X86RAPass::prepare(CCFunc* func) noexcept {
   _clobberedRegs.reset();
 
   _useAVX = false;
-  _varBaseReg = kInvalidReg; // Used by patcher.
+  _varBaseRegId = kInvalidReg; // Used by patcher.
   _varBaseOffset = 0;        // Used by patcher.
 
   return kErrorOk;
@@ -1355,7 +1355,10 @@ static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
   // which are saved or not preserved by default, if not successful it picks
   // any other register and adds it to `_savedRegs`.
   uint32_t stackArgsRegId;
-  if (frame.isNaked()) {
+  if (frame.hasPreservedFP()) {
+    stackArgsRegId = X86Gp::kIdBp;
+  }
+  else {
     // Passed registers as defined by the calling convention.
     uint32_t passed = decl.getPassedRegs(X86Reg::kKindGp);
 
@@ -1375,9 +1378,6 @@ static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
 
     stackArgsRegId = Utils::findFirstBit(regs);
     ASMJIT_ASSERT(stackArgsRegId < self->cc()->getGpCount());
-  }
-  else {
-    stackArgsRegId = X86Gp::kIdBp;
   }
 
   frame.setStackArgsRegId(stackArgsRegId);
@@ -1587,7 +1587,7 @@ Error X86RAPass::fetch() {
   // Global allocable registers.
   uint32_t* gaRegs = _gaRegs;
 
-  if (!func->_frame.isNaked())
+  if (func->_frame.hasPreservedFP())
     gaRegs[X86Reg::kKindGp] &= ~Utils::mask(X86Gp::kIdBp);
 
   // Allowed index registers (GP/XMM/YMM).
@@ -1732,7 +1732,7 @@ _NextGroup:
           uint32_t remain[X86Reg::_kKindRACount];
           CCHint* cur = node;
 
-          remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->_frame.isNaked();
+          remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->_frame.hasPreservedFP();
           remain[X86Reg::kKindMm ] = _regCount.getMm();
           remain[X86Reg::kKindK  ] = _regCount.getK();
           remain[X86Reg::kKindXyz] = _regCount.getXyz();
@@ -2104,17 +2104,17 @@ _NextGroup:
         ASMJIT_ASSERT(node_ == func);
         X86RAPass_assignStackArgsRegId(this, func);
 
-        FuncDecl* decl = func->getDecl();
+        FuncDecl& decl = func->getDecl();
         TiedReg* tied;
 
         RA_DECLARE();
         cc()->setCursor(node_);
 
         X86Gp saReg;
-        uint32_t argCount = decl->getArgCount();
+        uint32_t argCount = decl.getArgCount();
 
         for (uint32_t i = 0; i < argCount; i++) {
-          const FuncInOut& arg = decl->getArg(i);
+          const FuncInOut& arg = decl.getArg(i);
 
           VirtReg* vReg = func->getArg(i);
           if (!vReg) continue;
@@ -2156,7 +2156,7 @@ _NextGroup:
               VirtReg* saBase = cc()->getVirtReg(saReg);
               RA_INSERT(saBase, tied, TiedReg::kWReg, 0);
 
-              if (!func->_frame.isNaked())
+              if (func->_frame.hasPreservedFP())
                 saBase->_isFixed = true;
               tied->setOutPhysId(func->_frame.getStackArgsRegId());
             }
@@ -2197,11 +2197,11 @@ _NextGroup:
         CCFuncRet* node = static_cast<CCFuncRet*>(node_);
         ASMJIT_PROPAGATE(addReturningNode(node));
 
-        FuncDecl* decl = func->getDecl();
+        FuncDecl& decl = func->getDecl();
         RA_DECLARE();
 
-        if (decl->hasRet()) {
-          const FuncInOut& ret = decl->getRet(0);
+        if (decl.hasRet()) {
+          const FuncInOut& ret = decl.getRet(0);
           uint32_t retKind = x86RegTypeToKind(ret.getRegType());
 
           for (uint32_t i = 0; i < 2; i++) {
@@ -4217,145 +4217,6 @@ static Error X86RAPass_prepareFuncFrame(X86RAPass* self, CCFunc* func) {
 }
 
 //! \internal
-static Error X86RAPass_calculateFuncLayout(X86RAPass* self, CCFunc* func, FuncLayout& layout) {
-  FuncDecl& decl = func->_decl;
-  FuncFrame& frame = func->_frame;
-
-  uint32_t kind;
-  uint32_t gpSize = self->cc()->getGpSize();
-
-  layout.reset();
-
-  // Calculate a bit-mask of all registers that must be saved & restored.
-  for (kind = 0; kind < CallConv::kNumRegKinds; kind++)
-    layout._savedRegs[kind] = frame.getDirtyRegs(kind) & decl.getPreservedRegs(kind);
-
-  // Include EBP|RBP if the function preserves the frame-pointer.
-  if (!frame.isNaked()) {
-    layout._preservedFP = true;
-    layout._savedRegs[X86Reg::kKindGp] |= Utils::mask(X86Gp::kIdBp);
-  }
-
-  // Exclude ESP/RSP - this register is never included in saved-regs.
-  layout._savedRegs[X86Reg::kKindGp] &= ~Utils::mask(X86Gp::kIdSp);
-
-  // Calculate the final stack alignment.
-  uint32_t stackAlignment =
-    Utils::iMax<uint32_t>(
-      Utils::iMax<uint32_t>(
-        frame.getStackFrameAlignment(),
-        frame.getCallFrameAlignment()),
-      frame.getNaturalStackAlignment());
-  layout._stackAlignment = static_cast<uint8_t>(stackAlignment);
-
-  // Calculate if dynamic stack alignment is required. If true the function has
-  // to align stack dynamically to match `_stackAlignment` and would require to
-  // access its stack-based arguments through `_stackArgsRegId`.
-  bool dsa = stackAlignment > frame._naturalStackAlignment && stackAlignment >= 16;
-  layout._dynamicAlignment = dsa;
-
-  // This flag describes if the prolog inserter must store the previous ESP|RSP
-  // to stack so the epilog inserter can load the stack from it before returning.
-  bool dsaSlotUsed = dsa && frame.isNaked();
-  layout._dsaSlotUsed = dsaSlotUsed;
-
-  // These two are identical if the function doesn't align its stack dynamically.
-  uint32_t stackArgsRegId = frame.getStackArgsRegId();
-  if (stackArgsRegId == kInvalidReg)
-    stackArgsRegId = X86Gp::kIdSp;
-
-  // Fix stack arguments base-register from ESP|RSP to EBP|RBP in case it was
-  // not picked before and the function performs dynamic stack alignment.
-  if (dsa && stackArgsRegId == X86Gp::kIdSp)
-    stackArgsRegId = X86Gp::kIdBp;
-
-  if (stackArgsRegId != X86Gp::kIdSp)
-    layout._savedRegs[X86Reg::kKindGp] |= Utils::mask(stackArgsRegId) & decl.getPreservedRegs(X86Gp::kKindGp);
-
-  layout._stackBaseRegId = X86Gp::kIdSp;
-  layout._stackArgsRegId = static_cast<uint8_t>(stackArgsRegId);
-
-  // Setup stack size used to save preserved registers.
-  layout._gpStackSize  = Utils::bitCount(layout.getSavedRegs(X86Reg::kKindGp )) * gpSize;
-  layout._vecStackSize = Utils::bitCount(layout.getSavedRegs(X86Reg::kKindXyz)) * 16 +
-                         Utils::bitCount(layout.getSavedRegs(X86Reg::kKindMm )) *  8 ;
-
-  uint32_t v = 0;                                    // The beginning of the stack frame, aligned to CallFrame alignment.
-  v += frame._callFrameSize;                         // Count '_callFrameSize'  <- This is used to call functions.
-  v  = Utils::alignTo(v, stackAlignment);            // Align to function's SA
-
-  layout._stackBaseOffset = v;                       // Store '_stackBaseOffset'<- Function's own stack starts here..
-  v += frame._stackFrameSize;                        // Count '_stackFrameSize' <- Function's own stack ends here.
-
-  // If the function is aligned, calculate the alignment necessary to store
-  // vector registers, and set `FuncFrame::kX86FlagAlignedVecSR` to inform
-  // PrologEpilog inserter that it can use instructions to perform aligned
-  // stores/loads to save/restore VEC registers.
-  if (stackAlignment >= 16 && layout._vecStackSize) {
-    v = Utils::alignTo(v, 16);                       // Align '_vecStackOffset'.
-    layout._alignedVecSR = true;
-  }
-
-  layout._vecStackOffset = v;                        // Store '_vecStackOffset' <- Functions VEC Save|Restore starts here.
-  v += layout._vecStackSize;                         // Count '_vecStackSize'   <- Functions VEC Save|Restore ends here.
-
-  if (dsaSlotUsed) {
-    layout._dsaSlot = v;                             // Store '_dsaSlot'        <- Old stack pointer is stored here.
-    v += gpSize;
-  }
-
-  // The return address should be stored after GP save/restore regs. It has
-  // the same size as `gpSize` (basically the native register/pointer size).
-  // We don't adjust it now as `v` now contains the exact size that the
-  // function requires to adjust (call frame + stack frame, vec stack size).
-  // The stack (if we consider this size) is misaligned now, as it's always
-  // aligned before the function call - when `call()` is executed it pushes
-  // the current EIP|RIP onto the stack, and misaligns it by 12 or 8 bytes
-  // (depending on the architecture). So count number of bytes needed to align
-  // it up to the function's CallFrame (the beginning).
-  if (v || frame.hasFlag(FuncFrame::kFlagHasCalls))
-    v += Utils::alignDiff(v + layout._gpStackSize + gpSize, stackAlignment);
-
-  layout._stackAdjustment = v;                       // Store '_stackAdjustment'<- SA used by 'add zsp, SA' and 'sub zsp, SA'.
-  layout._gpStackOffset = v;                         // Store '_gpStackOffset'  <- Functions GP Save|Restore starts here.
-  v += layout._gpStackSize;                          // Count '_gpStackSize'    <- Functions GP Save|Restore ends here.
-
-  v += gpSize;                                       // Count 'ReturnAddress'.
-  v += decl.getSpillZoneSize();                      // Count 'SpillZoneSize'.
-
-  // Calculate where function arguments start, relative to the stackArgsRegId.
-  // If the register that will be used to access arguments passed by stack is
-  // ESP|RSP then it's exactly where we are now, otherwise we must calculate
-  // how many 'push regs' we did and adjust it based on that.
-  uint32_t stackArgsOffset = v;
-  if (stackArgsRegId != X86Gp::kIdSp) {
-    if (!frame.isNaked())
-      stackArgsOffset = gpSize;                      // Count one 'push'.
-    else
-      stackArgsOffset = layout._gpStackSize;         // Count the whole 'push' sequence.
-  }
-  layout._stackArgsOffset = stackArgsOffset;
-
-  // If the function does dynamic stack adjustment then the stack-adjustment
-  // must be aligned.
-  if (dsa)
-    layout._stackAdjustment = Utils::alignTo(layout._stackAdjustment, stackAlignment);
-
-  // Initialize variables based on CallConv flags.
-  if (decl.hasFlag(CallConv::kFlagCalleePopsStack))
-    layout._calleeStackCleanup = static_cast<uint16_t>(decl.getArgStackSize());
-
-  // Initialize variables based on FuncFrame flags.
-  if (frame.hasFlag(FuncFrame::kX86FlagMmxCleanup)) layout._x86MmxCleanup = true;
-  if (frame.hasFlag(FuncFrame::kX86FlagAvxCleanup)) layout._x86AvxCleanup = true;
-
-  self->_varBaseReg = layout._stackBaseRegId;
-  self->_varBaseOffset = layout._stackBaseOffset;
-
-  return kErrorOk;
-}
-
-//! \internal
 static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop, FuncLayout& layout) {
   X86Compiler* cc = self->cc();
   CBNode* node = func;
@@ -4379,7 +4240,7 @@ static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop,
           RACell* cell = vreg->getMemCell();
           ASMJIT_ASSERT(cell != nullptr);
 
-          m->_setBase(cc->_nativeGpReg.getRegType(), self->_varBaseReg);
+          m->_setBase(cc->_nativeGpReg.getRegType(), self->_varBaseRegId);
           m->addOffsetLo32(self->_varBaseOffset + cell->offset);
           m->clearRegHome();
         }
@@ -4388,168 +4249,6 @@ static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop,
 
     node = node->getNext();
   } while (node != stop);
-
-  return kErrorOk;
-}
-
-//! \internal
-static Error X86RAPass_insertProlog(X86RAPass* self, FuncLayout& layout) {
-  X86Compiler* cc = self->cc();
-
-  uint32_t i;
-  uint32_t regId;
-
-  uint32_t gpSize = cc->getGpSize();
-  uint32_t gpSaved = layout.getSavedRegs(X86Reg::kKindGp);
-
-  X86Gp zsp = cc->zsp();   // ESP|RSP register.
-  X86Gp zbp = cc->zsp();   // EBP|RBP register.
-  zbp.setId(X86Gp::kIdBp);
-
-  X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
-  X86Gp saReg = cc->zsp(); // Stack-arguments base register.
-
-  // Emit: 'push zbp'
-  //       'mov  zbp, zsp'.
-  if (layout.hasPreservedFP()) {
-    gpSaved &= ~Utils::mask(X86Gp::kIdBp);
-    ASMJIT_PROPAGATE(cc->push(zbp));
-    ASMJIT_PROPAGATE(cc->mov(zbp, zsp));
-  }
-
-  // Emit: 'push gp' sequence.
-  if (gpSaved) {
-    for (i = gpSaved, regId = 0; i; i >>= 1, regId++) {
-      if (!(i & 0x1)) continue;
-      gpReg.setId(regId);
-      ASMJIT_PROPAGATE(cc->push(gpReg));
-    }
-  }
-
-  // Emit: 'mov saReg, zsp'.
-  uint32_t stackArgsRegId = layout.getStackArgsRegId();
-  if (stackArgsRegId != kInvalidReg && stackArgsRegId != X86Gp::kIdSp) {
-    saReg.setId(stackArgsRegId);
-    if (!(layout.hasPreservedFP() && stackArgsRegId == X86Gp::kIdBp))
-      ASMJIT_PROPAGATE(cc->mov(saReg, zsp));
-  }
-
-  // Emit: 'and zsp, StackAlignment'.
-  if (layout.hasDynamicAlignment())
-    ASMJIT_PROPAGATE(cc->and_(zsp, -static_cast<int32_t>(layout.getStackAlignment())));
-
-  // Emit: 'sub zsp, StackAdjustment'.
-  if (layout.hasStackAdjustment())
-    ASMJIT_PROPAGATE(cc->sub(zsp, layout.getStackAdjustment()));
-
-  // Emit: 'mov [zsp + dsaSlot], saReg'.
-  if (layout.hasDynamicAlignment() && layout.hasDsaSlotUsed()) {
-    X86Mem saMem = x86::ptr(zsp, layout._dsaSlot);
-    ASMJIT_PROPAGATE(cc->mov(saMem, saReg));
-  }
-
-  // Emit 'movaps|movups [zsp + X], xmm0..15'.
-  uint32_t xmmSaved = layout.getSavedRegs(X86Reg::kKindXyz);
-  if (xmmSaved) {
-    X86Mem vecBase = x86::ptr(zsp, layout.getVecStackOffset());
-    X86Reg vecReg = x86::xmm(0);
-
-    uint32_t vecInst = layout.hasAlignedVecSR() ? X86Inst::kIdMovaps : X86Inst::kIdMovups;
-    uint32_t vecSize = 16;
-
-    for (i = xmmSaved, regId = 0; i; i >>= 1, regId++) {
-      if (!(i & 0x1)) continue;
-      vecReg.setId(regId);
-      ASMJIT_PROPAGATE(cc->emit(vecInst, vecBase, vecReg));
-      vecBase.addOffsetLo32(static_cast<int32_t>(vecSize));
-    }
-  }
-
-  return kErrorOk;
-}
-
-static Error X86RAPass_insertEpilog(X86RAPass* self, FuncLayout& layout) {
-  X86Compiler* cc = self->cc();
-
-  uint32_t i;
-  uint32_t regId;
-
-  uint32_t gpSize = cc->getGpSize();
-  uint32_t gpSaved = layout.getSavedRegs(X86Reg::kKindGp);
-
-  X86Gp zsp = cc->zsp();   // ESP|RSP register.
-  X86Gp zbp = cc->zsp();   // EBP|RBP register.
-  zbp.setId(X86Gp::kIdBp);
-
-  X86Gp gpReg = cc->zsp(); // General purpose register (temporary).
-
-  // Don't emit 'pop zbp' in the pop sequence, this case is handled separately.
-  if (layout.hasPreservedFP()) gpSaved &= ~Utils::mask(X86Gp::kIdBp);
-
-  // Emit 'movaps|movups xmm0..15, [zsp + X]'.
-  uint32_t xmmSaved = layout.getSavedRegs(X86Reg::kKindXyz);
-  if (xmmSaved) {
-    X86Mem vecBase = x86::ptr(zsp, layout.getVecStackOffset());
-    X86Reg vecReg = x86::xmm(0);
-
-    uint32_t vecInst = layout.hasAlignedVecSR() ? X86Inst::kIdMovaps : X86Inst::kIdMovups;
-    uint32_t vecSize = 16;
-
-    for (i = xmmSaved, regId = 0; i; i >>= 1, regId++) {
-      if (!(i & 0x1)) continue;
-      vecReg.setId(regId);
-      ASMJIT_PROPAGATE(cc->emit(vecInst, vecReg, vecBase));
-      vecBase.addOffsetLo32(static_cast<int32_t>(vecSize));
-    }
-  }
-
-  // Emit 'emms' and 'vzeroupper'.
-  if (layout.hasX86MmxCleanup()) ASMJIT_PROPAGATE(cc->emms());
-  if (layout.hasX86AvxCleanup()) ASMJIT_PROPAGATE(cc->vzeroupper());
-
-  if (layout.hasPreservedFP()) {
-    // Emit 'mov zsp, zbp' or 'lea zsp, [zbp - x]'
-    int32_t count = static_cast<int32_t>(layout.getGpStackSize() - gpSize);
-    if (!count)
-      ASMJIT_PROPAGATE(cc->mov(zsp, zbp));
-    else
-      ASMJIT_PROPAGATE(cc->lea(zsp, x86::ptr(zbp, -count)));
-  }
-  else {
-    if (layout.hasDynamicAlignment() && layout.hasDsaSlotUsed()) {
-      // Emit 'mov zsp, [zsp + DsaSlot]'.
-      X86Mem saMem = x86::ptr(zsp, layout._dsaSlot);
-      ASMJIT_PROPAGATE(cc->mov(zsp, saMem));
-    }
-    else if (layout.hasStackAdjustment()) {
-      // Emit 'add zsp, StackAdjustment'.
-      ASMJIT_PROPAGATE(cc->add(zsp, static_cast<int32_t>(layout.getStackAdjustment())));
-    }
-  }
-
-  // Emit 'pop gp' sequence.
-  if (gpSaved) {
-    i = gpSaved;
-    regId = 16;
-
-    do {
-      regId--;
-      if (i & 0x8000) {
-        gpReg.setId(regId);
-        ASMJIT_PROPAGATE(cc->pop(gpReg));
-      }
-      i <<= 1;
-    } while (regId != 0);
-  }
-
-  // Emit 'pop zbp'.
-  if (layout.hasPreservedFP()) ASMJIT_PROPAGATE(cc->pop(zbp));
-
-  // Emit 'ret' or 'ret x'.
-  if (layout.hasCalleeStackCleanup())
-    ASMJIT_PROPAGATE(cc->emit(X86Inst::kIdRet, static_cast<int>(layout.getCalleeStackCleanup())));
-  else
-    ASMJIT_PROPAGATE(cc->emit(X86Inst::kIdRet));
 
   return kErrorOk;
 }
@@ -4866,18 +4565,22 @@ _NextGroup:
 
 _Done:
   {
-    FuncLayout layout;
-
     ASMJIT_PROPAGATE(resolveCellOffsets());
     ASMJIT_PROPAGATE(X86RAPass_prepareFuncFrame(this, func));
-    ASMJIT_PROPAGATE(X86RAPass_calculateFuncLayout(this, func, layout));
+
+    FuncLayout layout;
+    ASMJIT_PROPAGATE(layout.init(func->getDecl(), func->getFrame()));
+
+    _varBaseRegId = layout._stackBaseRegId;
+    _varBaseOffset = layout._stackBaseOffset;
+
     ASMJIT_PROPAGATE(X86RAPass_patchFuncMem(this, func, stop, layout));
 
     cc->_setCursor(func);
-    ASMJIT_PROPAGATE(X86RAPass_insertProlog(this, layout));
+    ASMJIT_PROPAGATE(FuncUtils::insertProlog(this->cc(), layout));
 
     cc->_setCursor(func->getExitNode());
-    ASMJIT_PROPAGATE(X86RAPass_insertEpilog(this, layout));
+    ASMJIT_PROPAGATE(FuncUtils::insertProlog(this->cc(), layout));
   }
 
   ASMJIT_TLOG("[T] ======= Translate (End)\n");

@@ -351,7 +351,7 @@ int main(int argc, char* argv[]) {
   assert(sizeof(void*) == 8 &&
     "This example requires 64-bit environment.");
 
-  using namespace asmjit::x86;        // To make the access to X86 registers easier.
+  using namespace asmjit::x86;        // Easier access to x86/x64 registers.
   JitRuntime rt;                      // Create a runtime specialized for JIT.
 
   CodeHolder code;                    // Create a CodeHolder.
@@ -413,7 +413,7 @@ So far we have created two functions and executed them. These were typical use-c
 using namespace asmjit;
 
 int main(int argc, char* argv[]) {
-  using namespace asmjit::x86;        // To make the access to X86 registers easier.
+  using namespace asmjit::x86;        // Easier access to x86/x64 registers.
 
   CodeHolder code;                    // Create a CodeHolder.
   code.init(CodeInfo(Arch::kTypeX86));// Initialize it for a 32-bit X86 target.
@@ -421,6 +421,7 @@ int main(int argc, char* argv[]) {
   // Generate a 32-bit function that sums 4 floats and looks like:
   //   void func(float* dst, const float* a, const float* b)
   X86Assembler a(&code);              // Create and attach X86Assembler to `code`.
+
   a.mov(eax, dword_ptr(esp, 4));      // Load the destination pointer.
   a.mov(ecx, dword_ptr(esp, 8));      // Load the first source pointer.
   a.mov(edx, dword_ptr(esp, 12));     // Load the second source pointer.
@@ -447,8 +448,10 @@ int main(int argc, char* argv[]) {
 
   // We have no Runtime this time, it's on us what we do with the code.
   // CodeHolder stores code in CodeHolder::SectionEntry, which embeds CodeSection
-  // and CodeBuffer structures. We are interested in CodeBuffer:
-  CodeBuffer& buf = code.getSection(0)->buffer;
+  // and CodeBuffer structures. We are interested in section's CodeBuffer only.
+  //
+  // NOTE: The first section is always '.text', so it's safe to just use 0 index.
+  CodeBuffer& buf = code.getSectionEntry(0)->buffer;
 
   // Print the machine-code generated or do something more interesting with it?
   //   8B4424048B4C24048B5424040F28010F58010F2900C3
@@ -473,7 +476,7 @@ using namespace asmjit;
 typedef void (*SumFloatsFunc)(float* dst, const float* a, const float* b);
 
 int main(int argc, char* argv[]) {
-  using namespace asmjit::x86;        // To make the access to X86 registers easier.
+  using namespace asmjit::x86;        // Easier access to x86/x64 registers.
 
   CodeHolder code;                    // Create a CodeHolder.
   code.init(CodeInfo(Arch::kTypeHost));// Initialize it for the host architecture.

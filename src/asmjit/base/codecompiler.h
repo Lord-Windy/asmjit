@@ -301,11 +301,22 @@ public:
 
   //! Get the function end sentinel.
   ASMJIT_INLINE CBSentinel* getEnd() const noexcept { return _end; }
+
   //! Get function declaration.
-  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return const_cast<FuncDecl*>(&_decl); }
+  ASMJIT_INLINE FuncDecl& getDecl() noexcept { return _decl; }
+  //! Get function declaration.
+  ASMJIT_INLINE const FuncDecl& getDecl() const noexcept { return _decl; }
+
+  //! Get function declaration.
+  ASMJIT_INLINE FuncFrame& getFrame() noexcept { return _frame; }
+  //! Get function declaration.
+  ASMJIT_INLINE const FuncFrame& getFrame() const noexcept { return _frame; }
 
   //! Get arguments count.
   ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl.getArgCount(); }
+  //! Get returns count.
+  ASMJIT_INLINE uint32_t getRetCount() const noexcept { return _decl.getRetCount(); }
+
   //! Get arguments list.
   ASMJIT_INLINE VirtReg** getArgs() const noexcept { return _args; }
 
@@ -351,7 +362,7 @@ public:
   // --------------------------------------------------------------------------
 
   FuncDecl _decl;                        //!< Function declaration.
-  FuncFrame _frame;                      //!< Function frame-info and layout.
+  FuncFrame _frame;                      //!< Function frame.
 
   CBLabel* _exitNode;                    //!< Function exit.
   CBSentinel* _end;                      //!< Function end.
