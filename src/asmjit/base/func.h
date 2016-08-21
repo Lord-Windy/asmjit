@@ -382,7 +382,7 @@ struct FuncSignature {
   ASMJIT_INLINE uint32_t getCallConv() const noexcept { return _callConv; }
 
   //! Get if the function has variable number of arguments (...).
-  ASMJIT_INLINE bool hasVarArgs() const noexcept { _vaIndex != kNoVarArgs; }
+  ASMJIT_INLINE bool hasVarArgs() const noexcept { return _vaIndex != kNoVarArgs; }
   //! Get the variable arguments (...) index, `kNoVarArgs` if none.
   ASMJIT_INLINE uint32_t getVAIndex() const noexcept { return _vaIndex; }
 
