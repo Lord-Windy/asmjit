@@ -640,37 +640,37 @@ struct FuncFrameInfo {
   //! Get if the function preserves frame pointer (EBP|ESP on X86).
   ASMJIT_INLINE bool hasPreservedFP() const noexcept { return (_flags & kFlagPreserveFP) != 0; }
   //! Enable preserved frame pointer.
-  ASMJIT_INLINE bool enablePreservedFP() noexcept { _flags |= kFlagPreserveFP; }
+  ASMJIT_INLINE void enablePreservedFP() noexcept { _flags |= kFlagPreserveFP; }
   //! Disable preserved frame pointer.
-  ASMJIT_INLINE bool disablePreservedFP() noexcept { _flags &= ~kFlagPreserveFP; }
+  ASMJIT_INLINE void disablePreservedFP() noexcept { _flags &= ~kFlagPreserveFP; }
 
   //! Get if the function prolog and epilog should be compacted (as small as possible).
   ASMJIT_INLINE bool hasCompactPE() const noexcept { return (_flags & kFlagCompactPE) != 0; }
   //! Enable compact prolog/epilog.
-  ASMJIT_INLINE bool enableCompactPE() noexcept { _flags |= kFlagCompactPE; }
+  ASMJIT_INLINE void enableCompactPE() noexcept { _flags |= kFlagCompactPE; }
   //! Disable compact prolog/epilog.
-  ASMJIT_INLINE bool disableCompactPE() noexcept { _flags &= ~kFlagCompactPE; }
+  ASMJIT_INLINE void disableCompactPE() noexcept { _flags &= ~kFlagCompactPE; }
 
   //! Get if the function calls other functions.
   ASMJIT_INLINE bool hasCalls() const noexcept { return (_flags & kFlagHasCalls) != 0; }
   //! Set `kFlagHasCalls` to true.
-  ASMJIT_INLINE bool enableCalls() noexcept { _flags |= kFlagHasCalls; }
+  ASMJIT_INLINE void enableCalls() noexcept { _flags |= kFlagHasCalls; }
   //! Set `kFlagHasCalls` to false.
-  ASMJIT_INLINE bool disableCalls() noexcept { _flags &= ~kFlagHasCalls; }
+  ASMJIT_INLINE void disableCalls() noexcept { _flags &= ~kFlagHasCalls; }
 
   //! Get if the function contains MMX cleanup - 'emms' instruction in epilog.
   ASMJIT_INLINE bool hasMmxCleanup() const noexcept { return (_flags & kX86FlagMmxCleanup) != 0; }
   //! Enable MMX cleanup.
-  ASMJIT_INLINE bool enableMmxCleanup() noexcept { _flags |= kX86FlagMmxCleanup; }
+  ASMJIT_INLINE void enableMmxCleanup() noexcept { _flags |= kX86FlagMmxCleanup; }
   //! Disable MMX cleanup.
-  ASMJIT_INLINE bool disableMmxCleanup() noexcept { _flags &= ~kX86FlagMmxCleanup; }
+  ASMJIT_INLINE void disableMmxCleanup() noexcept { _flags &= ~kX86FlagMmxCleanup; }
 
   //! Get if the function contains AVX cleanup - 'vzeroupper' instruction in epilog.
   ASMJIT_INLINE bool hasAvxCleanup() const noexcept { return (_flags & kX86FlagAvxCleanup) != 0; }
   //! Enable AVX cleanup.
-  ASMJIT_INLINE bool enableAvxCleanup() noexcept { _flags |= kX86FlagAvxCleanup; }
+  ASMJIT_INLINE void enableAvxCleanup() noexcept { _flags |= kX86FlagAvxCleanup; }
   //! Disable AVX cleanup.
-  ASMJIT_INLINE bool disableAvxCleanup() noexcept { _flags &= ~kX86FlagAvxCleanup; }
+  ASMJIT_INLINE void disableAvxCleanup() noexcept { _flags &= ~kX86FlagAvxCleanup; }
 
   //! Get which registers (by `kind`) are saved/restored in prolog/epilog, respectively.
   ASMJIT_INLINE uint32_t getDirtyRegs(uint32_t kind) const noexcept {
