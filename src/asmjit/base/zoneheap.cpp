@@ -12,7 +12,7 @@
 #include "../base/zoneheap.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -177,4 +177,4 @@ void ZoneHeap::_releaseDynamic(void* p, size_t size) noexcept {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

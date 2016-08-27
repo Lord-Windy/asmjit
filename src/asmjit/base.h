@@ -9,8 +9,7 @@
 #define _ASMJIT_BASE_H
 
 // [Dependencies]
-#include "./build.h"
-
+#include "./base/arch.h"
 #include "./base/assembler.h"
 #include "./base/codebuilder.h"
 #include "./base/codecompiler.h"

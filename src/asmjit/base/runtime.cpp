@@ -13,7 +13,7 @@
 #include "../base/runtime.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -80,7 +80,7 @@ HostRuntime::HostRuntime() noexcept {
   _runtimeType = kRuntimeJit;
 
   // Setup the CodeInfo of this Runtime.
-  _codeInfo._arch = CpuInfo::getHost().getArch();
+  _codeInfo._archInfo       = CpuInfo::getHost().getArchInfo();
   _codeInfo._stackAlignment = static_cast<uint8_t>(hostDetectNaturalStackAlignment());
   _codeInfo._cdeclCallConv  = CallConv::kIdHostCDecl;
   _codeInfo._stdCallConv    = CallConv::kIdHostStdCall;
@@ -144,4 +144,4 @@ Error JitRuntime::_release(void* p) noexcept {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

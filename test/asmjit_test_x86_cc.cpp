@@ -5,13 +5,13 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Dependencies]
-#include "../asmjit/asmjit.h"
-#include "./genblend.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+
+#include "./asmjit.h"
+#include "./asmjit_test_misc.h"
 
 using namespace asmjit;
 
@@ -98,7 +98,7 @@ public:
       uint32_t varIndex = 0;
       uint32_t physId = 0;
       uint32_t regMask = 0x1;
-      uint32_t preservedMask = c.getFunc()->getDecl().getPreservedRegs(Reg::kKindGp);
+      uint32_t preservedMask = c.getFunc()->getDetail().getPreservedRegs(Reg::kKindGp);
 
       do {
         if ((preservedMask & regMask) != 0 && (physId != X86Gp::kIdSp && physId != X86Gp::kIdBp)) {
@@ -3207,7 +3207,7 @@ public:
 
   int _returnCode;
   int _binSize;
-  bool _alwaysPrintLog;
+  bool _verbose;
   StringBuilder _output;
 };
 
@@ -3219,7 +3219,7 @@ X86TestSuite::X86TestSuite() :
   _tests(&_zoneHeap),
   _returnCode(0),
   _binSize(0),
-  _alwaysPrintLog(false) {
+  _verbose(false) {
 
   // Align.
   ADD_TEST(X86Test_AlignBase);
@@ -3319,7 +3319,7 @@ int X86TestSuite::run() {
     code.setErrorHandler(&errorHandler);
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-    if (_alwaysPrintLog) {
+    if (_verbose) {
       fprintf(file, "\n");
       code.setLogger(&fileLogger);
     }
@@ -3338,7 +3338,7 @@ int X86TestSuite::run() {
 
     if (err == kErrorOk)
       err = runtime.add(&func, &code);
-    if (_alwaysPrintLog) fflush(file);
+    if (_verbose) fflush(file);
 
     if (err == kErrorOk) {
       StringBuilder result;
@@ -3349,9 +3349,8 @@ int X86TestSuite::run() {
       }
       else {
 #if !defined(ASMJIT_DISABLE_LOGGING)
-        if (!_alwaysPrintLog) {
+        if (!_verbose)
           fprintf(file, "\n%s", stringLogger.getString());
-        }
 #endif // ASMJIT_DISABLE_LOGGING
 
         fprintf(file, "-------------------------------------------------------------------------------\n");
@@ -3368,9 +3367,8 @@ int X86TestSuite::run() {
     }
     else {
 #if !defined(ASMJIT_DISABLE_LOGGING)
-      if (!_alwaysPrintLog) {
+      if (!_verbose)
         fprintf(file, "%s\n", stringLogger.getString());
-      }
 #endif // ASMJIT_DISABLE_LOGGING
 
       fprintf(file, "-------------------------------------------------------------------------------\n");
@@ -3424,8 +3422,8 @@ int main(int argc, char* argv[]) {
   X86TestSuite testSuite;
   CmdLine cmd(argc, argv);
 
-  if (cmd.hasArg("--always-print-log"))
-    testSuite._alwaysPrintLog = true;
+  if (cmd.hasArg("--verbose"))
+    testSuite._verbose = true;
 
   return testSuite.run();
 }

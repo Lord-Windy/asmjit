@@ -13,7 +13,7 @@
 #include "../base/vmem.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -60,9 +60,9 @@ public:
   //! code compatible and executable by this Runtime.
   ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
 
-  //! Get the Runtime's architecture type, see \ref Arch::Type.
+  //! Get the Runtime's architecture type, see \ref ArchInfo::Type.
   ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo.getArchType(); }
-  //! Get the Runtime's architecture sub-type, see \ref Arch::SubType.
+  //! Get the Runtime's architecture sub-type, see \ref ArchInfo::SubType.
   ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _codeInfo.getArchSubType(); }
 
   //! Get the runtime type, see \ref Type.
@@ -192,7 +192,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_RUNTIME_H

@@ -17,7 +17,7 @@
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -44,6 +44,15 @@ public:
 
   ASMJIT_API X86Assembler(CodeHolder* code = nullptr) noexcept;
   ASMJIT_API virtual ~X86Assembler() noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Compatibility]
+  // --------------------------------------------------------------------------
+
+  //! Implicit cast to `X86Emitter`.
+  ASMJIT_INLINE operator X86Emitter*() noexcept { return reinterpret_cast<X86Emitter*>(this); }
+  //! Implicit cast to `X86Emitter` (const).
+  ASMJIT_INLINE operator const X86Emitter*() const noexcept { return reinterpret_cast<const X86Emitter*>(this); }
 
   // --------------------------------------------------------------------------
   // [Events]
@@ -80,7 +89,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_X86_X86ASSEMBLER_H

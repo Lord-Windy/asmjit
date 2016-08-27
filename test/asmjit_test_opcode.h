@@ -5,11 +5,11 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _TEST_ASMJIT_TEST_OPCODE_H
-#define _TEST_ASMJIT_TEST_OPCODE_H
+#ifndef _ASMJIT_TEST_OPCODE_H
+#define _ASMJIT_TEST_OPCODE_H
 
 // [Dependencies]
-#include "../asmjit/asmjit.h"
+#include "./asmjit.h"
 
 namespace asmtest {
 
@@ -18,7 +18,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   using namespace asmjit;
   using namespace asmjit::x86;
 
-  bool isX64 = a.getArchType() != Arch::kTypeX86;
+  bool isX64 = a.is64Bit();
 
   /*
   // TODO: Finalize implicit vs explicit.
@@ -6000,4 +6000,4 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
 } // asmtest namespace
 
 // [Guard]
-#endif // _TEST_ASMJIT_TEST_OPCODE_H
+#endif // _ASMJIT_TEST_OPCODE_H

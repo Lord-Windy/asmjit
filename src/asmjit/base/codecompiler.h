@@ -8,7 +8,7 @@
 #ifndef _ASMJIT_BASE_CODECOMPILER_H
 #define _ASMJIT_BASE_CODECOMPILER_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
@@ -23,7 +23,7 @@
 #include "../base/zoneheap.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -273,18 +273,13 @@ public:
   ASMJIT_INLINE CCFunc(CodeBuilder* cb) noexcept
     : CBLabel(cb),
       _exitNode(nullptr),
-      _decl(),
+      _funcDetail(),
       _frameInfo(),
       _end(nullptr),
       _args(nullptr),
       _isFinished(false) {
 
     _type = kNodeFunc;
-    _stackFrameRegIndex = kInvalidReg;
-    _isStackFrameRegPreserved = false;
-
-    for (uint32_t i = 0; i < ASMJIT_ARRAY_SIZE(_stackFrameCopyGpIndex); i++)
-      _stackFrameCopyGpIndex[i] = static_cast<uint8_t>(kInvalidReg);
   }
 
   //! Destroy the `CCFunc` instance (NEVER CALLED).
@@ -303,9 +298,9 @@ public:
   ASMJIT_INLINE CBSentinel* getEnd() const noexcept { return _end; }
 
   //! Get function declaration.
-  ASMJIT_INLINE FuncDecl& getDecl() noexcept { return _decl; }
+  ASMJIT_INLINE FuncDetail& getDetail() noexcept { return _funcDetail; }
   //! Get function declaration.
-  ASMJIT_INLINE const FuncDecl& getDecl() const noexcept { return _decl; }
+  ASMJIT_INLINE const FuncDetail& getDetail() const noexcept { return _funcDetail; }
 
   //! Get function declaration.
   ASMJIT_INLINE FuncFrameInfo& getFrameInfo() noexcept { return _frameInfo; }
@@ -313,9 +308,9 @@ public:
   ASMJIT_INLINE const FuncFrameInfo& getFrameInfo() const noexcept { return _frameInfo; }
 
   //! Get arguments count.
-  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _decl.getArgCount(); }
+  ASMJIT_INLINE uint32_t getArgCount() const noexcept { return _funcDetail.getArgCount(); }
   //! Get returns count.
-  ASMJIT_INLINE uint32_t getRetCount() const noexcept { return _decl.getRetCount(); }
+  ASMJIT_INLINE uint32_t getRetCount() const noexcept { return _funcDetail.getRetCount(); }
 
   //! Get arguments list.
   ASMJIT_INLINE VirtReg** getArgs() const noexcept { return _args; }
@@ -338,30 +333,14 @@ public:
     _args[i] = nullptr;
   }
 
-  ASMJIT_INLINE uint32_t getFrameFlags() const noexcept { return _frameInfo.getFlags(); }
-  ASMJIT_INLINE void addFrameFlags(uint32_t flags) noexcept { _frameInfo.addFlags(flags); }
-
-  //! Get whether the function has stack frame register (only when the stack is misaligned).
-  //!
-  //! NOTE: Stack frame register can be used for both - aligning purposes or
-  //! generating standard prolog/epilog sequence.
-  ASMJIT_INLINE bool hasStackFrameReg() const noexcept { return _stackFrameRegIndex != kInvalidReg; }
-
-  //! Get stack frame register index.
-  //!
-  //! NOTE: Used only when stack is misaligned.
-  ASMJIT_INLINE uint32_t getStackFrameRegIndex() const noexcept { return _stackFrameRegIndex; }
-
-  //! Get whether the stack frame register is preserved.
-  //!
-  //! NOTE: Used only when stack is misaligned.
-  ASMJIT_INLINE bool isStackFrameRegPreserved() const noexcept { return static_cast<bool>(_isStackFrameRegPreserved); }
+  ASMJIT_INLINE uint32_t getAttributes() const noexcept { return _frameInfo.getAttributes(); }
+  ASMJIT_INLINE void addAttributes(uint32_t attrs) noexcept { _frameInfo.addAttributes(attrs); }
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
-  FuncDecl _decl;                        //!< Function declaration.
+  FuncDetail _funcDetail;                //!< Function detail.
   FuncFrameInfo _frameInfo;              //!< Function frame information.
 
   CBLabel* _exitNode;                    //!< Function exit.
@@ -371,13 +350,6 @@ public:
 
   //! Function was finished by `Compiler::endFunc()`.
   uint8_t _isFinished;
-  //! Stack frame register.
-  uint8_t _stackFrameRegIndex;
-  //! Whether the stack frame register is preserved.
-  uint8_t _isStackFrameRegPreserved;
-  //! Gp registers indexes that can be used to copy function arguments
-  //! to a new location in case we are doing manual stack alignment.
-  uint8_t _stackFrameCopyGpIndex[6];
 };
 
 // ============================================================================
@@ -441,16 +413,12 @@ public:
   //! Create a new `CCFuncCall` instance.
   ASMJIT_INLINE CCFuncCall(CodeBuilder* cb, uint32_t instId, uint32_t options, Operand* opArray, uint32_t opCount) noexcept
     : CBInst(cb, instId, options, opArray, opCount),
-      _decl(),
+      _funcDetail(),
       _args(nullptr) {
 
     _type = kNodeFuncCall;
     _ret[0].reset();
     _ret[1].reset();
-    _usedArgs[0] = 0;
-    _usedArgs[1] = 0;
-    _usedArgs[2] = 0;
-    _usedArgs[3] = 0;
     orFlags(kFlagIsRemovable);
   }
 
@@ -463,7 +431,7 @@ public:
 
   //! Set function signature.
   ASMJIT_INLINE Error setSignature(const FuncSignature& sign) noexcept {
-    return _decl.init(sign);
+    return _funcDetail.init(sign);
   }
 
   // --------------------------------------------------------------------------
@@ -471,7 +439,9 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get function declaration.
-  ASMJIT_INLINE FuncDecl* getDecl() const noexcept { return const_cast<FuncDecl*>(&_decl); }
+  ASMJIT_INLINE FuncDetail& getDetail() noexcept { return _funcDetail; }
+  //! Get function declaration.
+  ASMJIT_INLINE const FuncDetail& getDetail() const noexcept { return _funcDetail; }
 
   //! Get target operand.
   ASMJIT_INLINE Operand& getTarget() noexcept { return static_cast<Operand&>(_opArray[0]); }
@@ -517,12 +487,9 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  FuncDecl _decl;                        //!< Function declaration.
+  FuncDetail _funcDetail;                //!< Function detail.
   Operand_ _ret[2];                      //!< Return.
   Operand_* _args;                       //!< Arguments.
-
-  //! Mask of all registers actually used to pass function arguments.
-  uint32_t _usedArgs[4];
 };
 
 // ============================================================================
@@ -641,8 +608,6 @@ public:
   // [VirtReg / Stack]
   // --------------------------------------------------------------------------
 
-  virtual Error _prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept = 0;
-
   //! Create a new virtual register representing the given `vti` and `signature`.
   //!
   //! This function accepts either register type representing a machine-specific
@@ -736,7 +701,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER

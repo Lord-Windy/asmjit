@@ -9,14 +9,14 @@
 #define ASMJIT_EXPORTS_X86_OPERAND
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -30,7 +30,7 @@ namespace asmjit {
 //   uint8_t regKind;
 //   uint8_t regSize;
 // }
-#define ASMJIT_X86_INV_SIGNATURE() {{      \
+#define ASMJIT_X86_INV_SIGNATURE(TYPE) {{  \
   uint8_t(Operand::kOpNone),               \
   uint8_t(0),                              \
   uint8_t(0),                              \
@@ -94,57 +94,56 @@ namespace asmjit {
 
 const X86OpData x86OpData = {
   // --------------------------------------------------------------------------
-  // [RegInfo]
+  // [ArchRegs]
   // --------------------------------------------------------------------------
 
   {
-    ASMJIT_X86_INV_SIGNATURE(  ), // #00 (NONE).
-    ASMJIT_X86_INV_SIGNATURE(  ), // #01 (LABEL).
-    ASMJIT_X86_REG_SIGNATURE( 2), // #02 (RIP).
-    ASMJIT_X86_REG_SIGNATURE( 3), // #03 (SEG).
-    ASMJIT_X86_REG_SIGNATURE( 4), // #04 (GPB-LO).
-    ASMJIT_X86_REG_SIGNATURE( 5), // #05 (GPB-HI).
-    ASMJIT_X86_REG_SIGNATURE( 6), // #06 (GPW).
-    ASMJIT_X86_REG_SIGNATURE( 7), // #07 (GPD).
-    ASMJIT_X86_REG_SIGNATURE( 8), // #08 (GPQ).
-    ASMJIT_X86_REG_SIGNATURE( 9), // #09 (FP).
-    ASMJIT_X86_REG_SIGNATURE(10), // #10 (MM).
-    ASMJIT_X86_REG_SIGNATURE(11), // #11 (K).
-    ASMJIT_X86_REG_SIGNATURE(12), // #12 (XMM).
-    ASMJIT_X86_REG_SIGNATURE(13), // #13 (YMM).
-    ASMJIT_X86_REG_SIGNATURE(14), // #14 (ZMM).
-    ASMJIT_X86_INV_SIGNATURE(  ), // #15 (FUTURE).
-    ASMJIT_X86_REG_SIGNATURE(16), // #16 (BND).
-    ASMJIT_X86_REG_SIGNATURE(17), // #17 (CR).
-    ASMJIT_X86_REG_SIGNATURE(18), // #18 (DR).
-    ASMJIT_X86_INV_SIGNATURE(  )  // #19 (FUTURE).
-  },
-
-  // --------------------------------------------------------------------------
-  // [RegTypeToTypeId]
-  // --------------------------------------------------------------------------
-
-  {
-    X86RegTraits< 0>::kTypeId,
-    X86RegTraits< 1>::kTypeId,
-    X86RegTraits< 2>::kTypeId,
-    X86RegTraits< 3>::kTypeId,
-    X86RegTraits< 4>::kTypeId,
-    X86RegTraits< 5>::kTypeId,
-    X86RegTraits< 6>::kTypeId,
-    X86RegTraits< 7>::kTypeId,
-    X86RegTraits< 8>::kTypeId,
-    X86RegTraits< 9>::kTypeId,
-    X86RegTraits<10>::kTypeId,
-    X86RegTraits<11>::kTypeId,
-    X86RegTraits<12>::kTypeId,
-    X86RegTraits<13>::kTypeId,
-    X86RegTraits<14>::kTypeId,
-    X86RegTraits<15>::kTypeId,
-    X86RegTraits<16>::kTypeId,
-    X86RegTraits<17>::kTypeId,
-    X86RegTraits<18>::kTypeId,
-    X86RegTraits<19>::kTypeId
+    // RegType[].
+    {
+      ASMJIT_X86_INV_SIGNATURE(0),  // #00 (NONE).
+      ASMJIT_X86_INV_SIGNATURE(1),  // #01 (LABEL).
+      ASMJIT_X86_REG_SIGNATURE(2),  // #02 (RIP).
+      ASMJIT_X86_REG_SIGNATURE(3),  // #03 (SEG).
+      ASMJIT_X86_REG_SIGNATURE(4),  // #04 (GPB-LO).
+      ASMJIT_X86_REG_SIGNATURE(5),  // #05 (GPB-HI).
+      ASMJIT_X86_REG_SIGNATURE(6),  // #06 (GPW).
+      ASMJIT_X86_REG_SIGNATURE(7),  // #07 (GPD).
+      ASMJIT_X86_REG_SIGNATURE(8),  // #08 (GPQ).
+      ASMJIT_X86_REG_SIGNATURE(9),  // #09 (FP).
+      ASMJIT_X86_REG_SIGNATURE(10), // #10 (MM).
+      ASMJIT_X86_REG_SIGNATURE(11), // #11 (K).
+      ASMJIT_X86_REG_SIGNATURE(12), // #12 (XMM).
+      ASMJIT_X86_REG_SIGNATURE(13), // #13 (YMM).
+      ASMJIT_X86_REG_SIGNATURE(14), // #14 (ZMM).
+      ASMJIT_X86_INV_SIGNATURE(15), // #15 (FUTURE).
+      ASMJIT_X86_REG_SIGNATURE(16), // #16 (BND).
+      ASMJIT_X86_REG_SIGNATURE(17), // #17 (CR).
+      ASMJIT_X86_REG_SIGNATURE(18), // #18 (DR).
+      ASMJIT_X86_INV_SIGNATURE(19)  // #19 (FUTURE).
+    },
+    // RegTypeToTypeId[].
+    {
+      X86RegTraits< 0>::kTypeId,
+      X86RegTraits< 1>::kTypeId,
+      X86RegTraits< 2>::kTypeId,
+      X86RegTraits< 3>::kTypeId,
+      X86RegTraits< 4>::kTypeId,
+      X86RegTraits< 5>::kTypeId,
+      X86RegTraits< 6>::kTypeId,
+      X86RegTraits< 7>::kTypeId,
+      X86RegTraits< 8>::kTypeId,
+      X86RegTraits< 9>::kTypeId,
+      X86RegTraits<10>::kTypeId,
+      X86RegTraits<11>::kTypeId,
+      X86RegTraits<12>::kTypeId,
+      X86RegTraits<13>::kTypeId,
+      X86RegTraits<14>::kTypeId,
+      X86RegTraits<15>::kTypeId,
+      X86RegTraits<16>::kTypeId,
+      X86RegTraits<17>::kTypeId,
+      X86RegTraits<18>::kTypeId,
+      X86RegTraits<19>::kTypeId
+    }
   },
 
   // --------------------------------------------------------------------------
@@ -181,7 +180,7 @@ const X86OpData x86OpData = {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // ASMJIT_BUILD_X86

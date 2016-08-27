@@ -49,8 +49,11 @@ script:
   - cd ..
 
   - ./build/asmjit_test_unit
-  - ./build/asmjit_test_x86
+  - ./build/asmjit_test_opcode > /dev/null
+  - ./build/asmjit_test_x86_asm
+  - ./build/asmjit_test_x86_cc
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_unit; fi;
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_x86; fi;
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_x86_asm; fi;
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then valgrind --leak-check=full --show-reachable=yes ./build/asmjit_test_x86_cc; fi;

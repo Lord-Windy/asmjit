@@ -40,7 +40,9 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang)$")
     "-fno-tree-vectorize"
     "-fvisibility=hidden"
     "-Winconsistent-missing-override")
-  list(APPEND ASMJIT_PRIVATE_CFLAGS_REL -fmerge-all-constants)
+  list(APPEND ASMJIT_PRIVATE_CFLAGS_REL
+    "-O2" # CMake by default uses -O3, which does nothing useful.
+    "-fmerge-all-constants")
 endif()
 
 if(ASMJIT_TRACE)
@@ -80,11 +82,11 @@ cxx_project_info(asmjit)
 
 set(ASMJIT_SRC "")
 
-cxx_define_source(asmjit ASMJIT_SRC asmjit
-  apibegin.h
-  apiend.h
-
+cxx_add_source(asmjit ASMJIT_SRC asmjit
   asmjit.h
+  asmjit_apibegin.h
+  asmjit_apiend.h
+
   base.h
   build.h
 
@@ -92,7 +94,9 @@ cxx_define_source(asmjit ASMJIT_SRC asmjit
   x86.h
 )
 
-cxx_define_source(asmjit ASMJIT_SRC asmjit/base
+cxx_add_source(asmjit ASMJIT_SRC asmjit/base
+  arch.cpp
+  arch.h
   assembler.cpp
   assembler.h
   codebuilder.cpp
@@ -137,7 +141,7 @@ cxx_define_source(asmjit ASMJIT_SRC asmjit/base
 )
 
 if(0)
-cxx_define_source(asmjit ASMJIT_SRC asmjit/arm
+cxx_add_source(asmjit ASMJIT_SRC asmjit/arm
   armassembler.cpp
   armassembler.h
   arminst.cpp
@@ -148,14 +152,14 @@ cxx_define_source(asmjit ASMJIT_SRC asmjit/arm
 )
 endif()
 
-cxx_define_source(asmjit ASMJIT_SRC asmjit/x86
+cxx_add_source(asmjit ASMJIT_SRC asmjit/x86
   x86assembler.cpp
   x86assembler.h
   x86compiler.cpp
   x86compiler.h
   x86emitter.h
-  x86func.cpp
-  x86func_p.h
+  x86internal.cpp
+  x86internal_p.h
   x86inst.cpp
   x86inst.h
   x86logging.cpp
@@ -174,7 +178,7 @@ cxx_define_source(asmjit ASMJIT_SRC asmjit/x86
 
 if(NOT ASMJIT_EMBED)
   # Add `asmjit` library.
-  cxx_define_library(asmjit asmjit
+  cxx_add_library(asmjit asmjit
     "${ASMJIT_SRC}"
     "${ASMJIT_DEPS}"
     "${ASMJIT_PRIVATE_CFLAGS}"
@@ -194,16 +198,16 @@ if(NOT ASMJIT_EMBED)
 
   # Add `asmjit` tests and samples.
   if(ASMJIT_BUILD_TEST)
-    cxx_define_source(asmjit ASMJIT_TEST_SRC test asmjit_test_unit.cpp broken.cpp broken.h)
-    cxx_define_executable(asmjit asmjit_test_unit
+    cxx_add_source(asmjit ASMJIT_TEST_SRC ../test asmjit_test_unit.cpp broken.cpp broken.h)
+    cxx_add_executable(asmjit asmjit_test_unit
       "${ASMJIT_SRC};${ASMJIT_TEST_SRC}"
       "${ASMJIT_DEPS}"
       "${ASMJIT_PRIVATE_CFLAGS};${CXX_DEFINE}ASMJIT_TEST;${CXX_DEFINE}ASMJIT_EMBED"
       "${ASMJIT_PRIVATE_CFLAGS_DBG}"
       "${ASMJIT_PRIVATE_CFLAGS_REL}")
 
-    foreach(_target asmjit_bench_x86 asmjit_test_opcode asmjit_test_x86)
-      cxx_define_executable(asmjit ${_target} "src/test/${_target}.cpp" "${ASMJIT_LIBS}" "${ASMJIT_CFLAGS}" "" "")
+    foreach(_target asmjit_bench_x86 asmjit_test_opcode asmjit_test_x86_asm asmjit_test_x86_cc)
+      cxx_add_executable(asmjit ${_target} "test/${_target}.cpp" "${ASMJIT_LIBS}" "${ASMJIT_CFLAGS}" "" "")
     endforeach()
   endif()
 endif()

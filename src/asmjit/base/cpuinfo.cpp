@@ -31,7 +31,7 @@
 #endif
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -43,14 +43,14 @@ namespace asmjit {
 #if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
 
 #if ASMJIT_ARCH_ARM32
-static void armPopulateBaselineArm32Features(CpuInfo* cpuInfo) noexcept {
-  cpuInfo->_arch.init(Arch::kTypeArm32);
+static ASMJIT_INLINE void armPopulateBaselineArm32Features(CpuInfo* cpuInfo) noexcept {
+  cpuInfo->_archInfo.init(ArchInfo::kTypeArm32);
 }
 #endif // ASMJIT_ARCH_ARM32
 
 #if ASMJIT_ARCH_ARM64
-static void armPopulateBaselineArm64Features(CpuInfo* cpuInfo) noexcept {
-  cpuInfo->_arch.init(Arch::kTypeArm64);
+static ASMJIT_INLINE void armPopulateBaselineArm64Features(CpuInfo* cpuInfo) noexcept {
+  cpuInfo->_archInfo.init(ArchInfo::kTypeArm64);
 
   // Thumb (including all variations) is only supported on ARM32.
 
@@ -74,7 +74,7 @@ static void armPopulateBaselineArm64Features(CpuInfo* cpuInfo) noexcept {
 //! Detect ARM CPU features on Windows.
 //!
 //! The detection is based on `IsProcessorFeaturePresent()` API call.
-static void armDetectCpuInfoOnWindows(CpuInfo* cpuInfo) noexcept {
+static ASMJIT_INLINE void armDetectCpuInfoOnWindows(CpuInfo* cpuInfo) noexcept {
 #if ASMJIT_ARCH_ARM32
   armPopulateBaselineArm32Features(cpuInfo);
 
@@ -134,7 +134,7 @@ static void armDetectHWCaps(CpuInfo* cpuInfo,
 //! Detect ARM CPU features on Linux.
 //!
 //! The detection is based on `getauxval()`.
-static void armDetectCpuInfoOnLinux(CpuInfo* cpuInfo) noexcept {
+ASMJIT_FAVOR_SIZE static void armDetectCpuInfoOnLinux(CpuInfo* cpuInfo) noexcept {
 #if ASMJIT_ARCH_ARM32
   armPopulateBaselineArm32Features(cpuInfo);
 
@@ -199,7 +199,7 @@ static void armDetectCpuInfoOnLinux(CpuInfo* cpuInfo) noexcept {
 }
 #endif // ASMJIT_OS_LINUX
 
-static void armDetectCpuInfo(CpuInfo* cpuInfo) noexcept {
+ASMJIT_FAVOR_SIZE static void armDetectCpuInfo(CpuInfo* cpuInfo) noexcept {
 #if ASMJIT_OS_WINDOWS
   armDetectCpuInfoOnWindows(cpuInfo);
 #elif ASMJIT_OS_LINUX
@@ -297,7 +297,7 @@ static void ASMJIT_INLINE x86CallCpuId(CpuIdResult* result, uint32_t inEax, uint
 //! \internal
 //!
 //! Wrapper to call `xgetbv` instruction.
-static void x86CallXGetBV(XGetBVResult* result, uint32_t inEcx) noexcept {
+static ASMJIT_INLINE void x86CallXGetBV(XGetBVResult* result, uint32_t inEcx) noexcept {
 #if ASMJIT_CC_MSC_GE(16, 0, 40219) // 2010SP1+
   uint64_t value = _xgetbv(inEcx);
   result->eax = static_cast<uint32_t>(value & 0xFFFFFFFFU);
@@ -321,7 +321,7 @@ static void x86CallXGetBV(XGetBVResult* result, uint32_t inEcx) noexcept {
 //! \internal
 //!
 //! Map a 12-byte vendor string returned by `cpuid` into a `CpuInfo::Vendor` ID.
-static uint32_t x86GetCpuVendorID(const char* vendorString) noexcept {
+static ASMJIT_INLINE uint32_t x86GetCpuVendorID(const char* vendorString) noexcept {
   struct VendorData {
     uint32_t id;
     char text[12];
@@ -378,13 +378,13 @@ L_Skip:
   d[0] = '\0';
 }
 
-static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
+ASMJIT_FAVOR_SIZE static void x86DetectCpuInfo(CpuInfo* cpuInfo) noexcept {
   uint32_t i, maxId;
 
   CpuIdResult regs;
   XGetBVResult xcr0 = { 0, 0 };
 
-  cpuInfo->_arch.init(Arch::kTypeHost);
+  cpuInfo->_archInfo.init(ArchInfo::kTypeHost);
 
   // --------------------------------------------------------------------------
   // [CPUID EAX=0x0]
@@ -615,7 +615,7 @@ static ASMJIT_INLINE uint32_t cpuDetectHWThreadsCount() noexcept {
 // [asmjit::CpuInfo - Detect]
 // ============================================================================
 
-void CpuInfo::detect() noexcept {
+ASMJIT_FAVOR_SIZE void CpuInfo::detect() noexcept {
   reset();
 
 #if ASMJIT_ARCH_ARM32 || ASMJIT_ARCH_ARM64
@@ -645,4 +645,4 @@ const CpuInfo& CpuInfo::getHost() noexcept {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

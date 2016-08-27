@@ -9,7 +9,7 @@
   * Operand API is mostly intact, omitting Var/Reg should fix most compile-time errors. There is now no difference between a register index and register id internally. If you ever used `reg.getRegIndex()` then use `reg.getId()` instead. Also renamed `isInitialized()` to `isValid()`.
     * There are much more changes, but they are mostly internal and keeping most operand methods compatible.
     * Added new functionality into `asmjit::x86` namespace related to operands.
-    * X86Xmm/X86Ymm/X86Zmm register operands now inherit from X86Xyz.
+    * X86Xmm/X86Ymm/X86Zmm register operands now inherit from X86Vec.
     * Register kind (was register class) is now part of `Reg` operand, you can get it by using `reg.getRegKind()`.
     * Register class enum moved to `X86Reg`, `kX86RegClassGp` is now `X86Reg::kKindGp`.
     * Register type enum moved to `X86Reg`, `kX86RegTypeXmm` is now `X86Reg::kRegXmm`.
@@ -21,37 +21,36 @@
 
     * Rename `HLNode` to `CBNode` (CodeBuilder node).
     * Rename all other `HL` to `CB`.
-    * Rename `X86FuncNode` to `CCFunc` (CodeCompiler function)
-    * Rename `X86CallNode` to `CCFuncCall` (CodeCompiler function-call)
+    * Rename `X86FuncNode` to `CCFunc` (CodeCompiler function), no more arch specific prefixes here.
+    * Rename `X86CallNode` to `CCFuncCall` (CodeCompiler function-call), also, no more X86 prefix.
 
   * AsmJit now uses CodeHolder to hold code. You don't need `Runtime` anymore if you don't plan to execute the code or if you plan to relocate it yourself:
 
 ```c++
-CodeHolder code;                   // Create CodeHolder (holds the code).
-code.init(CodeInfo(Arch::kIdX64)); // Initialize CodeHolder to hold X64 code.
+CodeHolder code;                       // Create CodeHolder (holds the code).
+code.init(CodeInfo(ArchInfo::kIdX64)); // Initialize CodeHolder to hold X64 code.
 
 // Everything else as usual:
-X86Assembler a(&code);             // Create the emitter (Assembler, CodeBuilder, CodeCompiler).
+X86Assembler a(&code);                 // Create the emitter (Assembler, CodeBuilder, CodeCompiler).
 ```
 
   * Initializing with JitRuntime involves using CodeHolder:
 
 ```c++
-JitRuntime rt;                     // Create JitRuntime.
+JitRuntime rt;                         // Create JitRuntime.
 
-CodeHolder code;                   // Create CodeHolder.
-code.init(rt.getCodeInfo());       // Initialize CodeHolder to match the JitRuntime.
+CodeHolder code;                       // Create CodeHolder.
+code.init(rt.getCodeInfo());           // Initialize CodeHolder to match the JitRuntime.
 
-X86Assembler a(&code);             // Create the emitter (Assembler, CodeBuilder, CodeCompiler).
+X86Assembler a(&code);                 // Create the emitter (Assembler, CodeBuilder, CodeCompiler).
+...                                    // Generate some code.
 
-...                                // Generate the code.
+typedef void (*SomeFunc)(void);        // Prototype of the function you generated.
 
-typedef void (*SomeFunc)(void);    // Prototype of the function you generated.
+SomeFunc func;                         // Function pointer.
+Error err = rt.add(&func, &code);      // Add the generated function to the runtime.
 
-SomeFunc func;                     // Function pointer.
-Error err = rt.add(&func, &code);  // Add the generated function to the runtime.
-
-rt.remove(func);                   // Remove the generated function from the runtime.
+rt.remove(func);                       // Remove the generated function from the runtime.
 ```
 
   * Merged virtual registers (known as variables or Vars) into registers themselves, making the interface simpler:

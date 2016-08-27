@@ -31,7 +31,7 @@
 #endif // ASMJIT_OS_WINDOWS
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -225,4 +225,4 @@ uint32_t OSUtils::getTickCount() noexcept { return 0; }
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

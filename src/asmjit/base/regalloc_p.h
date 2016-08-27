@@ -8,7 +8,7 @@
 #ifndef _ASMJIT_BASE_REGALLOC_P_H
 #define _ASMJIT_BASE_REGALLOC_P_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
@@ -18,7 +18,7 @@
 #include "../base/zoneheap.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -569,7 +569,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER

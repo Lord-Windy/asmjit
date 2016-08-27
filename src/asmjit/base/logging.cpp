@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_LOGGING)
 
 // [Dependencies]
@@ -17,7 +17,7 @@
 #include <stdarg.h>
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -196,7 +196,7 @@ Error StringLogger::log(const char* buf, size_t len) noexcept {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_LOGGING

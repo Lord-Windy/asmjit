@@ -88,4 +88,5 @@ test_script:
       cd c:\dev\asmjit\build\%BUILD_TYPE%
     )
   - asmjit_test_unit.exe
-  - asmjit_test_x86.exe
+  - asmjit_test_x86_asm.exe
+  - asmjit_test_x86_cc.exe

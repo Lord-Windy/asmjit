@@ -8,14 +8,14 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -111,8 +111,8 @@ UNIT(x86_operand) {
   EXPECT(x86::xmm4.getId() == 4);
   EXPECT(x86::xmm4.getSize() == 16);
   EXPECT(x86::xmm4.getRegType() == X86Reg::kRegXmm);
-  EXPECT(x86::xmm4.getRegKind() == X86Reg::kKindXyz);
-  EXPECT(x86::xmm4.isXyz());
+  EXPECT(x86::xmm4.getRegKind() == X86Reg::kKindVec);
+  EXPECT(x86::xmm4.isVec());
 
   INFO("Checking YMM register properties");
   EXPECT(X86Ymm().isReg() == false);
@@ -120,8 +120,8 @@ UNIT(x86_operand) {
   EXPECT(x86::ymm5.getId() == 5);
   EXPECT(x86::ymm5.getSize() == 32);
   EXPECT(x86::ymm5.getRegType() == X86Reg::kRegYmm);
-  EXPECT(x86::ymm5.getRegKind() == X86Reg::kKindXyz);
-  EXPECT(x86::ymm5.isXyz());
+  EXPECT(x86::ymm5.getRegKind() == X86Reg::kKindVec);
+  EXPECT(x86::ymm5.isVec());
 
   INFO("Checking ZMM register properties");
   EXPECT(X86Zmm().isReg() == false);
@@ -129,11 +129,11 @@ UNIT(x86_operand) {
   EXPECT(x86::zmm6.getId() == 6);
   EXPECT(x86::zmm6.getSize() == 64);
   EXPECT(x86::zmm6.getRegType() == X86Reg::kRegZmm);
-  EXPECT(x86::zmm6.getRegKind() == X86Reg::kKindXyz);
-  EXPECT(x86::zmm6.isXyz());
+  EXPECT(x86::zmm6.getRegKind() == X86Reg::kKindVec);
+  EXPECT(x86::zmm6.isVec());
 
   INFO("Checking XYZ register properties");
-  EXPECT(X86Xyz().isReg() == false);
+  EXPECT(X86Vec().isReg() == false);
   // Converts a XYZ register to a type of the passed register, but keeps the ID.
   EXPECT(x86::xmm4.as(x86::ymm10) == x86::ymm4);
   EXPECT(x86::xmm4.as(x86::zmm11) == x86::zmm4);
@@ -170,7 +170,7 @@ UNIT(x86_operand) {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // ASMJIT_BUILD_X86

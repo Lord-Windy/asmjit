@@ -13,7 +13,7 @@
 #include "../base/vmem.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 // This file contains implementation of virtual memory management for AsmJit
 // library. There are several goals I decided to write implementation myself:

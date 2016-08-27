@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER) && defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
@@ -16,10 +16,11 @@
 #include "../base/utils.h"
 #include "../x86/x86assembler.h"
 #include "../x86/x86compiler.h"
+#include "../x86/x86internal_p.h"
 #include "../x86/x86regalloc_p.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -30,15 +31,6 @@ namespace asmjit {
 enum { kCompilerDefaultLookAhead = 64 };
 
 static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uint32_t opCount);
-
-// ============================================================================
-// [asmjit::X86RAPass - Utils]
-// ============================================================================
-
-static ASMJIT_INLINE uint32_t x86RegTypeToKind(uint32_t regType) noexcept {
-  ASMJIT_ASSERT(regType < X86Reg::kRegCount);
-  return x86OpData.regInfo[regType].regKind;
-}
 
 // ============================================================================
 // [asmjit::X86RAPass - SpecialInst]
@@ -367,24 +359,25 @@ Error X86RAPass::prepare(CCFunc* func) noexcept {
   ASMJIT_PROPAGATE(Base::prepare(func));
 
   uint32_t archType = _cc->getArchType();
-  _regCount._gp  = archType == Arch::kTypeX86 ? 8 : 16;
+  _regCount._gp  = archType == ArchInfo::kTypeX86 ? 8 : 16;
   _regCount._mm  = 8;
   _regCount._k   = 8;
-  _regCount._xyz = archType == Arch::kTypeX86 ? 8 : 16;
+  _regCount._vec = archType == ArchInfo::kTypeX86 ? 8 : 16;
   _zsp = cc()->zsp();
   _zbp = cc()->zbp();
 
   _gaRegs[X86Reg::kKindGp ] = Utils::bits(_regCount.getGp()) & ~Utils::mask(X86Gp::kIdSp);
   _gaRegs[X86Reg::kKindMm ] = Utils::bits(_regCount.getMm());
   _gaRegs[X86Reg::kKindK  ] = Utils::bits(_regCount.getK());
-  _gaRegs[X86Reg::kKindXyz] = Utils::bits(_regCount.getXyz());
+  _gaRegs[X86Reg::kKindVec] = Utils::bits(_regCount.getVec());
 
   _x86State.reset(0);
   _clobberedRegs.reset();
 
-  _useAVX = false;
+  _avxEnabled = false;
+
   _varBaseRegId = kInvalidReg; // Used by patcher.
-  _varBaseOffset = 0;        // Used by patcher.
+  _varBaseOffset = 0;          // Used by patcher.
 
   return kErrorOk;
 }
@@ -393,177 +386,40 @@ Error X86RAPass::prepare(CCFunc* func) noexcept {
 // [asmjit::X86RAPass - Emit]
 // ============================================================================
 
-Error X86RAPass::emitLoad(VirtReg* vreg, uint32_t id, const char* reason) noexcept {
-  ASMJIT_ASSERT(id != kInvalidReg);
-
-  X86Reg dst = X86Reg::fromSignature(vreg->getSignature(), id);
-  X86Mem src = getVarMem(vreg);
-
-  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
-  return kErrorOk;
-}
-
-Error X86RAPass::emitSave(VirtReg* vreg, uint32_t id, const char* reason) noexcept {
-  ASMJIT_ASSERT(id != kInvalidReg);
-
-  X86Mem dst = getVarMem(vreg);
-  X86Reg src = X86Reg::fromSignature(vreg->getSignature(), id);
-
-  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
-  return kErrorOk;
-}
-
-Error X86RAPass::emitMove(VirtReg* vreg, uint32_t dstPhysId, uint32_t srcPhysId, const char* reason) noexcept {
-  ASMJIT_ASSERT(dstPhysId != kInvalidReg);
-  ASMJIT_ASSERT(srcPhysId != kInvalidReg);
-
-  X86Reg dst = X86Reg::fromSignature(vreg->getSignature(), dstPhysId);
-  X86Reg src = X86Reg::fromSignature(vreg->getSignature(), srcPhysId);
-
-  ASMJIT_PROPAGATE(emitRegOp(dst, src, vreg->getTypeId()));
-  if (_emitComments)
-    cc()->getCursor()->setInlineComment(cc()->_cbDataZone.sformat("[%s] %s", reason, vreg->getName()));
-  return kErrorOk;
-}
-
-Error X86RAPass::emitRegOp(Operand_& dst, Operand_& src, uint32_t typeId) noexcept {
-  uint32_t instId = 0;
-  bool isMem = dst.isMem() || src.isMem();
-
-  switch (typeId) {
-    case TypeId::kI8:
-    case TypeId::kU8:
-    case TypeId::kI16:
-    case TypeId::kU16:
-      if (src.isMem()) {
-        // Use movzx and change the destination register to GPD (safer, no dependencies).
-        dst.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
-        instId = X86Inst::kIdMovzx;
-      }
-      else if (!dst.isMem()) {
-        // Change both destination and source registers to GPD (safer, no dependencies).
-        dst.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
-        src.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
-      }
-      ASMJIT_FALLTHROUGH;
-
-    case TypeId::kI32:
-    case TypeId::kU32:
-    case TypeId::kI64:
-    case TypeId::kU64: instId = X86Inst::kIdMov; break;
-
-    case TypeId::kMask8: instId = X86Inst::kIdKmovb; break;
-    case TypeId::kMask16: instId = X86Inst::kIdKmovw; break;
-    case TypeId::kMask32: instId = X86Inst::kIdKmovd; break;
-    case TypeId::kMask64: instId = X86Inst::kIdKmovq; break;
-
-    case TypeId::kMmx32:
-      if (isMem) {
-        instId = X86Inst::kIdMovd;
-        break;
-      }
-      ASMJIT_FALLTHROUGH;
-
-    case TypeId::kMmx64:
-      instId = X86Inst::kIdMovq;
-      break;
-
-    default: {
-      uint32_t eId = TypeId::elementOf(typeId);
-      if (TypeId::isVec32(typeId) && isMem) {
-        if (eId == TypeId::kF32)
-          instId = _useAVX ? X86Inst::kIdVmovss : X86Inst::kIdMovss;
-        else
-          instId = _useAVX ? X86Inst::kIdVmovd : X86Inst::kIdMovd;
-        break;
-      }
-
-      if (TypeId::isVec64(typeId) && isMem) {
-        if (eId == TypeId::kF32)
-          instId = _useAVX ? X86Inst::kIdVmovsd : X86Inst::kIdMovsd;
-        else
-          instId = _useAVX ? X86Inst::kIdVmovq : X86Inst::kIdMovq;
-        break;
-      }
-
-      if (eId == TypeId::kF32)
-        instId = _useAVX ? X86Inst::kIdVmovaps : X86Inst::kIdMovaps;
-      else if (eId == TypeId::kF64)
-        instId = _useAVX ? X86Inst::kIdVmovapd : X86Inst::kIdMovapd;
-      else
-        instId = _useAVX ? X86Inst::kIdVmovdqa : X86Inst::kIdMovdqa;
-      break;
-    }
+Error X86RAPass::emitMove(VirtReg* vReg, uint32_t dstId, uint32_t srcId, const char* reason) {
+  const char* comment = nullptr;
+  if (_emitComments) {
+    _stringBuilder.setFormat("[%s] %s", reason, vReg->getName());
+    comment = _stringBuilder.getData();
   }
 
-  if (!instId)
-    return DebugUtils::errored(kErrorInvalidState);
-
-  return cc()->emit(instId, dst, src);
+  X86Reg dst(X86Reg::fromSignature(vReg->getSignature(), dstId));
+  X86Reg src(X86Reg::fromSignature(vReg->getSignature(), srcId));
+  return X86Internal::emitRegMove(reinterpret_cast<X86Emitter*>(cc()), dst, src, vReg->getTypeId(), _avxEnabled, comment);
 }
 
-Error X86RAPass::emitCvtOp(VirtReg* dst, uint32_t dstId, VirtReg* src, uint32_t srcId) noexcept {
-  uint32_t cvtOp = (dst->getTypeId() << 8) | src->getTypeId();
-  uint32_t instId = 0;
-
-  X86Reg dstReg = X86Reg::fromTypeAndId(dst->getRegType(), dstId);
-  X86Reg srcReg = X86Reg::fromTypeAndId(src->getRegType(), srcId);
-
-  switch (cvtOp) {
-    case ((TypeId::kI16 << 8) | TypeId::kI8 ):
-    case ((TypeId::kI32 << 8) | TypeId::kI8 ):
-    case ((TypeId::kI32 << 8) | TypeId::kI16):
-    case ((TypeId::kI64 << 8) | TypeId::kI8 ):
-    case ((TypeId::kI16 << 8) | TypeId::kI16):
-      instId = X86Inst::kIdMovsx;
-      break;
-
-    case ((TypeId::kI64 << 8) | TypeId::kI32):
-      instId = X86Inst::kIdMovsxd;
-      break;
-
-    case ((TypeId::kU16 << 8) | TypeId::kI8 ):
-    case ((TypeId::kU16 << 8) | TypeId::kU8 ):
-    case ((TypeId::kU32 << 8) | TypeId::kI8 ):
-    case ((TypeId::kU32 << 8) | TypeId::kU8 ):
-    case ((TypeId::kU32 << 8) | TypeId::kI16):
-    case ((TypeId::kU32 << 8) | TypeId::kU16):
-      instId = X86Inst::kIdMovzx;
-      break;
-
-    // Convert to a 32-bit 'movzx'.
-    case ((TypeId::kU64 << 8) | TypeId::kI8 ):
-    case ((TypeId::kU64 << 8) | TypeId::kU8 ):
-    case ((TypeId::kU64 << 8) | TypeId::kI16):
-    case ((TypeId::kU64 << 8) | TypeId::kU16):
-      dstReg.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
-      instId = X86Inst::kIdMovzx;
-      break;
-
-    // Convert to a 32-bit 'mov', which zero extends for free.
-    case ((TypeId::kU64 << 8) | TypeId::kI32):
-    case ((TypeId::kU64 << 8) | TypeId::kU32):
-      dstReg.setSignature(X86RegTraits<X86Reg::kRegGpd>::kSignature);
-      instId = X86Inst::kIdMov;
-      break;
-
-    // Scalar double to float.
-    case ((TypeId::kF32x1 << 8) | TypeId::kF64x1):
-      instId = _useAVX ? X86Inst::kIdCvtsd2ss : X86Inst::kIdVcvtsd2ss;
-      break;
-
-    // Scalar float to double.
-    case ((TypeId::kF64x1 << 8) | TypeId::kF32x1):
-      instId = _useAVX ? X86Inst::kIdCvtss2sd : X86Inst::kIdVcvtss2sd;
-      break;
+Error X86RAPass::emitLoad(VirtReg* vReg, uint32_t id, const char* reason) {
+  const char* comment = nullptr;
+  if (_emitComments) {
+    _stringBuilder.setFormat("[%s] %s", reason, vReg->getName());
+    comment = _stringBuilder.getData();
   }
 
-  if (!instId) return kErrorOk;
-  return cc()->emit(instId, dstReg, srcReg);
+  X86Reg dst(X86Reg::fromSignature(vReg->getSignature(), id));
+  X86Mem src(getVarMem(vReg));
+  return X86Internal::emitRegMove(reinterpret_cast<X86Emitter*>(cc()), dst, src, vReg->getTypeId(), _avxEnabled, comment);
+}
+
+Error X86RAPass::emitSave(VirtReg* vReg, uint32_t id, const char* reason) {
+  const char* comment = nullptr;
+  if (_emitComments) {
+    _stringBuilder.setFormat("[%s] %s", reason, vReg->getName());
+    comment = _stringBuilder.getData();
+  }
+
+  X86Mem dst(getVarMem(vReg));
+  X86Reg src(X86Reg::fromSignature(vReg->getSignature(), id));
+  return X86Internal::emitRegMove(reinterpret_cast<X86Emitter*>(cc()), dst, src, vReg->getTypeId(), _avxEnabled, comment);
 }
 
 Error X86RAPass::emitSwapGp(VirtReg* dstReg, VirtReg* srcReg, uint32_t dstPhysId, uint32_t srcPhysId, const char* reason) noexcept {
@@ -894,7 +750,7 @@ MovXmmQ:
 template<int C>
 static ASMJIT_INLINE void X86RAPass_checkStateVars(X86RAPass* self) {
   X86RAState* state = self->getState();
-  VirtReg** sVars = state->getListByRC(C);
+  VirtReg** sVars = state->getListByKind(C);
 
   uint32_t physId;
   uint32_t regMask;
@@ -924,7 +780,7 @@ static ASMJIT_INLINE void X86RAPass_checkStateVars(X86RAPass* self) {
 void X86RAPass::_checkState() {
   X86RAPass_checkStateVars<X86Reg::kKindGp >(this);
   X86RAPass_checkStateVars<X86Reg::kKindMm >(this);
-  X86RAPass_checkStateVars<X86Reg::kKindXyz>(this);
+  X86RAPass_checkStateVars<X86Reg::kKindVec>(this);
 }
 #else
 void X86RAPass::_checkState() {}
@@ -938,8 +794,8 @@ template<int C>
 static ASMJIT_INLINE void X86RAPass_loadStateVars(X86RAPass* self, X86RAState* src) {
   X86RAState* cur = self->getState();
 
-  VirtReg** cVars = cur->getListByRC(C);
-  VirtReg** sVars = src->getListByRC(C);
+  VirtReg** cVars = cur->getListByKind(C);
+  VirtReg** sVars = src->getListByKind(C);
 
   uint32_t physId;
   uint32_t modified = src->_modified.get(C);
@@ -966,7 +822,7 @@ void X86RAPass::loadState(RAState* src_) {
   // Load allocated variables.
   X86RAPass_loadStateVars<X86Reg::kKindGp >(this, src);
   X86RAPass_loadStateVars<X86Reg::kKindMm >(this, src);
-  X86RAPass_loadStateVars<X86Reg::kKindXyz>(this, src);
+  X86RAPass_loadStateVars<X86Reg::kKindVec>(this, src);
 
   // Load masks.
   cur->_occupied = src->_occupied;
@@ -1029,8 +885,8 @@ template<int C>
 static ASMJIT_INLINE void X86RAPass_switchStateVars(X86RAPass* self, X86RAState* src) {
   X86RAState* dst = self->getState();
 
-  VirtReg** dVars = dst->getListByRC(C);
-  VirtReg** sVars = src->getListByRC(C);
+  VirtReg** dVars = dst->getListByKind(C);
+  VirtReg** sVars = src->getListByKind(C);
 
   X86StateCell* cells = src->_cells;
   uint32_t regCount = self->_regCount.get(C);
@@ -1148,7 +1004,7 @@ void X86RAPass::switchState(RAState* src_) {
   // Switch variables.
   X86RAPass_switchStateVars<X86Reg::kKindGp >(this, src);
   X86RAPass_switchStateVars<X86Reg::kKindMm >(this, src);
-  X86RAPass_switchStateVars<X86Reg::kKindXyz>(this, src);
+  X86RAPass_switchStateVars<X86Reg::kKindVec>(this, src);
 
   // Calculate changed state.
   VirtReg** vregs = _contextVd.getData();
@@ -1182,9 +1038,9 @@ template<int C>
 static ASMJIT_INLINE void X86RAPass_intersectStateVars(X86RAPass* self, X86RAState* a, X86RAState* b) {
   X86RAState* dst = self->getState();
 
-  VirtReg** dVars = dst->getListByRC(C);
-  VirtReg** aVars = a->getListByRC(C);
-  VirtReg** bVars = b->getListByRC(C);
+  VirtReg** dVars = dst->getListByKind(C);
+  VirtReg** aVars = a->getListByKind(C);
+  VirtReg** bVars = b->getListByKind(C);
 
   X86StateCell* aCells = a->_cells;
   X86StateCell* bCells = b->_cells;
@@ -1284,7 +1140,7 @@ void X86RAPass::intersectStates(RAState* a_, RAState* b_) {
 
   X86RAPass_intersectStateVars<X86Reg::kKindGp >(this, a, b);
   X86RAPass_intersectStateVars<X86Reg::kKindMm >(this, a, b);
-  X86RAPass_intersectStateVars<X86Reg::kKindXyz>(this, a, b);
+  X86RAPass_intersectStateVars<X86Reg::kKindVec>(this, a, b);
 
   ASMJIT_X86_CHECK_STATE
 }
@@ -1347,7 +1203,7 @@ static void X86RAPass_prepareSingleVarInst(uint32_t instId, TiedReg* tr) {
 // ============================================================================
 
 static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
-  const FuncDecl& decl = func->getDecl();
+  const FuncDetail& fd = func->getDetail();
   FuncFrameInfo& ffi = func->getFrameInfo();
 
   // Select some register which will contain the base address of function
@@ -1360,12 +1216,12 @@ static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
   }
   else {
     // Passed registers as defined by the calling convention.
-    uint32_t passed = decl.getPassedRegs(X86Reg::kKindGp);
+    uint32_t passed = fd.getPassedRegs(X86Reg::kKindGp);
 
     // Registers actually used to pass function arguments (related to this
     // function signature) with ESP|RSP included as this register can't be
     // used in general to hold anything bug stack pointer.
-    uint32_t used = decl.getUsedRegs(X86Reg::kKindGp) | Utils::mask(X86Gp::kIdSp);
+    uint32_t used = fd.getUsedRegs(X86Reg::kKindGp) | Utils::mask(X86Gp::kIdSp);
 
     // First try register that is defined to pass a function argument by the
     // calling convention, but is not used by this function. This will most
@@ -1381,27 +1237,6 @@ static void X86RAPass_assignStackArgsRegId(X86RAPass* self, CCFunc* func) {
   }
 
   ffi.setStackArgsRegId(stackArgsRegId);
-}
-
-//! \internal
-//!
-//! Get mask of all registers actually used to pass function arguments.
-static ASMJIT_INLINE void X86RAPass_queryUsedArgs(X86RAPass* self, CCFuncCall* node, FuncDecl* decl, uint32_t dst[4]) {
-  dst[0] = 0;
-  dst[1] = 0;
-  dst[2] = 0;
-  dst[3] = 0;
-
-  uint32_t i;
-  uint32_t argCount = decl->getArgCount();
-
-  for (i = 0; i < argCount; i++) {
-    const FuncInOut& arg = decl->getArg(i);
-    if (!arg.byReg()) continue;
-
-    uint32_t kind = x86RegTypeToKind(arg.getRegType());
-    dst[kind] |= Utils::mask(arg.getRegId());
-  }
 }
 
 // ============================================================================
@@ -1438,7 +1273,7 @@ static ASMJIT_INLINE uint32_t X86RAPass_typeOfConvertedSArg(X86RAPass* self, uin
 static ASMJIT_INLINE Error X86RAPass_insertPushArg(
   X86RAPass* self, CCFuncCall* call,
   VirtReg* sReg, const uint32_t* gaRegs,
-  const FuncInOut& arg, uint32_t argIndex,
+  const FuncDetail::Value& arg, uint32_t argIndex,
   SArgData* sArgList, uint32_t& sArgCount) {
 
   X86Compiler* cc = self->cc();
@@ -1465,7 +1300,7 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
   // Only handles float<->double conversion.
   if (X86RAPass_mustConvertSArg(self, dstTypeId, srcTypeId)) {
     uint32_t cvtTypeId = X86RAPass_typeOfConvertedSArg(self, dstTypeId, srcTypeId);
-    uint32_t cvtRegKind = X86Reg::kKindXyz;
+    uint32_t cvtRegKind = X86Reg::kKindVec;
 
     while (++i < sArgCount) {
       sArgData = &sArgList[i];
@@ -1479,7 +1314,7 @@ static ASMJIT_INLINE Error X86RAPass_insertPushArg(
       return kErrorOk;
     }
 
-    VirtReg* cReg = cc->newVirtReg(dstTypeId, x86OpData.regInfo[X86Reg::kRegXmm].signature, nullptr);
+    VirtReg* cReg = cc->newVirtReg(dstTypeId, x86OpData.archRegs.regInfo[X86Reg::kRegXmm].signature, nullptr);
     if (!cReg) return DebugUtils::errored(kErrorNoHeapMemory);
 
     CCPushArg* sArg = cc->newNodeT<CCPushArg>(call, sReg, cReg);
@@ -1735,7 +1570,7 @@ _NextGroup:
           remain[X86Reg::kKindGp ] = _regCount.getGp() - 1 - func->getFrameInfo().hasPreservedFP();
           remain[X86Reg::kKindMm ] = _regCount.getMm();
           remain[X86Reg::kKindK  ] = _regCount.getK();
-          remain[X86Reg::kKindXyz] = _regCount.getXyz();
+          remain[X86Reg::kKindVec] = _regCount.getVec();
 
           // Merge as many alloc-hints as possible.
           for (;;) {
@@ -1850,7 +1685,7 @@ _NextGroup:
               RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegKind()] & gpAllowedMask);
               if (static_cast<X86Reg*>(op)->isGpb()) {
                 tied->flags |= static_cast<X86Gp*>(op)->isGpbLo() ? TiedReg::kX86GpbLo : TiedReg::kX86GpbHi;
-                if (archType == Arch::kTypeX86) {
+                if (archType == ArchInfo::kTypeX86) {
                   // If a byte register is accessed in 32-bit mode we have to limit
                   // all allocable registers for that variable to eax/ebx/ecx/edx.
                   // Other variables are not affected.
@@ -1882,7 +1717,7 @@ _NextGroup:
                 if (static_cast<const X86Reg*>(op)->isGp())
                   c = X86Reg::kKindGp;
                 else
-                  c = X86Reg::kKindXyz;
+                  c = X86Reg::kKindVec;
 
                 if (inReg != kInvalidReg) {
                   uint32_t mask = Utils::mask(inReg);
@@ -2104,29 +1939,29 @@ _NextGroup:
         ASMJIT_ASSERT(node_ == func);
         X86RAPass_assignStackArgsRegId(this, func);
 
-        FuncDecl& decl = func->getDecl();
+        FuncDetail& fd = func->getDetail();
         TiedReg* tied;
 
         RA_DECLARE();
         cc()->setCursor(node_);
 
         X86Gp saReg;
-        uint32_t argCount = decl.getArgCount();
+        uint32_t argCount = fd.getArgCount();
 
         for (uint32_t i = 0; i < argCount; i++) {
-          const FuncInOut& arg = decl.getArg(i);
+          const FuncDetail::Value& arg = fd.getArg(i);
 
           VirtReg* vReg = func->getArg(i);
           if (!vReg) continue;
 
           // Overlapped function arguments.
           if (vReg->_tied)
-            return DebugUtils::errored(kErrorOverlappedArgs);
+            return DebugUtils::errored(kErrorOverlappingRegArgs);
 
           uint32_t aTypeId = arg.getTypeId();
           uint32_t vTypeId = vReg->getTypeId();
 
-          uint32_t aKind = x86RegTypeToKind(arg.getRegType());
+          uint32_t aKind = X86Reg::kindOf(arg.getRegType());
           uint32_t vKind = vReg->getRegKind();
 
           if (arg.byReg()) {
@@ -2141,8 +1976,13 @@ _NextGroup:
               RA_INSERT(vTmp, tied, TiedReg::kWReg, 0);
               tied->setOutPhysId(arg.getRegId());
 
+              X86Reg dstReg(X86Reg::fromSignature(vReg->getSignature(), vReg->getId()));
+              X86Reg srcReg(X86Reg::fromSignature(vTmp->getSignature(), vTmp->getId()));
+
               // Emit conversion after the prolog.
-              ASMJIT_PROPAGATE(emitCvtOp(vReg, vReg->getId(), vTmp, vTmp->getId()));
+              return X86Internal::emitArgMove(reinterpret_cast<X86Emitter*>(cc()),
+                dstReg, vReg->getTypeId(),
+                srcReg, vTmp->getTypeId(), _avxEnabled);
             }
           }
           else {
@@ -2164,9 +2004,11 @@ _NextGroup:
             // Argument passed by stack is handled after the prolog.
             X86Gp aReg = X86Gp::fromSignature(vReg->getSignature(), vReg->getId());
             X86Mem aMem = x86::ptr(saReg, arg.getStackOffset());
-
             aMem.markArgHome();
-            ASMJIT_PROPAGATE(emitRegOp(aReg, aMem, vReg->getTypeId()));
+
+            ASMJIT_PROPAGATE(
+              X86Internal::emitArgMove(reinterpret_cast<X86Emitter*>(cc()),
+                aReg, vReg->getTypeId(), aMem, arg.getTypeId(), _avxEnabled));
           }
         }
 
@@ -2197,12 +2039,12 @@ _NextGroup:
         CCFuncRet* node = static_cast<CCFuncRet*>(node_);
         ASMJIT_PROPAGATE(addReturningNode(node));
 
-        FuncDecl& decl = func->getDecl();
+        FuncDetail& fd = func->getDetail();
         RA_DECLARE();
 
-        if (decl.hasRet()) {
-          const FuncInOut& ret = decl.getRet(0);
-          uint32_t retKind = x86RegTypeToKind(ret.getRegType());
+        if (fd.hasRet()) {
+          const FuncDetail::Value& ret = fd.getRet(0);
+          uint32_t retKind = X86Reg::kindOf(ret.getRegType());
 
           for (uint32_t i = 0; i < 2; i++) {
             Operand_* op = &node->_ret[i];
@@ -2240,22 +2082,21 @@ _NextGroup:
 
       case CBNode::kNodeFuncCall: {
         CCFuncCall* node = static_cast<CCFuncCall*>(node_);
-        FuncDecl* decl = node->getDecl();
+        FuncDetail& fd = node->getDetail();
 
         Operand_* target = node->_opArray;
         Operand_* args = node->_args;
         Operand_* rets = node->_ret;
 
         func->getFrameInfo().enableCalls();
-        func->getFrameInfo().mergeCallFrameSize(node->_decl.getArgStackSize());
+        func->getFrameInfo().mergeCallFrameSize(fd.getArgStackSize());
         // TODO: Each function frame should also define its stack arguments' alignment.
         // func->getFrameInfo().mergeCallFrameAlignment();
-        X86RAPass_queryUsedArgs(this, node, decl, node->_usedArgs);
 
         uint32_t i;
-        uint32_t argCount = decl->getArgCount();
+        uint32_t argCount = fd.getArgCount();
         uint32_t sArgCount = 0;
-        uint32_t gpAllocableMask = gaRegs[X86Reg::kKindGp] & ~node->_usedArgs[X86Reg::kKindGp];
+        uint32_t gpAllocableMask = gaRegs[X86Reg::kKindGp] & ~node->getDetail().getUsedRegs(X86Reg::kKindGp);
 
         VirtReg* vreg;
         TiedReg* tied;
@@ -2306,13 +2147,13 @@ _NextGroup:
           if (!op->isVirtReg()) continue;
 
           vreg = cc()->getVirtRegById(op->getId());
-          const FuncInOut& arg = decl->getArg(i);
+          const FuncDetail::Value& arg = fd.getArg(i);
 
           if (arg.byReg()) {
             RA_MERGE(vreg, tied, 0, 0);
 
             uint32_t argType = arg.getTypeId();
-            uint32_t argClass = x86RegTypeToKind(arg.getRegType());
+            uint32_t argClass = X86Reg::kindOf(arg.getRegType());
 
             if (vreg->getRegKind() == argClass) {
               tied->inRegs |= Utils::mask(arg.getRegId());
@@ -2339,10 +2180,10 @@ _NextGroup:
           Operand_* op = &rets[i];
           if (!op->isVirtReg()) continue;
 
-          const FuncInOut& ret = decl->getRet(i);
+          const FuncDetail::Value& ret = fd.getRet(i);
           if (ret.byReg()) {
             uint32_t retType = ret.getTypeId();
-            uint32_t retKind = x86RegTypeToKind(ret.getRegType());
+            uint32_t retKind = X86Reg::kindOf(ret.getRegType());
 
             vreg = cc()->getVirtRegById(op->getId());
             RA_MERGE(vreg, tied, 0, 0);
@@ -2358,10 +2199,10 @@ _NextGroup:
         }
 
         // Init clobbered.
-        clobberedRegs.set(X86Reg::kKindGp , Utils::bits(_regCount.getGp())  & (~decl->_callConv.getPreservedRegs(X86Reg::kKindGp )));
-        clobberedRegs.set(X86Reg::kKindMm , Utils::bits(_regCount.getMm())  & (~decl->_callConv.getPreservedRegs(X86Reg::kKindMm )));
-        clobberedRegs.set(X86Reg::kKindK  , Utils::bits(_regCount.getK())   & (~decl->_callConv.getPreservedRegs(X86Reg::kKindK  )));
-        clobberedRegs.set(X86Reg::kKindXyz, Utils::bits(_regCount.getXyz()) & (~decl->_callConv.getPreservedRegs(X86Reg::kKindXyz)));
+        clobberedRegs.set(X86Reg::kKindGp , Utils::bits(_regCount.getGp())  & (~fd.getPreservedRegs(X86Reg::kKindGp )));
+        clobberedRegs.set(X86Reg::kKindMm , Utils::bits(_regCount.getMm())  & (~fd.getPreservedRegs(X86Reg::kKindMm )));
+        clobberedRegs.set(X86Reg::kKindK  , Utils::bits(_regCount.getK())   & (~fd.getPreservedRegs(X86Reg::kKindK  )));
+        clobberedRegs.set(X86Reg::kKindVec, Utils::bits(_regCount.getVec()) & (~fd.getPreservedRegs(X86Reg::kKindVec)));
 
         RA_FINALIZE(node_);
         break;
@@ -2467,12 +2308,12 @@ struct X86BaseAlloc {
   //! Get TiedReg list (all).
   ASMJIT_INLINE TiedReg* getTiedArray() const { return _tiedArray[0]; }
   //! Get TiedReg list (per class).
-  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t kind) const { return _tiedArray[kind]; }
+  ASMJIT_INLINE TiedReg* getTiedArrayByKind(uint32_t kind) const { return _tiedArray[kind]; }
 
   //! Get TiedReg count (all).
   ASMJIT_INLINE uint32_t getTiedCount() const { return _tiedTotal; }
   //! Get TiedReg count (per class).
-  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t kind) const { return _tiedCount.get(kind); }
+  ASMJIT_INLINE uint32_t getTiedCountByKind(uint32_t kind) const { return _tiedCount.get(kind); }
 
   //! Get if all variables of the given register `kind` are done.
   ASMJIT_INLINE bool isTiedDone(uint32_t kind) const { return _tiedDone.get(kind) == _tiedCount.get(kind); }
@@ -2551,7 +2392,7 @@ ASMJIT_INLINE void X86BaseAlloc::init(CBNode* node, X86RAData* raData) {
     _tiedArray[X86Reg::kKindGp ] = tied;
     _tiedArray[X86Reg::kKindMm ] = tied + raData->getTiedStart(X86Reg::kKindMm );
     _tiedArray[X86Reg::kKindK  ] = tied + raData->getTiedStart(X86Reg::kKindK  );
-    _tiedArray[X86Reg::kKindXyz] = tied + raData->getTiedStart(X86Reg::kKindXyz);
+    _tiedArray[X86Reg::kKindVec] = tied + raData->getTiedStart(X86Reg::kKindVec);
   }
 
   // Setup counters.
@@ -2582,8 +2423,8 @@ ASMJIT_INLINE void X86BaseAlloc::cleanup() {
 
 template<int C>
 ASMJIT_INLINE void X86BaseAlloc::unuseBefore() {
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   const uint32_t checkFlags = TiedReg::kXReg  |
                               TiedReg::kRMem  |
@@ -2599,8 +2440,8 @@ ASMJIT_INLINE void X86BaseAlloc::unuseBefore() {
 
 template<int C>
 ASMJIT_INLINE void X86BaseAlloc::unuseAfter() {
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   for (uint32_t i = 0; i < tiedCount; i++) {
     TiedReg* tied = &tiedArray[i];
@@ -2701,23 +2542,23 @@ Error X86VarAlloc::run(CBNode* node_) {
     // Unuse overwritten variables.
     unuseBefore<X86Reg::kKindGp>();
     unuseBefore<X86Reg::kKindMm>();
-    unuseBefore<X86Reg::kKindXyz>();
+    unuseBefore<X86Reg::kKindVec>();
 
     // Plan the allocation. Planner assigns input/output registers for each
     // variable and decides whether to allocate it in register or stack.
     plan<X86Reg::kKindGp>();
     plan<X86Reg::kKindMm>();
-    plan<X86Reg::kKindXyz>();
+    plan<X86Reg::kKindVec>();
 
     // Spill all variables marked by plan().
     spill<X86Reg::kKindGp>();
     spill<X86Reg::kKindMm>();
-    spill<X86Reg::kKindXyz>();
+    spill<X86Reg::kKindVec>();
 
     // Alloc all variables marked by plan().
     alloc<X86Reg::kKindGp>();
     alloc<X86Reg::kKindMm>();
-    alloc<X86Reg::kKindXyz>();
+    alloc<X86Reg::kKindVec>();
 
     // Translate node operands.
     if (node_->getType() == CBNode::kNodeInst) {
@@ -2728,26 +2569,33 @@ Error X86VarAlloc::run(CBNode* node_) {
       CCPushArg* node = static_cast<CCPushArg*>(node_);
 
       CCFuncCall* call = static_cast<CCFuncCall*>(node->getCall());
-      FuncDecl* decl = call->getDecl();
+      FuncDetail& fd = call->getDetail();
 
       uint32_t argIndex = 0;
       uint32_t argMask = node->_args;
 
-      VirtReg* srcReg = node->getSrcReg();
       VirtReg* cvtReg = node->getCvtReg();
+      VirtReg* srcReg = node->getSrcReg();
 
       // Convert first.
       ASMJIT_ASSERT(srcReg->getPhysId() != kInvalidReg);
 
       if (cvtReg) {
         ASMJIT_ASSERT(cvtReg->getPhysId() != kInvalidReg);
-        _context->emitCvtOp(cvtReg, cvtReg->getPhysId(), srcReg, srcReg->getPhysId());
+
+        X86Reg dstOp(X86Reg::fromSignature(cvtReg->getSignature(), cvtReg->getId()));
+        X86Reg srcOp(X86Reg::fromSignature(srcReg->getSignature(), srcReg->getId()));
+
+        // Emit conversion after the prolog.
+        return X86Internal::emitArgMove(reinterpret_cast<X86Emitter*>(_context->cc()),
+          dstOp, cvtReg->getTypeId(),
+          srcOp, srcReg->getTypeId(), _context->_avxEnabled);
         srcReg = cvtReg;
       }
 
       while (argMask != 0) {
         if (argMask & 0x1) {
-          FuncInOut& arg = decl->getArg(argIndex);
+          FuncDetail::Value& arg = fd.getArg(argIndex);
           ASMJIT_ASSERT(arg.byStack());
 
           X86Mem dst = x86::ptr(_context->_zsp, -static_cast<int>(_context->getGpSize()) + arg.getStackOffset());
@@ -2762,7 +2610,7 @@ Error X86VarAlloc::run(CBNode* node_) {
     // Mark variables as modified.
     modified<X86Reg::kKindGp>();
     modified<X86Reg::kKindMm>();
-    modified<X86Reg::kKindXyz>();
+    modified<X86Reg::kKindVec>();
 
     // Cleanup; disconnect Vd->Va.
     cleanup();
@@ -2778,7 +2626,7 @@ Error X86VarAlloc::run(CBNode* node_) {
   if (raData->tiedTotal != 0) {
     unuseAfter<X86Reg::kKindGp>();
     unuseAfter<X86Reg::kKindMm>();
-    unuseAfter<X86Reg::kKindXyz>();
+    unuseAfter<X86Reg::kKindVec>();
   }
 
   return kErrorOk;
@@ -2815,8 +2663,8 @@ ASMJIT_INLINE void X86VarAlloc::plan() {
   uint32_t willAlloc = _willAlloc.get(C);
   uint32_t willFree = 0;
 
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
   X86RAState* state = getState();
 
   // Calculate 'willAlloc' and 'willFree' masks based on mandatory masks.
@@ -3025,7 +2873,7 @@ ASMJIT_INLINE void X86VarAlloc::spill() {
   if (m == 0) return;
 
   X86RAState* state = getState();
-  VirtReg** vregs = state->getListByRC(C);
+  VirtReg** vregs = state->getListByKind(C);
 
   // Available registers for decision if move has any benefit over spill.
   uint32_t availableRegs = getGaRegs(C) & ~(state->_occupied.get(C) | m | _willAlloc.get(C));
@@ -3070,8 +2918,8 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
   uint32_t i;
   bool didWork;
 
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   // Alloc `in` regs.
   do {
@@ -3089,7 +2937,7 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
       // Shouldn't be the same.
       ASMJIT_ASSERT(aPhysId != bPhysId);
 
-      VirtReg* bVReg = getState()->getListByRC(C)[bPhysId];
+      VirtReg* bVReg = getState()->getListByKind(C)[bPhysId];
       if (bVReg) {
         // Gp registers only - Swap two registers if we can solve two
         // allocation tasks by a single 'xchg' instruction, swapping
@@ -3145,7 +2993,7 @@ ASMJIT_INLINE void X86VarAlloc::alloc() {
     ASMJIT_ASSERT(physId != kInvalidReg);
 
     if (vreg->getPhysId() != physId) {
-      ASMJIT_ASSERT(getState()->getListByRC(C)[physId] == nullptr);
+      ASMJIT_ASSERT(getState()->getListByKind(C)[physId] == nullptr);
       _context->attach<C>(vreg, physId, false);
     }
 
@@ -3241,7 +3089,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
         uint32_t homeRegs = 0;
         uint32_t tempRegs = 0;
 
-        VirtReg** vregs = state->getListByRC(C);
+        VirtReg** vregs = state->getListByKind(C);
         uint32_t count = _cc->getRegCount().get(C);
 
         for (uint32_t i = 0; i < count; i++) {
@@ -3265,8 +3113,8 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
         // Process the current node if it has any variables associated in.
         X86RAData* raData = node->getMap<X86RAData>();
         if (raData) {
-          TiedReg* tiedArray = raData->getTiedArrayByRC(C);
-          uint32_t tiedCount = raData->getTiedCountByRC(C);
+          TiedReg* tiedArray = raData->getTiedArrayByKind(C);
+          uint32_t tiedCount = raData->getTiedCountByKind(C);
 
           uint32_t homeRegs = 0;
           uint32_t tempRegs = safeRegs;
@@ -3420,7 +3268,7 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessAlloc(VirtReg* vreg, uint32_t allocable
 
     raData = node->getPassData<X86RAData>();
     if (raData) {
-      TiedReg* tied = raData->findTiedByRC(C, vreg);
+      TiedReg* tied = raData->findTiedByKind(C, vreg);
       uint32_t mask;
 
       if (tied) {
@@ -3471,8 +3319,8 @@ ASMJIT_INLINE uint32_t X86VarAlloc::guessSpill(VirtReg* vreg, uint32_t allocable
 
 template<int C>
 ASMJIT_INLINE void X86VarAlloc::modified() {
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   for (uint32_t i = 0; i < tiedCount; i++) {
     TiedReg* tied = &tiedArray[i];
@@ -3605,23 +3453,23 @@ Error X86CallAlloc::run(CCFuncCall* node) {
   // variable. If any variable is used multiple times it will be handled later.
   plan<X86Reg::kKindGp >();
   plan<X86Reg::kKindMm >();
-  plan<X86Reg::kKindXyz>();
+  plan<X86Reg::kKindVec>();
 
   // Spill.
   spill<X86Reg::kKindGp >();
   spill<X86Reg::kKindMm >();
-  spill<X86Reg::kKindXyz>();
+  spill<X86Reg::kKindVec>();
 
   // Alloc.
   alloc<X86Reg::kKindGp >();
   alloc<X86Reg::kKindMm >();
-  alloc<X86Reg::kKindXyz>();
+  alloc<X86Reg::kKindVec>();
 
   // Unuse clobbered registers that are not used to pass function arguments and
   // save variables used to pass function arguments that will be reused later on.
   save<X86Reg::kKindGp >();
   save<X86Reg::kKindMm >();
-  save<X86Reg::kKindXyz>();
+  save<X86Reg::kKindVec>();
 
   // Allocate immediates in registers and on the stack.
   allocImmsOnStack();
@@ -3629,7 +3477,7 @@ Error X86CallAlloc::run(CCFuncCall* node) {
   // Duplicate.
   duplicate<X86Reg::kKindGp >();
   duplicate<X86Reg::kKindMm >();
-  duplicate<X86Reg::kKindXyz>();
+  duplicate<X86Reg::kKindVec>();
 
   // Translate call operand.
   ASMJIT_PROPAGATE(X86RAPass_translateOperands(_context, node->getOpArray(), node->getOpCount()));
@@ -3638,14 +3486,14 @@ Error X86CallAlloc::run(CCFuncCall* node) {
   _cc->_setCursor(node);
 
   // If the callee pops stack it has to be manually adjusted back.
-  FuncDecl* decl = node->getDecl();
-  if (decl->hasFlag(CallConv::kFlagCalleePopsStack) && decl->getArgStackSize() != 0)
-    _cc->emit(X86Inst::kIdSub, _context->_zsp, static_cast<int>(decl->getArgStackSize()));
+  FuncDetail& fd = node->getDetail();
+  if (fd.hasFlag(CallConv::kFlagCalleePopsStack) && fd.getArgStackSize() != 0)
+    _cc->emit(X86Inst::kIdSub, _context->_zsp, static_cast<int>(fd.getArgStackSize()));
 
   // Clobber.
   clobber<X86Reg::kKindGp >();
   clobber<X86Reg::kKindMm >();
-  clobber<X86Reg::kKindXyz>();
+  clobber<X86Reg::kKindVec>();
 
   // Return.
   ret();
@@ -3653,7 +3501,7 @@ Error X86CallAlloc::run(CCFuncCall* node) {
   // Unuse.
   unuseAfter<X86Reg::kKindGp >();
   unuseAfter<X86Reg::kKindMm >();
-  unuseAfter<X86Reg::kKindXyz>();
+  unuseAfter<X86Reg::kKindVec>();
 
   // Cleanup; disconnect Vd->Va.
   cleanup();
@@ -3670,10 +3518,10 @@ ASMJIT_INLINE void X86CallAlloc::init(CCFuncCall* node, X86RAData* raData) {
 
   // Create mask of all registers that will be used to pass function arguments.
   _willAlloc.reset();
-  _willAlloc.set(X86Reg::kKindGp , node->_usedArgs[X86Reg::kKindGp ]);
-  _willAlloc.set(X86Reg::kKindMm , node->_usedArgs[X86Reg::kKindMm ]);
-  _willAlloc.set(X86Reg::kKindK  , node->_usedArgs[X86Reg::kKindK  ]);
-  _willAlloc.set(X86Reg::kKindXyz, node->_usedArgs[X86Reg::kKindXyz]);
+  _willAlloc.set(X86Reg::kKindGp , node->getDetail().getUsedRegs(X86Reg::kKindGp ));
+  _willAlloc.set(X86Reg::kKindMm , node->getDetail().getUsedRegs(X86Reg::kKindMm ));
+  _willAlloc.set(X86Reg::kKindK  , node->getDetail().getUsedRegs(X86Reg::kKindK  ));
+  _willAlloc.set(X86Reg::kKindVec, node->getDetail().getUsedRegs(X86Reg::kKindVec));
   _willSpill.reset();
 }
 
@@ -3693,8 +3541,8 @@ ASMJIT_INLINE void X86CallAlloc::plan() {
   uint32_t willAlloc = _willAlloc.get(C);
   uint32_t willFree = clobbered & ~willAlloc;
 
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   X86RAState* state = getState();
 
@@ -3809,7 +3657,7 @@ ASMJIT_INLINE void X86CallAlloc::spill() {
     return;
 
   X86RAState* state = getState();
-  VirtReg** sVars = state->getListByRC(C);
+  VirtReg** sVars = state->getListByKind(C);
 
   // Available registers for decision if move has any benefit over spill.
   uint32_t availableRegs = getGaRegs(C) & ~(state->_occupied.get(C) | m | _willAlloc.get(C));
@@ -3844,11 +3692,11 @@ template<int C>
 ASMJIT_INLINE void X86CallAlloc::alloc() {
   if (isTiedDone(C)) return;
 
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   X86RAState* state = getState();
-  VirtReg** sVars = state->getListByRC(C);
+  VirtReg** sVars = state->getListByKind(C);
 
   uint32_t i;
   bool didWork;
@@ -3866,7 +3714,7 @@ ASMJIT_INLINE void X86CallAlloc::alloc() {
       // Shouldn't be the same.
       ASMJIT_ASSERT(sPhysId != bPhysId);
 
-      VirtReg* bVReg = getState()->getListByRC(C)[bPhysId];
+      VirtReg* bVReg = getState()->getListByKind(C)[bPhysId];
       if (bVReg) {
         TiedReg* bTied = bVReg->_tied;
 
@@ -3920,9 +3768,9 @@ ASMJIT_INLINE void X86CallAlloc::alloc() {
 
 ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
   CCFuncCall* node = getNode();
-  FuncDecl* decl = node->getDecl();
+  FuncDetail& fd = node->getDetail();
 
-  uint32_t argCount = decl->getArgCount();
+  uint32_t argCount = fd.getArgCount();
   Operand_* args = node->_args;
 
   for (uint32_t i = 0; i < argCount; i++) {
@@ -3930,7 +3778,7 @@ ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
     if (!op.isImm()) continue;
 
     const Imm& imm = static_cast<const Imm&>(op);
-    const FuncInOut& arg = decl->getArg(i);
+    const FuncDetail::Value& arg = fd.getArg(i);
     uint32_t varType = arg.getTypeId();
 
     if (arg.byReg()) {
@@ -3949,8 +3797,8 @@ ASMJIT_INLINE void X86CallAlloc::allocImmsOnStack() {
 
 template<int C>
 ASMJIT_INLINE void X86CallAlloc::duplicate() {
-  TiedReg* tiedArray = getTiedArrayByRC(C);
-  uint32_t tiedCount = getTiedCountByRC(C);
+  TiedReg* tiedArray = getTiedArrayByKind(C);
+  uint32_t tiedCount = getTiedCountByKind(C);
 
   for (uint32_t i = 0; i < tiedCount; i++) {
     TiedReg* tied = &tiedArray[i];
@@ -4015,7 +3863,7 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessAlloc(VirtReg* vreg, uint32_t allocabl
 
     X86RAData* raData = node->getPassData<X86RAData>();
     if (raData) {
-      TiedReg* tied = raData->findTiedByRC(C, vreg);
+      TiedReg* tied = raData->findTiedByKind(C, vreg);
       if (tied) {
         uint32_t inRegs = tied->inRegs;
         if (inRegs != 0) {
@@ -4054,7 +3902,7 @@ ASMJIT_INLINE uint32_t X86CallAlloc::guessSpill(VirtReg* vreg, uint32_t allocabl
 template<int C>
 ASMJIT_INLINE void X86CallAlloc::save() {
   X86RAState* state = getState();
-  VirtReg** sVars = state->getListByRC(C);
+  VirtReg** sVars = state->getListByKind(C);
 
   uint32_t i;
   uint32_t affected = _raData->clobberedRegs.get(C) & state->_occupied.get(C) & state->_modified.get(C);
@@ -4079,7 +3927,7 @@ ASMJIT_INLINE void X86CallAlloc::save() {
 template<int C>
 ASMJIT_INLINE void X86CallAlloc::clobber() {
   X86RAState* state = getState();
-  VirtReg** sVars = state->getListByRC(C);
+  VirtReg** sVars = state->getListByKind(C);
 
   uint32_t i;
   uint32_t affected = _raData->clobberedRegs.get(C) & state->_occupied.get(C);
@@ -4105,11 +3953,11 @@ ASMJIT_INLINE void X86CallAlloc::clobber() {
 
 ASMJIT_INLINE void X86CallAlloc::ret() {
   CCFuncCall* node = getNode();
-  FuncDecl* decl = node->getDecl();
-
+  FuncDetail& fd = node->getDetail();
   Operand_* rets = node->_ret;
+
   for (uint32_t i = 0; i < 2; i++) {
-    const FuncInOut& ret = decl->getRet(i);
+    const FuncDetail::Value& ret = fd.getRet(i);
     Operand_* op = &rets[i];
 
     if (!ret.byReg() || !op->isVirtReg())
@@ -4129,10 +3977,10 @@ ASMJIT_INLINE void X86CallAlloc::ret() {
         _context->attach<X86Reg::kKindMm>(vreg, regId, true);
         break;
 
-      case X86Reg::kKindXyz:
-        if (x86RegTypeToKind(ret.getRegType()) == X86Reg::kKindXyz) {
-          _context->unuse<X86Reg::kKindXyz>(vreg);
-          _context->attach<X86Reg::kKindXyz>(vreg, regId, true);
+      case X86Reg::kKindVec:
+        if (X86Reg::kindOf(ret.getRegType()) == X86Reg::kKindVec) {
+          _context->unuse<X86Reg::kKindVec>(vreg);
+          _context->attach<X86Reg::kKindVec>(vreg, regId, true);
         }
         else {
           uint32_t elementId = TypeId::elementOf(vreg->getTypeId());
@@ -4141,7 +3989,7 @@ ASMJIT_INLINE void X86CallAlloc::ret() {
           X86Mem m = _context->getVarMem(vreg);
           m.setSize(size);
 
-          _context->unuse<X86Reg::kKindXyz>(vreg, VirtReg::kStateMem);
+          _context->unuse<X86Reg::kKindVec>(vreg, VirtReg::kStateMem);
           _cc->fstp(m);
         }
         break;
@@ -4197,7 +4045,7 @@ static Error X86RAPass_translateOperands(X86RAPass* self, Operand_* opArray, uin
 
 //! \internal
 static Error X86RAPass_prepareFuncFrame(X86RAPass* self, CCFunc* func) {
-  FuncDecl& decl = func->getDecl();
+  FuncDetail& fd = func->getDetail();
   FuncFrameInfo& ffi = func->getFrameInfo();
 
   X86RegMask& clobberedRegs = self->_clobberedRegs;
@@ -4207,7 +4055,7 @@ static Error X86RAPass_prepareFuncFrame(X86RAPass* self, CCFunc* func) {
   ffi.setDirtyRegs(X86Reg::kKindGp , clobberedRegs.get(X86Reg::kKindGp ));
   ffi.setDirtyRegs(X86Reg::kKindMm , clobberedRegs.get(X86Reg::kKindMm ));
   ffi.setDirtyRegs(X86Reg::kKindK  , clobberedRegs.get(X86Reg::kKindK  ));
-  ffi.setDirtyRegs(X86Reg::kKindXyz, clobberedRegs.get(X86Reg::kKindXyz));
+  ffi.setDirtyRegs(X86Reg::kKindVec, clobberedRegs.get(X86Reg::kKindVec));
 
   // Initialize stack size & alignment.
   ffi.setStackFrameSize(self->_memAllTotal);
@@ -4217,7 +4065,7 @@ static Error X86RAPass_prepareFuncFrame(X86RAPass* self, CCFunc* func) {
 }
 
 //! \internal
-static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop, FuncLayout& layout) {
+static Error X86RAPass_patchFuncMem(X86RAPass* self, CCFunc* func, CBNode* stop, FuncFrameLayout& layout) {
   X86Compiler* cc = self->cc();
   CBNode* node = func;
 
@@ -4568,8 +4416,8 @@ _Done:
     ASMJIT_PROPAGATE(resolveCellOffsets());
     ASMJIT_PROPAGATE(X86RAPass_prepareFuncFrame(this, func));
 
-    FuncLayout layout;
-    ASMJIT_PROPAGATE(layout.init(func->getDecl(), func->getFrameInfo()));
+    FuncFrameLayout layout;
+    ASMJIT_PROPAGATE(layout.init(func->getDetail(), func->getFrameInfo()));
 
     _varBaseRegId = layout._stackBaseRegId;
     _varBaseOffset = layout._stackBaseOffset;
@@ -4577,10 +4425,10 @@ _Done:
     ASMJIT_PROPAGATE(X86RAPass_patchFuncMem(this, func, stop, layout));
 
     cc->_setCursor(func);
-    ASMJIT_PROPAGATE(FuncUtils::insertProlog(this->cc(), layout));
+    ASMJIT_PROPAGATE(FuncUtils::emitProlog(this->cc(), layout));
 
     cc->_setCursor(func->getExitNode());
-    ASMJIT_PROPAGATE(FuncUtils::insertEpilog(this->cc(), layout));
+    ASMJIT_PROPAGATE(FuncUtils::emitEpilog(this->cc(), layout));
   }
 
   ASMJIT_TLOG("[T] ======= Translate (End)\n");
@@ -4590,7 +4438,7 @@ _Done:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER && ASMJIT_BUILD_X86

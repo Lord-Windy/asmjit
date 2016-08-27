@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER) && defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
@@ -18,7 +18,7 @@
 #include "../x86/x86regalloc_p.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -37,23 +37,18 @@ X86Compiler::~X86Compiler() noexcept {}
 // ============================================================================
 
 Error X86Compiler::onAttach(CodeHolder* code) noexcept {
-  if (code->getArchType() == Arch::kTypeX86) {
-    ASMJIT_PROPAGATE(Base::onAttach(code));
+  uint32_t archType = code->getArchType();
+  if (!ArchInfo::isX86Family(archType))
+    return DebugUtils::errored(kErrorInvalidArch);
 
+  ASMJIT_PROPAGATE(Base::onAttach(code));
+  if (archType == ArchInfo::kTypeX86)
     _nativeGpArray = x86OpData.gpd;
-    _nativeGpReg = _nativeGpArray[0];
-    return kErrorOk;
-  }
-
-  if (code->getArchType() == Arch::kTypeX64) {
-    ASMJIT_PROPAGATE(Base::onAttach(code));
-
+  else
     _nativeGpArray = x86OpData.gpq;
-    _nativeGpReg = _nativeGpArray[0];
-    return kErrorOk;
-  }
 
-  return DebugUtils::errored(kErrorInvalidArch);
+  _nativeGpReg = _nativeGpArray[0];
+  return kErrorOk;
 }
 
 Error X86Compiler::onDetach(CodeHolder* code) noexcept {
@@ -183,6 +178,11 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     else if (options & X86Inst::kOptionTaken)
       node->orFlags(CBNode::kFlagIsTaken);
 
+    if (inlineComment) {
+      inlineComment = static_cast<char*>(_cbDataZone.dup(inlineComment, ::strlen(inlineComment), true));
+      node->setInlineComment(inlineComment);
+    }
+
     addNode(node);
     return kErrorOk;
   }
@@ -199,8 +199,14 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (opCount > 3) opArray[3].copyFrom(o3);
     if (opCount > 4) opArray[4].copyFrom(_op4);
     if (opCount > 5) opArray[5].copyFrom(_op5);
+    node = new(node) CBInst(this, instId, options, opArray, opCount);
 
-    addNode(new(node) CBInst(this, instId, options, opArray, opCount));
+    if (inlineComment) {
+      inlineComment = static_cast<char*>(_cbDataZone.dup(inlineComment, ::strlen(inlineComment), true));
+      node->setInlineComment(inlineComment);
+    }
+
+    addNode(node);
     return kErrorOk;
   }
 }
@@ -228,14 +234,15 @@ CCFunc* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
   if (!func->_exitNode || !func->_end) goto _NoMemory;
 
   // Function prototype.
-  err = func->_decl.init(sign);
+  err = func->getDetail().init(sign);
   if (err != kErrorOk) {
     setLastError(err);
     return nullptr;
   }
 
-  // Function frame.
-  func->getFrameInfo().setNaturalStackAlignment(_codeInfo.getStackAlignment());
+  // Override the natural stack alignment of the calling convention to what's
+  // specified by CodeInfo.
+  func->_funcDetail._callConv.setNaturalStackAlignment(_codeInfo.getStackAlignment());
 
   // Allocate space for function arguments.
   func->_args = nullptr;
@@ -323,7 +330,7 @@ CCFuncCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) 
   opArray[0].copyFrom(o0);
   new (node) CCFuncCall(this, X86Inst::kIdCall, 0, opArray, 1);
 
-  if ((err = node->_decl.init(sign)) != kErrorOk) {
+  if ((err = node->getDetail().init(sign)) != kErrorOk) {
     setLastError(err);
     return nullptr;
   }
@@ -368,107 +375,10 @@ Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
   return kErrorOk;
 }
 
-Error X86Compiler::_prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept {
-  // Zero this so it's clear in case we return an error.
-  signatureOut = 0;
-
-  uint32_t typeId = typeIdInOut;
-
-  // Passed RegType instead of TypeId?
-  if (typeId < 32)
-    typeId = x86OpData.regTypeToTypeId[typeId];
-
-  if (ASMJIT_UNLIKELY(!TypeId::isValid(typeId)))
-    return DebugUtils::errored(kErrorInvalidTypeId);
-
-  // First normalize architecture dependent types.
-  if (TypeId::isAbstract(typeId)) {
-    if (typeId == TypeId::kIntPtr)
-      typeId = getGpSize() == 4 ? TypeId::kI32 : TypeId::kI64;
-    else
-      typeId = getGpSize() == 4 ? TypeId::kU32 : TypeId::kU64;
-  }
-
-  // Type size helps to construct all kinds of registers. If the size is zero
-  // then the TypeId is invalid.
-  uint32_t size = TypeId::sizeOf(typeId);
-  if (ASMJIT_UNLIKELY(!size))
-    return DebugUtils::errored(kErrorInvalidTypeId);
-
-  if (ASMJIT_UNLIKELY(typeId == TypeId::kF80))
-    return DebugUtils::errored(kErrorInvalidUseOfF80);
-
-  uint32_t regType = 0;
-
-  switch (typeId) {
-    case TypeId::kI8:
-    case TypeId::kU8:
-      regType = X86Reg::kRegGpbLo;
-      break;
-
-    case TypeId::kI16:
-    case TypeId::kU16:
-      regType = X86Reg::kRegGpw;
-      break;
-
-    case TypeId::kI32:
-    case TypeId::kU32:
-      regType = X86Reg::kRegGpd;
-      break;
-
-    case TypeId::kI64:
-    case TypeId::kU64:
-      if (getGpSize() < 8)
-        return DebugUtils::errored(kErrorInvalidUseOfGpq);
-
-      regType = X86Reg::kRegGpq;
-      break;
-
-    // F32 and F64 are always promoted to use vector registers.
-    case TypeId::kF32:
-      typeId = TypeId::kF32x1;
-      regType = X86Reg::kRegXmm;
-      break;
-
-    case TypeId::kF64:
-      typeId = TypeId::kF64x1;
-      regType = X86Reg::kRegXmm;
-      break;
-
-    // Mask registers {k}.
-    case TypeId::kMask8:
-    case TypeId::kMask16:
-    case TypeId::kMask32:
-    case TypeId::kMask64:
-      regType = X86Reg::kRegK;
-      break;
-
-    // MMX registers.
-    case TypeId::kMmx32:
-    case TypeId::kMmx64:
-      regType = X86Reg::kRegMm;
-      break;
-
-    // XMM|YMM|ZMM registers.
-    default:
-      if (size <= 16)
-        regType = X86Reg::kRegXmm;
-      else if (size == 32)
-        regType = X86Reg::kRegYmm;
-      else
-        regType = X86Reg::kRegZmm;
-      break;
-  }
-
-  typeIdInOut = typeId;
-  signatureOut = x86OpData.regInfo[regType].signature;
-  return kErrorOk;
-}
-
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER && ASMJIT_BUILD_X86

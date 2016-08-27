@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_LOGGING)
 
 // [Dependencies]
@@ -17,7 +17,7 @@
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -72,7 +72,7 @@ static const char* x86GetAddressSizeString(uint32_t size) noexcept {
 X86Formatter::X86Formatter() noexcept {}
 X86Formatter::~X86Formatter() noexcept {}
 
-Error X86Formatter::formatRegister(StringBuilder& out, uint32_t logOptions, uint32_t regType, uint32_t regId) const noexcept {
+ASMJIT_FAVOR_SIZE Error X86Formatter::formatRegister(StringBuilder& out, uint32_t logOptions, uint32_t regType, uint32_t regId) const noexcept {
   static const char reg8l[] = "al\0\0" "cl\0\0" "dl\0\0" "bl\0\0" "spl\0"  "bpl\0"  "sil\0"  "dil\0" ;
   static const char reg8h[] = "ah\0\0" "ch\0\0" "dh\0\0" "bh\0\0" "--\0\0" "--\0\0" "--\0\0" "--\0\0";
   static const char reg32[] = "eax\0"  "ecx\0"  "edx\0"  "ebx\0"  "esp\0"  "ebp\0"  "esi\0"  "edi\0" ;
@@ -124,7 +124,7 @@ Invalid:
   return kErrorOk;
 }
 
-Error X86Formatter::formatOperand(StringBuilder& out, uint32_t logOptions, const Operand_& op) const noexcept {
+ASMJIT_FAVOR_SIZE Error X86Formatter::formatOperand(StringBuilder& out, uint32_t logOptions, const Operand_& op) const noexcept {
   if (op.isReg()) {
     const Reg& r = static_cast<const Reg&>(op);
     if (r.isPhysReg()) {
@@ -213,7 +213,7 @@ Error X86Formatter::formatOperand(StringBuilder& out, uint32_t logOptions, const
   return kErrorOk;
 }
 
-Error X86Formatter::formatInstruction(
+ASMJIT_FAVOR_SIZE Error X86Formatter::formatInstruction(
   StringBuilder& out,
   uint32_t logOptions,
   uint32_t instId,
@@ -285,7 +285,7 @@ Error X86Formatter::formatInstruction(
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_LOGGING

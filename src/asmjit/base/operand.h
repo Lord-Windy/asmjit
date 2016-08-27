@@ -12,7 +12,7 @@
 #include "../base/utils.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -328,8 +328,10 @@ struct Operand_ {
   // [Operator Overload]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE bool operator==(const Operand_& other) const noexcept { return  isEqual(other); }
-  ASMJIT_INLINE bool operator!=(const Operand_& other) const noexcept { return !isEqual(other); }
+  template<typename T>
+  ASMJIT_INLINE bool operator==(const T& other) const noexcept { return  isEqual(other); }
+  template<typename T>
+  ASMJIT_INLINE bool operator!=(const T& other) const noexcept { return !isEqual(other); }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -469,18 +471,16 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE Label& operator=(const Label& other) noexcept { copyFrom(other); return *this; }
-  ASMJIT_INLINE bool operator==(const Label& other) const noexcept { return _packed[0] == other._packed[0]; }
-  ASMJIT_INLINE bool operator!=(const Label& other) const noexcept { return _packed[1] == other._packed[1]; }
 };
 
 // ============================================================================
 // [asmjit::RegTraits]
 // ============================================================================
 
-//! Allows to resolve a signature of a register `RegT` at compile-time.
+//! Allows to resolve a signature of `RegT` register at compile-time.
 //!
 //! Must be provided by an architecture-specific implementation, ambiguous
-//! registers like `Reg`, `X86Gp` and `X86Xyz` are not resolved by design.
+//! registers like `Reg`, `X86Gp` and `X86Vec` are not resolved by design.
 template<typename RegT>
 struct RegTraits {};
 
@@ -515,14 +515,15 @@ union RegInfo {
 class Reg : public Operand {
 public:
   ASMJIT_ENUM(RegType) {
-    kRegNone    = 0,                     //!< No register - unused, invalid, multiple meanings.
-    _kRegStart  = 2,                     //!< Start of register types (must be honored).
-    kRegRip     = _kRegStart             //!< Universal id of RIP register (if supported).
+    kRegNone      = 0,                   //!< No register - unused, invalid, multiple meanings.
+    _kRegStart    = 2,                   //!< Start of register types (must be honored).
+    kRegRip       = _kRegStart,          //!< Universal id of RIP register (if supported).
+    kRegMax       = 31                   //!< Maximum possible register id of all architectures.
   };
 
   //! Register kind.
   ASMJIT_ENUM(Kind) {
-    kKindGp = 0                         //!< GP register kind, compatible with all architectures.
+    kKindGp = 0                          //!< GP register kind, compatible with all architectures.
   };
 
   // --------------------------------------------------------------------------
@@ -544,6 +545,9 @@ public:
   ASMJIT_INLINE Reg(const _Init&, uint32_t signature, uint32_t id) noexcept : Operand(NoInit) { _initReg(signature, id); }
   explicit ASMJIT_INLINE Reg(const _NoInit&) noexcept : Operand(NoInit) {}
 
+  //! Create a new register based on `signature` and `id`.
+  static ASMJIT_INLINE Reg fromSignature(uint32_t signature, uint32_t id) noexcept { return Reg(Init, signature, id); }
+
   // --------------------------------------------------------------------------
   // [Reg Specific]
   // --------------------------------------------------------------------------
@@ -564,42 +568,47 @@ public:
 
   //! Get if this register is the same as `other`.
   //!
-  //! NOTE: This is not the same as `isEqual(other)` as `isEqual()` checks
-  //! the whole operand whereas `isSameReg()` only checks register signature
-  //! and id. Registers can optionally contain a type annotation, which is
-  //! not checked by `isSameReg()`.
-  ASMJIT_INLINE bool isSameReg(const Reg& other) const noexcept { return _packed[0] == _packed[1]; }
+  //! This is just an optimization. Registers by default only use the first
+  //! 8 bytes of the Operand, so this method takes advantage of this knowledge
+  //! and only compares these 8 bytes. If both operands were created correctly
+  //! then `isEqual()` and `isSame()` should give the same answer, however, if
+  //! some operands contains a garbage or other metadata in the upper 8 bytes
+  //! then `isSame()` may return `true` in cases where `isEqual()` returns
+  //! false. However. no such case is known at the moment.
+  ASMJIT_INLINE bool isSame(const Reg& other) const noexcept { return _packed[0] == _packed[1]; }
 
-  //! Get if this register has the same type as `other`.
-  //!
-  //! This is like `isSameReg`, but doesn't compare the register id.
-  ASMJIT_INLINE bool isSameType(const Reg& other) const noexcept { return _signature == other._signature; }
+  //! Set a 32-bit operand signature based on traits of `T`.
+  template<typename T>
+  ASMJIT_INLINE void setSignatureT() noexcept { _signature = RegTraits<T>::kSignature; }
 
   //! Get the register type.
   ASMJIT_INLINE uint32_t getRegType() const noexcept { return _reg.regType; }
   //! Get the register kind.
   ASMJIT_INLINE uint32_t getRegKind() const noexcept { return _reg.regKind; }
 
-  //! Cast this register to a non-ambiguous register type `T` keeping this register id and optional virtual type-id.
+  //! Cast this register to `RegT` by also changing its signature.
   //!
-  //! NOTE: This can cast to an incompatible register, use with caution.
+  //! NOTE: Improper use of `as()` can lead to hard-to-debug errors.
   template<typename RegT>
   ASMJIT_INLINE RegT as() const noexcept { return RegT(Init, RegTraits<RegT>::kSignature, getId()); }
 
-  //! Cast this register to the same register as `other` keeping this register id and optional virtual type-id.
+  //! Cast this register to `other` by also changing its signature.
   //!
-  //! NOTE: This can cast to an incompatible register, use with caution.
+  //! NOTE: Improper use of `as()` can lead to hard-to-debug errors.
   template<typename RegT>
   ASMJIT_INLINE RegT as(const RegT& other) const noexcept { return RegT(Init, other.getSignature(), getId()); }
 
   //! Clone the register operand.
   ASMJIT_INLINE Reg clone() const noexcept { return Reg(*this); }
 
-  //! Create a new register based on `signature` and `id`.
-  static ASMJIT_INLINE Reg fromSignature(uint32_t signature, uint32_t id) noexcept { return Reg(Init, signature, id); }
-
   //! Set the register id to `id`.
   ASMJIT_INLINE void setId(uint32_t id) noexcept { _reg.id = id; }
+
+  //! Set register's `signature` and `id`.
+  ASMJIT_INLINE void setSignatureAndId(uint32_t signature, uint32_t id) noexcept {
+    _signature = signature;
+    _reg.id = id;
+  }
 
 #define ASMJIT_DEFINE_ABSTRACT_REG(REG, BASE_REG)                              \
 public:                                                                        \
@@ -626,14 +635,17 @@ public:                                                                        \
   /*! Clone the register operand. */                                           \
   ASMJIT_INLINE REG clone() const ASMJIT_NOEXCEPT { return REG(*this); }       \
                                                                                \
+  /*! Create a new register from register type and id. */                      \
+  static ASMJIT_INLINE REG fromTypeAndId(uint32_t regType, uint32_t id) ASMJIT_NOEXCEPT { \
+    return REG(Init, signatureOf(regType), id);                                \
+  }                                                                            \
+                                                                               \
   /*! Create a new register from signature and id. */                          \
   static ASMJIT_INLINE REG fromSignature(uint32_t signature, uint32_t id) ASMJIT_NOEXCEPT { \
     return REG(Init, signature, id);                                           \
   }                                                                            \
                                                                                \
   ASMJIT_INLINE REG& operator=(const REG& other) ASMJIT_NOEXCEPT { copyFrom(other); return *this; } \
-  ASMJIT_INLINE bool operator==(const REG& other) const ASMJIT_NOEXCEPT { return  isEqual(other); } \
-  ASMJIT_INLINE bool operator!=(const REG& other) const ASMJIT_NOEXCEPT { return !isEqual(other); }
 
 #define ASMJIT_DEFINE_FINAL_REG(REG, BASE_REG, TRAITS)                         \
   ASMJIT_DEFINE_ABSTRACT_REG(REG, BASE_REG)                                    \
@@ -895,8 +907,6 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE Mem& operator=(const Mem& other) noexcept { copyFrom(other); return *this; }
-  ASMJIT_INLINE bool operator==(const Mem& other) const noexcept { return  isEqual(other); }
-  ASMJIT_INLINE bool operator!=(const Mem& other) const noexcept { return !isEqual(other); }
 };
 
 // ============================================================================
@@ -1075,8 +1085,6 @@ public:
 
   //! Assign `other` to the immediate operand.
   ASMJIT_INLINE Imm& operator=(const Imm& other) noexcept { copyFrom(other); return *this; }
-  ASMJIT_INLINE bool operator==(const Imm& other) const noexcept { return  isEqual(other); }
-  ASMJIT_INLINE bool operator!=(const Imm& other) const noexcept { return !isEqual(other); }
 };
 
 //! Create a signed immediate operand.
@@ -1376,7 +1384,7 @@ ASMJIT_DEFINE_TYPE_ID(TypeId::Vec512    , TypeId::kI32x16);
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_OPERAND_H

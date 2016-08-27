@@ -13,7 +13,7 @@
 #include "../base/vmem.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -627,11 +627,11 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
     }
   }
 
-  size_t result = archType == Arch::kTypeX64 ? (size_t)(tramp - dst) : (size_t)(minCodeSize);
+  size_t result = archType == ArchInfo::kTypeX64 ? (size_t)(tramp - dst) : (size_t)(minCodeSize);
   return result;
 }
 
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

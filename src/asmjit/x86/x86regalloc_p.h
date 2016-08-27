@@ -8,7 +8,7 @@
 #ifndef _ASMJIT_X86_X86REGALLOC_P_H
 #define _ASMJIT_X86_X86REGALLOC_P_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
@@ -21,7 +21,7 @@
 #include "../x86/x86misc.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -51,7 +51,7 @@ struct X86RAData : public RAData {
   }
 
   //! Get TiedReg array for a given register `kind`.
-  ASMJIT_INLINE TiedReg* getTiedArrayByRC(uint32_t kind) const noexcept {
+  ASMJIT_INLINE TiedReg* getTiedArrayByKind(uint32_t kind) const noexcept {
     return const_cast<TiedReg*>(tiedArray) + tiedIndex.get(kind);
   }
 
@@ -61,7 +61,7 @@ struct X86RAData : public RAData {
   }
 
   //! Get TiedReg count for a given register `kind`.
-  ASMJIT_INLINE uint32_t getTiedCountByRC(uint32_t kind) const noexcept {
+  ASMJIT_INLINE uint32_t getTiedCountByKind(uint32_t kind) const noexcept {
     return tiedCount.get(kind);
   }
 
@@ -72,9 +72,9 @@ struct X86RAData : public RAData {
   }
 
   //! Get TiedReg at the specified index for a given register `kind`.
-  ASMJIT_INLINE TiedReg* getTiedAtByRC(uint32_t kind, uint32_t index) const noexcept {
+  ASMJIT_INLINE TiedReg* getTiedAtByKind(uint32_t kind, uint32_t index) const noexcept {
     ASMJIT_ASSERT(index < tiedCount._regs[kind]);
-    return getTiedArrayByRC(kind) + index;
+    return getTiedArrayByKind(kind) + index;
   }
 
   ASMJIT_INLINE void setTiedAt(uint32_t index, TiedReg& tied) noexcept {
@@ -99,9 +99,9 @@ struct X86RAData : public RAData {
   }
 
   //! Find TiedReg (by class).
-  ASMJIT_INLINE TiedReg* findTiedByRC(uint32_t kind, VirtReg* vreg) const noexcept {
-    TiedReg* tiedArray = getTiedArrayByRC(kind);
-    uint32_t tiedCount = getTiedCountByRC(kind);
+  ASMJIT_INLINE TiedReg* findTiedByKind(uint32_t kind, VirtReg* vreg) const noexcept {
+    TiedReg* tiedArray = getTiedArrayByKind(kind);
+    uint32_t tiedCount = getTiedCountByKind(kind);
 
     for (uint32_t i = 0; i < tiedCount; i++)
       if (tiedArray[i].vreg == vreg)
@@ -159,7 +159,7 @@ union X86StateCell {
   // [Reset]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE void reset() { _packed = 0; }
+  ASMJIT_INLINE void reset() noexcept { _packed = 0; }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -207,11 +207,11 @@ struct X86RAState : RAState {
     return _list;
   }
 
-  ASMJIT_INLINE VirtReg** getListByRC(uint32_t kind) {
+  ASMJIT_INLINE VirtReg** getListByKind(uint32_t kind) {
     switch (kind) {
       case X86Reg::kKindGp : return _listGp;
       case X86Reg::kKindMm : return _listMm;
-      case X86Reg::kKindXyz: return _listXmm;
+      case X86Reg::kKindVec: return _listXmm;
 
       default:
         return nullptr;
@@ -297,10 +297,9 @@ public:
   virtual Error prepare(CCFunc* func) noexcept override;
 
   // --------------------------------------------------------------------------
-  // [Arch]
+  // [ArchInfo]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE bool isX64() const noexcept { return _zsp.getSize() == 8; }
   ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _zsp.getSize(); }
 
   // --------------------------------------------------------------------------
@@ -308,9 +307,9 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get compiler as `X86Compiler`.
-  ASMJIT_INLINE X86Compiler* cc() const { return static_cast<X86Compiler*>(_cc); }
+  ASMJIT_INLINE X86Compiler* cc() const noexcept { return static_cast<X86Compiler*>(_cc); }
   //! Get clobbered registers (global).
-  ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t kind) { return _clobberedRegs.get(kind); }
+  ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t kind) noexcept { return _clobberedRegs.get(kind); }
 
   // --------------------------------------------------------------------------
   // [Helpers]
@@ -324,11 +323,10 @@ public:
   // [Emit]
   // --------------------------------------------------------------------------
 
-  Error emitLoad(VirtReg* vreg, uint32_t id, const char* reason) noexcept;
-  Error emitSave(VirtReg* vreg, uint32_t id, const char* reason) noexcept;
-  Error emitMove(VirtReg* vreg, uint32_t toPhysId, uint32_t fromPhysId, const char* reason) noexcept;
-  Error emitRegOp(Operand_& dst, Operand_& src, uint32_t typeId) noexcept;
-  Error emitCvtOp(VirtReg* dst, uint32_t dstId, VirtReg* src, uint32_t srcId) noexcept;
+  // Tiny wrappers that call `X86Internal::emit...()`.
+  Error emitMove(VirtReg* vreg, uint32_t dstId, uint32_t srcId, const char* reason);
+  Error emitLoad(VirtReg* vreg, uint32_t id, const char* reason);
+  Error emitSave(VirtReg* vreg, uint32_t id, const char* reason);
   Error emitSwapGp(VirtReg* aVReg, VirtReg* bVReg, uint32_t aId, uint32_t bId, const char* reason) noexcept;
 
   Error emitImmToReg(uint32_t dstTypeId, uint32_t dstPhysId, const Imm* src) noexcept;
@@ -365,7 +363,7 @@ public:
     vreg->setPhysId(physId);
     vreg->addHomeId(physId);
 
-    _x86State.getListByRC(C)[physId] = vreg;
+    _x86State.getListByKind(C)[physId] = vreg;
     _x86State._occupied.or_(C, regMask);
     _x86State._modified.or_(C, static_cast<uint32_t>(modified) << physId);
 
@@ -389,7 +387,7 @@ public:
     vreg->resetPhysId();
     vreg->setModified(false);
 
-    _x86State.getListByRC(C)[physId] = nullptr;
+    _x86State.getListByKind(C)[physId] = nullptr;
     _x86State._occupied.andNot(C, regMask);
     _x86State._modified.andNot(C, regMask);
 
@@ -415,8 +413,8 @@ public:
 
     vreg->setPhysId(newPhysId);
 
-    _x86State.getListByRC(C)[oldPhysId] = nullptr;
-    _x86State.getListByRC(C)[newPhysId] = vreg;
+    _x86State.getListByKind(C)[oldPhysId] = nullptr;
+    _x86State.getListByKind(C)[newPhysId] = vreg;
 
     _x86State._occupied.xor_(C, bothRegMask);
     _x86State._modified.xor_(C, bothRegMask & -static_cast<int32_t>(vreg->isModified()));
@@ -458,7 +456,6 @@ public:
     uint32_t regMask = Utils::mask(physId);
 
     emitSave(vreg, physId, "Save");
-
     vreg->setModified(false);
     _x86State._modified.andNot(C, regMask);
 
@@ -510,8 +507,8 @@ public:
     aVReg->setPhysId(bIndex);
     bVReg->setPhysId(aIndex);
 
-    _x86State.getListByRC(X86Reg::kKindGp)[aIndex] = bVReg;
-    _x86State.getListByRC(X86Reg::kKindGp)[bIndex] = aVReg;
+    _x86State.getListByKind(X86Reg::kKindGp)[aIndex] = bVReg;
+    _x86State.getListByKind(X86Reg::kKindGp)[bIndex] = aVReg;
 
     uint32_t m = aVReg->isModified() ^ bVReg->isModified();
     _x86State._modified.xor_(X86Reg::kKindGp, (m << aIndex) | (m << bIndex));
@@ -533,7 +530,7 @@ public:
     uint32_t oldState = vreg->getState();
     uint32_t regMask = Utils::mask(physId);
 
-    ASMJIT_ASSERT(_x86State.getListByRC(C)[physId] == nullptr || physId == oldPhysId);
+    ASMJIT_ASSERT(_x86State.getListByKind(C)[physId] == nullptr || physId == oldPhysId);
 
     if (oldState != VirtReg::kStateReg) {
       if (oldState == VirtReg::kStateMem)
@@ -543,7 +540,7 @@ public:
     else if (oldPhysId != physId) {
       emitMove(vreg, physId, oldPhysId, "Alloc");
 
-      _x86State.getListByRC(C)[oldPhysId] = nullptr;
+      _x86State.getListByKind(C)[oldPhysId] = nullptr;
       regMask ^= Utils::mask(oldPhysId);
     }
     else {
@@ -555,7 +552,7 @@ public:
     vreg->setPhysId(physId);
     vreg->addHomeId(physId);
 
-    _x86State.getListByRC(C)[physId] = vreg;
+    _x86State.getListByKind(C)[physId] = vreg;
     _x86State._occupied.xor_(C, regMask);
     _x86State._modified.xor_(C, regMask & -static_cast<int32_t>(vreg->isModified()));
 
@@ -576,7 +573,7 @@ public:
 
     uint32_t physId = vreg->getPhysId();
     ASMJIT_ASSERT(physId != kInvalidReg);
-    ASMJIT_ASSERT(_x86State.getListByRC(C)[physId] == vreg);
+    ASMJIT_ASSERT(_x86State.getListByKind(C)[physId] == vreg);
 
     if (vreg->isModified())
       emitSave(vreg, physId, "Spill");
@@ -686,7 +683,7 @@ public:
   //! Global allocable registers mask.
   uint32_t _gaRegs[X86Reg::_kKindRACount];
 
-  uint8_t _useAVX;
+  bool _avxEnabled;
 
   //! Function variables base pointer (register).
   uint8_t _varBaseRegId;
@@ -706,7 +703,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER

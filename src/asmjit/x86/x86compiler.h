@@ -8,7 +8,7 @@
 #ifndef _ASMJIT_X86_X86COMPILER_H
 #define _ASMJIT_X86_X86COMPILER_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
@@ -18,7 +18,7 @@
 #include "../x86/x86misc.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -46,6 +46,15 @@ public:
   ASMJIT_API X86Compiler(CodeHolder* code = nullptr) noexcept;
   //! Destroy the `X86Compiler` instance.
   ASMJIT_API ~X86Compiler() noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Compatibility]
+  // --------------------------------------------------------------------------
+
+  //! Implicit cast to `X86Emitter`.
+  ASMJIT_INLINE operator X86Emitter*() noexcept { return reinterpret_cast<X86Emitter*>(this); }
+  //! Implicit cast to `X86Emitter` (const).
+  ASMJIT_INLINE operator const X86Emitter*() const noexcept { return reinterpret_cast<const X86Emitter*>(this); }
 
   // --------------------------------------------------------------------------
   // [Events]
@@ -109,8 +118,6 @@ public:
   // --------------------------------------------------------------------------
   // [VirtReg]
   // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _prepareTypeId(uint32_t& typeIdInOut, uint32_t& signatureOut) noexcept override;
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
 #define ASMJIT_NEW_REG(OUT, PARAM, NAME_FMT)            \
@@ -307,7 +314,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER

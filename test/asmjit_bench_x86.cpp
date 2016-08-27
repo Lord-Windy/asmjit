@@ -5,13 +5,13 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Dependencies]
-#include "../asmjit/asmjit.h"
-#include "./asmjit_test_opcode.h"
-#include "./genblend.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "./asmjit.h"
+#include "./asmjit_test_misc.h"
+#include "./asmjit_test_opcode.h"
 
 using namespace asmjit;
 
@@ -70,7 +70,7 @@ static void benchX86(uint32_t archType) {
   X86Compiler cc;
 
   uint32_t r, i;
-  const char* archName = archType == Arch::kTypeX86 ? "X86" : "X64";
+  const char* archName = archType == ArchInfo::kTypeX86 ? "X86" : "X64";
 
   // --------------------------------------------------------------------------
   // [Bench - Assembler]
@@ -117,7 +117,7 @@ static void benchX86(uint32_t archType) {
       // function calling conventions, which is required by generateAlphaBlend.
       // So we must setup this manually.
       CodeInfo ci(archType);
-      ci.setCdeclCallConv(archType == Arch::kTypeX86 ? CallConv::kIdX86CDecl : CallConv::kIdX86Unix64);
+      ci.setCdeclCallConv(archType == ArchInfo::kTypeX86 ? CallConv::kIdX86CDecl : CallConv::kIdX86SysV64);
 
       code.init(ci);
       code.attach(&cc);
@@ -138,8 +138,8 @@ static void benchX86(uint32_t archType) {
 
 int main(int argc, char* argv[]) {
 #if defined(ASMJIT_BUILD_X86)
-  benchX86(Arch::kTypeX86);
-  benchX86(Arch::kTypeX64);
+  benchX86(ArchInfo::kTypeX86);
+  benchX86(ArchInfo::kTypeX64);
 #endif // ASMJIT_BUILD_X86
 
   return 0;

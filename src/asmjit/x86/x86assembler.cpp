@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
@@ -19,7 +19,7 @@
 #include "../x86/x86assembler.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -364,28 +364,26 @@ X86Assembler::~X86Assembler() noexcept {}
 // ============================================================================
 
 Error X86Assembler::onAttach(CodeHolder* code) noexcept {
-  if (code->getArchType() == Arch::kTypeX86) {
-    ASMJIT_PROPAGATE(Base::onAttach(code));
+  uint32_t archType = code->getArchType();
+  if (!ArchInfo::isX86Family(archType))
+    return DebugUtils::errored(kErrorInvalidArch);
 
+  ASMJIT_PROPAGATE(Base::onAttach(code));
+
+  if (archType == ArchInfo::kTypeX86) {
+    // 32 bit architecture - X86.
     _setAddressOverrideMask(kX86MemInfo_67H_X86);
     _globalOptions |= X86Inst::_kOptionInvalidRex;
-
     _nativeGpArray = x86OpData.gpd;
-    _nativeGpReg = _nativeGpArray[0];
-    return kErrorOk;
   }
-
-  if (code->getArchType() == Arch::kTypeX64) {
-    ASMJIT_PROPAGATE(Base::onAttach(code));
-
+  else {
+    // 64 bit architecture - X64 or X32.
     _setAddressOverrideMask(kX86MemInfo_67H_X64);
-
     _nativeGpArray = x86OpData.gpq;
-    _nativeGpReg = _nativeGpArray[0];
-    return kErrorOk;
   }
 
-  return DebugUtils::errored(kErrorInvalidArch);
+  _nativeGpReg = _nativeGpArray[0];
+  return kErrorOk;
 }
 
 Error X86Assembler::onDetach(CodeHolder* code) noexcept {
@@ -1286,7 +1284,7 @@ CaseX86M_Bx_MulDiv:
           goto EmitX86R;
         }
 
-        if (getArchType() == Arch::kTypeX86) {
+        if (is32Bit()) {
           // INC r16|r32 is only encodable in 32-bit mode (collides with REX).
           opCode = iExtData->getSecondaryOpCode() + (rbReg & 0x07);
           ADD_66H_P_BY_SIZE(o0.getSize());
@@ -1389,10 +1387,8 @@ CaseX86M_Bx_MulDiv:
       if (ASMJIT_UNLIKELY(!label))
         goto InvalidLabel;
 
-      if ((getArchType() == Arch::kTypeX86 && o0.getSize() == 2) ||
-          (getArchType() != Arch::kTypeX86 && o0.getSize() == 4)) {
+      if ((is32Bit() && o0.getSize() == 2) || (is64Bit() && o0.getSize() == 4))
         EMIT_BYTE(0x67);
-      }
       EMIT_BYTE(0xE3);
 
       if (label->isBound()) {
@@ -3649,7 +3645,7 @@ EmitModSib:
     else {
       EMIT_BYTE(x86EncodeMod(0, opReg, 5));
 
-      if (getArchType() == Arch::kTypeX86) {
+      if (is32Bit()) {
 EmitModSib_LabelRip_X86:
         dispOffset = rmMem->getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
@@ -3773,7 +3769,7 @@ EmitModVSib:
     }
     // ==========|> [LABEL|RIP + INDEX + DISP32].
     else {
-      if (getArchType() == Arch::kTypeX86) {
+      if (is32Bit()) {
         EMIT_BYTE(x86EncodeMod(0, opReg, 4));
         EMIT_BYTE(x86EncodeSib(rmMem->getShift(), rxReg, 5));
         goto EmitModSib_LabelRip_X86;
@@ -4072,7 +4068,7 @@ EmitJmpOrCallAbs:
 
     uint32_t trampolineSize = 0;
 
-    if (getArchType() == Arch::kTypeX64) {
+    if (getArchType() == ArchInfo::kTypeX64) {
       uint64_t baseAddress = _code->getBaseAddress();
 
       // If the base address of the output is known, it's possible to determine
@@ -4213,7 +4209,7 @@ InvalidLabel:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // ASMJIT_BUILD_X86

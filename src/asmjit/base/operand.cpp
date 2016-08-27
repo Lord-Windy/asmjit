@@ -11,7 +11,7 @@
 #include "../base/operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -139,7 +139,7 @@ UNIT(base_operand) {
 
   // Create some register (not specific to any architecture).
   uint32_t rSig = Operand::makeRegSignature(1, 2, 8);
-  Reg r1(Init, rSig, 5);
+  Reg r1(Reg::fromSignature(rSig, 5));
 
   EXPECT(r1.isValid()      == true);
   EXPECT(r1.isReg()        == true);
@@ -204,4 +204,4 @@ UNIT(base_operand) {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

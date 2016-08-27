@@ -9,6 +9,7 @@
 #define _ASMJIT_BASE_CODEHOLDER_H
 
 // [Dependencies]
+#include "../base/arch.h"
 #include "../base/func.h"
 #include "../base/logging.h"
 #include "../base/operand.h"
@@ -19,7 +20,7 @@
 #include "../base/zoneheap.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -120,7 +121,7 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE CodeInfo() noexcept
-    : _arch(),
+    : _archInfo(),
       _stackAlignment(0),
       _cdeclCallConv(CallConv::kIdNone),
       _stdCallConv(CallConv::kIdNone),
@@ -129,7 +130,7 @@ public:
   ASMJIT_INLINE CodeInfo(const CodeInfo& other) noexcept { *this = other; }
 
   explicit ASMJIT_INLINE CodeInfo(uint32_t archType, uint32_t archMode = 0, uint64_t baseAddress = 0) noexcept
-    : _arch(archType, archMode),
+    : _archInfo(archType, archMode),
       _packedMiscInfo(0),
       _baseAddress(baseAddress) {}
 
@@ -138,23 +139,23 @@ public:
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE bool isInitialized() const noexcept {
-    return _arch._type != Arch::kTypeNone;
+    return _archInfo._type != ArchInfo::kTypeNone;
   }
 
   ASMJIT_INLINE void init(const CodeInfo& other) noexcept {
-    _arch = other._arch;
+    _archInfo = other._archInfo;
     _packedMiscInfo = other._packedMiscInfo;
     _baseAddress = other._baseAddress;
   }
 
   ASMJIT_INLINE void init(uint32_t archType, uint32_t archMode = 0) noexcept {
-    _arch.init(archType, archMode);
+    _archInfo.init(archType, archMode);
     _packedMiscInfo = 0;
     _baseAddress = 0;
   }
 
   ASMJIT_INLINE void reset() noexcept {
-    _arch.reset();
+    _archInfo.reset();
     _stackAlignment = 0;
     _cdeclCallConv = CallConv::kIdNone;
     _stdCallConv = CallConv::kIdNone;
@@ -166,17 +167,17 @@ public:
   // [Architecture Information]
   // --------------------------------------------------------------------------
 
-  //! Get architecture as \ref Arch.
-  ASMJIT_INLINE const Arch& getArch() const noexcept { return _arch; }
+  //! Get architecture information, see \ref ArchInfo.
+  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
 
-  //! Get architecture type, see \ref Arch::Type.
-  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _arch._type; }
-  //! Get architecture sub-type, see \ref Arch::SubType.
-  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _arch._subType; }
+  //! Get architecture type, see \ref ArchInfo::Type.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _archInfo.getType(); }
+  //! Get architecture sub-type, see \ref ArchInfo::SubType.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _archInfo.getSubType(); }
   //! Get a size of a GP register of the architecture the code is using.
-  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _arch._gpSize; }
+  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _archInfo.getGpSize(); }
   //! Get number of GP registers available of the architecture the code is using.
-  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _arch._gpCount; }
+  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _archInfo.getGpCount(); }
 
   // --------------------------------------------------------------------------
   // [High-Level Information]
@@ -217,7 +218,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  Arch _arch;                            //!< Architecture information.
+  ArchInfo _archInfo;                    //!< Architecture information.
 
   union {
     struct {
@@ -452,20 +453,20 @@ public:
   // [Code-Information]
   // --------------------------------------------------------------------------
 
-  //! Get information about the code, see \ref CodeInfo.
+  //! Get code/target information, see \ref CodeInfo.
   ASMJIT_INLINE const CodeInfo& getCodeInfo() const noexcept { return _codeInfo; }
 
-  //! Get information about the architecture, see \ref Arch.
-  ASMJIT_INLINE const Arch& getArch() const noexcept { return _codeInfo._arch; }
+  //! Get architecture information, see \ref ArchInfo.
+  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _codeInfo.getArchInfo(); }
   //! Get the target's architecture type.
-  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo._arch.getType(); }
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return getArchInfo().getType(); }
   //! Get the target's architecture sub-type.
-  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _codeInfo._arch.getSubType(); }
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return getArchInfo().getSubType(); }
 
   //! Get if a static base-address is set.
-  ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _codeInfo._baseAddress != kNoBaseAddress; }
+  ASMJIT_INLINE bool hasBaseAddress() const noexcept { return _codeInfo.hasBaseAddress(); }
   //! Get a static base-address (uint64_t).
-  ASMJIT_INLINE uint64_t getBaseAddress() const noexcept { return _codeInfo._baseAddress; }
+  ASMJIT_INLINE uint64_t getBaseAddress() const noexcept { return _codeInfo.getBaseAddress(); }
 
   // --------------------------------------------------------------------------
   // [Global Information]
@@ -652,7 +653,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_CODEHOLDER_H

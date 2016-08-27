@@ -27,7 +27,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if defined(ASMJIT_BUILD_X86)
 
 // [Dependencies]
@@ -36,7 +36,7 @@
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -3254,7 +3254,7 @@ static const X86ValidationData _x64ValidationData = {
 };
 
 Error X86Inst::validate(
-  uint32_t archId,
+  uint32_t archType,
   uint32_t instId, uint32_t options,
   const Operand_& opExtra, const Operand_* opArray, uint32_t opCount) noexcept {
 
@@ -3262,16 +3262,16 @@ Error X86Inst::validate(
   uint32_t archMask;
   const X86ValidationData* vd;
 
-  if (archId == Arch::kTypeX86) {
+  if (!ArchInfo::isX86Family(archType))
+    return DebugUtils::errored(kErrorInvalidArch);
+
+  if (archType == ArchInfo::kTypeX86) {
     vd = &_x86ValidationData;
     archMask = X86Inst::kArchMaskX86;
   }
-  else if (archId == Arch::kTypeX64) {
+  else {
     vd = &_x64ValidationData;
     archMask = X86Inst::kArchMaskX64;
-  }
-  else {
-    return DebugUtils::errored(kErrorInvalidArch);
   }
 
   if (ASMJIT_UNLIKELY(instId >= X86Inst::_kIdCount))
@@ -3647,14 +3647,14 @@ UNIT(x86_inst_names) {
 #endif // ASMJIT_TEST && !ASMJIT_DISABLE_TEXT
 
 #if defined(ASMJIT_TEST) && !defined(ASMJIT_DISABLE_VALIDATION)
-static Error x86_validate(uint32_t id, const Operand& o0 = Operand(), const Operand& o1 = Operand(), const Operand& o2 = Operand()) {
+static Error x86_validate(uint32_t instId, const Operand& o0 = Operand(), const Operand& o1 = Operand(), const Operand& o2 = Operand()) {
   Operand opArray[] = { o0, o1, o2 };
-  return X86Inst::validate(Arch::kTypeX86, id, 0, Operand(), opArray, 3);
+  return X86Inst::validate(ArchInfo::kTypeX86, instId, 0, Operand(), opArray, 3);
 }
 
-static Error x64_validate(uint32_t id, const Operand& o0 = Operand(), const Operand& o1 = Operand(), const Operand& o2 = Operand()) {
+static Error x64_validate(uint32_t instId, const Operand& o0 = Operand(), const Operand& o1 = Operand(), const Operand& o2 = Operand()) {
   Operand opArray[] = { o0, o1, o2 };
-  return X86Inst::validate(Arch::kTypeX64, id, 0, Operand(), opArray, 3);
+  return X86Inst::validate(ArchInfo::kTypeX64, instId, 0, Operand(), opArray, 3);
 }
 
 UNIT(x86_inst_validation) {
@@ -3719,7 +3719,7 @@ UNIT(x86_inst_validation) {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // ASMJIT_BUILD_X86

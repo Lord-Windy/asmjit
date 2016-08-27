@@ -9,11 +9,12 @@
 #define _ASMJIT_BASE_CODEEMITTER_H
 
 // [Dependencies]
+#include "../base/arch.h"
 #include "../base/codeholder.h"
 #include "../base/operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -237,14 +238,22 @@ public:
   //! Get \ref CodeHolder this CodeEmitter is attached to.
   ASMJIT_INLINE CodeHolder* getCode() const noexcept { return _code; }
 
-  //! Get information about the architecture, see \ref Arch.
-  ASMJIT_INLINE const Arch& getArch() const noexcept { return _codeInfo._arch; }
-  //! Get the target architecture.
-  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _codeInfo._arch.getType(); }
+  //! Get information about the architecture, see \ref ArchInfo.
+  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _codeInfo.getArchInfo(); }
+
+  //! Get if the target architecture is 32-bit.
+  ASMJIT_INLINE bool is32Bit() const noexcept { return getArchInfo().is32Bit(); }
+  //! Get if the target architecture is 64-bit.
+  ASMJIT_INLINE bool is64Bit() const noexcept { return getArchInfo().is64Bit(); }
+
+  //! Get the target architecture type.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return getArchInfo().getType(); }
+  //! Get the target architecture sub-type.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return getArchInfo().getSubType(); }
   //! Get the target architecture's GP register size (4 or 8 bytes).
-  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return _codeInfo._arch.getGpSize(); }
+  ASMJIT_INLINE uint32_t getGpSize() const noexcept { return getArchInfo().getGpSize(); }
   //! Get the number of target GP registers.
-  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return _codeInfo._arch.getGpCount(); }
+  ASMJIT_INLINE uint32_t getGpCount() const noexcept { return getArchInfo().getGpCount(); }
 
   // --------------------------------------------------------------------------
   // [Code-Emitter Type]
@@ -434,7 +443,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_CODEEMITTER_H

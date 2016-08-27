@@ -9,10 +9,10 @@
 #define _ASMJIT_BASE_CPUINFO_H
 
 // [Dependencies]
-#include "../base/globals.h"
+#include "../base/arch.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -163,9 +163,9 @@ public:
   // [Init / Reset]
   // --------------------------------------------------------------------------
 
-  //! Set CPU architecture, see \Arch.
+  //! Initialize CpuInfo to the given architecture, see \ArchInfo.
   ASMJIT_INLINE void initArch(uint32_t archType, uint32_t archMode = 0) noexcept {
-    _arch.init(archType, archMode);
+    _archInfo.init(archType, archMode);
   }
 
   ASMJIT_INLINE void reset() noexcept { ::memset(this, 0, sizeof(CpuInfo)); }
@@ -181,9 +181,11 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get generic architecture information.
-  ASMJIT_INLINE const Arch& getArch() const noexcept { return _arch; }
-  //! Get CPU architecture, see \Arch.
-  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _arch._type; }
+  ASMJIT_INLINE const ArchInfo& getArchInfo() const noexcept { return _archInfo; }
+  //! Get CPU architecture type, see \ArchInfo::Type.
+  ASMJIT_INLINE uint32_t getArchType() const noexcept { return _archInfo.getType(); }
+  //! Get CPU architecture sub-type, see \ArchInfo::SubType.
+  ASMJIT_INLINE uint32_t getArchSubType() const noexcept { return _archInfo.getSubType(); }
 
   //! Get CPU vendor string.
   ASMJIT_INLINE const char* getVendorString() const noexcept { return _vendorString; }
@@ -264,7 +266,7 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  Arch _arch;                            //!< CPU architecture.
+  ArchInfo _archInfo;                    //!< CPU architecture information.
   char _vendorString[16];                //!< CPU vendor string.
   char _brandString[64];                 //!< CPU brand string.
   uint32_t _vendorId;                    //!< CPU vendor id, see \ref Vendor.
@@ -286,7 +288,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_CPUINFO_H

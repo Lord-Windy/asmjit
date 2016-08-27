@@ -8,7 +8,7 @@
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
@@ -21,7 +21,7 @@
 #include <stdarg.h>
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -36,7 +36,7 @@ static const char noName[1] = { '\0' };
 // ============================================================================
 
 bool CCFuncCall::_setArg(uint32_t i, const Operand_& op) noexcept {
-  if ((i & ~kFuncArgHi) >= _decl.getArgCount())
+  if ((i & ~kFuncArgHi) >= _funcDetail.getArgCount())
     return false;
 
   _args[i] = op;
@@ -166,18 +166,18 @@ VirtReg* CodeCompiler::newVirtReg(uint32_t typeId, uint32_t signature, const cha
 }
 
 Error CodeCompiler::_newReg(Reg& out, uint32_t typeId, const char* name) {
-  uint32_t signature = 0;
+  RegInfo regInfo;
 
-  Error err = _prepareTypeId(typeId, signature);
+  Error err = ArchUtils::typeIdToRegInfo(getArchType(), typeId, regInfo);
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);
 
-  VirtReg* vreg = newVirtReg(typeId, signature, name);
-  if (ASMJIT_UNLIKELY(!vreg)) {
+  VirtReg* vReg = newVirtReg(typeId, regInfo.signature, name);
+  if (ASMJIT_UNLIKELY(!vReg)) {
     out.reset();
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  out._initReg(signature, vreg->getId());
+  out._initReg(regInfo.signature, vReg->getId());
   return kErrorOk;
 }
 
@@ -188,19 +188,24 @@ Error CodeCompiler::_newReg(Reg& out, uint32_t typeId, const char* nameFmt, va_l
 }
 
 Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* name) {
-  uint32_t typeId = ref.getRegType();
-  uint32_t signature = 0;
+  RegInfo regInfo;
+  uint32_t typeId;
 
-  Error err = _prepareTypeId(typeId, signature);
+  if (isVirtRegValid(ref))
+    typeId = getVirtReg(ref)->getTypeId();
+  else
+    typeId = ref.getRegType();
+
+  Error err = ArchUtils::typeIdToRegInfo(getArchType(), typeId, regInfo);
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);
 
-  VirtReg* vreg = newVirtReg(typeId, signature, name);
-  if (ASMJIT_UNLIKELY(!vreg)) {
+  VirtReg* vReg = newVirtReg(typeId, regInfo.signature, name);
+  if (ASMJIT_UNLIKELY(!vReg)) {
     out.reset();
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  out._initReg(signature, vreg->getId());
+  out._initReg(regInfo.signature, vReg->getId());
   return kErrorOk;
 }
 
@@ -220,18 +225,18 @@ Error CodeCompiler::_newStack(Mem& out, uint32_t size, uint32_t alignment, const
 
   if (alignment > 64) alignment = 64;
 
-  VirtReg* vreg = newVirtReg(0, 0, name);
-  if (ASMJIT_UNLIKELY(!vreg)) {
+  VirtReg* vReg = newVirtReg(0, 0, name);
+  if (ASMJIT_UNLIKELY(!vReg)) {
     out.reset();
     return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   }
 
-  vreg->_size = size;
-  vreg->_isStack = true;
-  vreg->_alignment = static_cast<uint8_t>(alignment);
+  vReg->_size = size;
+  vReg->_isStack = true;
+  vReg->_alignment = static_cast<uint8_t>(alignment);
 
   // Set the memory operand to GPD/GPQ and its id to VirtReg.
-  out = Mem(Init, _nativeGpReg.getRegType(), vreg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagRegHome);
+  out = Mem(Init, _nativeGpReg.getRegType(), vReg->getId(), Reg::kRegNone, kInvalidValue, 0, 0, Mem::kFlagRegHome);
   return kErrorOk;
 }
 
@@ -347,7 +352,7 @@ void CodeCompiler::rename(Reg& reg, const char* fmt, ...) {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_COMPILER

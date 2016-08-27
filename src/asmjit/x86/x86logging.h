@@ -8,14 +8,14 @@
 #ifndef _ASMJIT_X86_X86LOGGING_H
 #define _ASMJIT_X86_X86LOGGING_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 #if !defined(ASMJIT_DISABLE_LOGGING)
 
 // [Dependencies]
 #include "../base/logging.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -48,7 +48,7 @@ public:
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // !ASMJIT_DISABLE_LOGGING

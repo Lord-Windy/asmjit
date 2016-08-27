@@ -223,7 +223,7 @@ function(cxx_project_info product)
     "${${PRODUCT}_PRIVATE_CFLAGS_REL}")
 endfunction()
 
-function(cxx_define_source product out src_dir)
+function(cxx_add_source product out src_dir)
   string(TOUPPER "${product}" PRODUCT)
 
   set(src_path "${${PRODUCT}_SOURCE_DIR}/${src_dir}")
@@ -275,7 +275,7 @@ function(cxx_define_source product out src_dir)
   set("${out}" "${out_tmp}" PARENT_SCOPE)
 endfunction()
 
-function(cxx_define_library product target src deps cflags cflags_dbg cflags_rel)
+function(cxx_add_library product target src deps cflags cflags_dbg cflags_rel)
   string(TOUPPER "${product}" PRODUCT)
 
   if(NOT ${PRODUCT}_STATIC)
@@ -304,7 +304,7 @@ function(cxx_define_library product target src deps cflags cflags_dbg cflags_rel
   endif()
 endfunction()
 
-function(cxx_define_executable product target src deps cflags cflags_dbg cflags_rel)
+function(cxx_add_executable product target src deps cflags cflags_dbg cflags_rel)
   string(TOUPPER "${product}" PRODUCT)
   add_executable(${target} ${src})
 

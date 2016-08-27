@@ -15,7 +15,7 @@
 #include "../base/utils.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -2404,6 +2404,17 @@ struct X86Inst {
   static ASMJIT_INLINE const X86Inst& getInst(uint32_t instId) noexcept;
 
   // --------------------------------------------------------------------------
+  // [Utilities]
+  // --------------------------------------------------------------------------
+
+  //! Get a 'kmov?' instruction by register `size`.
+  static ASMJIT_INLINE uint32_t kmovIdFromSize(uint32_t size) noexcept {
+    return size == 1 ? X86Inst::kIdKmovb :
+           size == 2 ? X86Inst::kIdKmovw :
+           size == 4 ? X86Inst::kIdKmovd : X86Inst::kIdKmovq;
+  }
+
+  // --------------------------------------------------------------------------
   // [Id <-> Name]
   // --------------------------------------------------------------------------
 
@@ -2461,7 +2472,7 @@ struct X86Inst {
 
 #if !defined(ASMJIT_DISABLE_VALIDATION)
   ASMJIT_API static Error validate(
-    uint32_t archId, uint32_t instId, uint32_t options,
+    uint32_t archType, uint32_t instId, uint32_t options,
     const Operand_& opExtra,
     const Operand_* opArray, uint32_t opCount) noexcept;
 #endif // !ASMJIT_DISABLE_VALIDATION
@@ -2537,7 +2548,7 @@ struct X86Util {
 #undef _OP_ID
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_X86_X86INST_H

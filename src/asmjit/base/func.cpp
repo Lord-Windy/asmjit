@@ -8,60 +8,49 @@
 #define ASMJIT_EXPORTS
 
 // [Dependencies]
+#include "../base/arch.h"
 #include "../base/func.h"
 
 #if defined(ASMJIT_BUILD_X86)
-#include "../x86/x86func_p.h"
+#include "../x86/x86internal_p.h"
 #include "../x86/x86operand.h"
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-#include "../arm/armfunc_p.h"
+#include "../arm/arminternal_p.h"
 #include "../arm/armoperand.h"
 #endif // ASMJIT_BUILD_ARM
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
-
-// ============================================================================
-// [asmjit::Func - Helpers]
-// ============================================================================
-
-static ASMJIT_INLINE bool CallConv_isX86(uint32_t ccId) noexcept {
-  return ccId >= CallConv::_kIdX86Start && ccId <= CallConv::_kIdX64End;
-}
-
-static ASMJIT_INLINE bool CallConv_isArm(uint32_t ccId) noexcept {
-  return ccId >= CallConv::_kIdArmStart && ccId <= CallConv::_kIdArmEnd;
-}
 
 // ============================================================================
 // [asmjit::CallConv - Init / Reset]
 // ============================================================================
 
-Error CallConv::init(uint32_t ccId) noexcept {
+ASMJIT_FAVOR_SIZE Error CallConv::init(uint32_t ccId) noexcept {
   reset();
 
 #if defined(ASMJIT_BUILD_X86)
-  if (CallConv_isX86(ccId))
-    return X86FuncUtils::initCallConv(*this, ccId);
+  if (CallConv::isX86Family(ccId))
+    return X86Internal::initCallConv(*this, ccId);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-  if (CallConv_isArm(ccId))
-    return ArmFuncUtils::initCallConv(*this, ccId);
+  if (CallConv::isArmFamily(ccId))
+    return ArmInternal::initCallConv(*this, ccId);
 #endif // ASMJIT_BUILD_ARM
 
   return DebugUtils::errored(kErrorInvalidArgument);
 }
 
 // ============================================================================
-// [asmjit::FuncDecl - Init / Reset]
+// [asmjit::FuncDetail - Init / Reset]
 // ============================================================================
 
-Error FuncDecl::init(const FuncSignature& sign) {
+ASMJIT_FAVOR_SIZE Error FuncDetail::init(const FuncSignature& sign) {
   uint32_t ccId = sign.getCallConv();
   CallConv& cc = _callConv;
 
@@ -71,12 +60,12 @@ Error FuncDecl::init(const FuncSignature& sign) {
 
   ASMJIT_PROPAGATE(cc.init(ccId));
 
-  uint32_t gpSize = (cc.getArchType() == Arch::kTypeX86) ? 4 : 8;
+  uint32_t gpSize = (cc.getArchType() == ArchInfo::kTypeX86) ? 4 : 8;
   uint32_t deabstractDelta = TypeId::deabstractDeltaOfSize(gpSize);
 
   const uint8_t* args = sign.getArgs();
   for (uint32_t i = 0; i < static_cast<int32_t>(argCount); i++) {
-    FuncInOut& arg = _args[i];
+    Value& arg = _args[i];
     arg.initTypeId(TypeId::deabstract(args[i], deabstractDelta));
   }
   _argCount = static_cast<uint8_t>(argCount);
@@ -88,13 +77,13 @@ Error FuncDecl::init(const FuncSignature& sign) {
   }
 
 #if defined(ASMJIT_BUILD_X86)
-  if (CallConv_isX86(ccId))
-    return X86FuncUtils::initFuncDecl(*this, sign, gpSize);
+  if (CallConv::isX86Family(ccId))
+    return X86Internal::initFuncDetail(*this, sign, gpSize);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-  if (CallConv_isArm(ccId))
-    return ArmFuncUtils::initFuncDecl(*this, sign, gpSize);
+  if (CallConv::isArmFamily(ccId))
+    return ArmInternal::initFuncDetail(*this, sign, gpSize);
 #endif // ASMJIT_BUILD_ARM
 
   // We should never bubble here as if `cc.init()` succeeded then there has to
@@ -103,54 +92,95 @@ Error FuncDecl::init(const FuncSignature& sign) {
 }
 
 // ============================================================================
+// [asmjit::FuncFrameLayout - Init / Reset]
+// ============================================================================
+
+ASMJIT_FAVOR_SIZE Error FuncFrameLayout::init(const FuncDetail& func, const FuncFrameInfo& ffi) noexcept {
+  uint32_t ccId = func.getCallConv().getId();
+
+#if defined(ASMJIT_BUILD_X86)
+  if (CallConv::isX86Family(ccId))
+    return X86Internal::initFrameLayout(*this, func, ffi);
+#endif // ASMJIT_BUILD_X86
+
+#if defined(ASMJIT_BUILD_ARM)
+  if (CallConv::isArmFamily(ccId))
+    return ArmInternal::initFrameLayout(*this, func, ffi);
+#endif // ASMJIT_BUILD_ARM
+
+  return DebugUtils::errored(kErrorInvalidArgument);
+}
+
+// ============================================================================
+// [asmjit::FuncArgsMapper]
+// ============================================================================
+
+ASMJIT_FAVOR_SIZE Error FuncArgsMapper::updateFrameInfo(FuncFrameInfo& ffi) const noexcept {
+  const FuncDetail* func = getFuncDetail();
+  if (!func) return DebugUtils::errored(kErrorInvalidState);
+
+  uint32_t ccId = func->getCallConv().getId();
+
+#if defined(ASMJIT_BUILD_X86)
+  if (CallConv::isX86Family(ccId))
+    return X86Internal::argsToFrameInfo(*this, ffi);
+#endif // ASMJIT_BUILD_X86
+
+#if defined(ASMJIT_BUILD_ARM)
+  if (CallConv::isArmFamily(ccId))
+    return ArmInternal::argsToFrameInfo(*this, ffi);
+#endif // ASMJIT_BUILD_X86
+
+  return DebugUtils::errored(kErrorInvalidArch);
+}
+
+// ============================================================================
 // [asmjit::FuncUtils]
 // ============================================================================
 
-Error FuncLayout::init(const FuncDecl& decl, const FuncFrameInfo& ffi) noexcept {
-  uint32_t ccId = decl.getCallConv().getId();
-
+ASMJIT_FAVOR_SIZE Error FuncUtils::emitProlog(CodeEmitter* emitter, const FuncFrameLayout& layout) {
 #if defined(ASMJIT_BUILD_X86)
-  if (CallConv_isX86(ccId))
-    return X86FuncUtils::initFuncLayout(*this, decl, ffi);
+  if (emitter->getArchInfo().isX86Family())
+    return X86Internal::emitProlog(static_cast<X86Emitter*>(emitter), layout);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-  if (CallConv_isArm(ccId))
-    return ArmFuncUtils::initFuncLayout(*this, decl, ffi);
+  if (emitter->getArchInfo().isArmFamily())
+    return ArmInternal::emitProlog(static_cast<ArmEmitter*>(emitter), layout);
 #endif // ASMJIT_BUILD_ARM
 
-  return DebugUtils::errored(kErrorInvalidArgument);
+  return DebugUtils::errored(kErrorInvalidArch);
 }
 
-Error FuncUtils::insertProlog(CodeEmitter* emitter, const FuncLayout& layout) {
+ASMJIT_FAVOR_SIZE Error FuncUtils::emitEpilog(CodeEmitter* emitter, const FuncFrameLayout& layout) {
 #if defined(ASMJIT_BUILD_X86)
-  if (emitter->getArch().isX86Family())
-    return X86FuncUtils::insertProlog(reinterpret_cast<X86Emitter*>(emitter), layout);
+  if (emitter->getArchInfo().isX86Family())
+    return X86Internal::emitEpilog(static_cast<X86Emitter*>(emitter), layout);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-  if (emitter->getArch().isArmFamily())
-    return ArmFuncUtils::insertProlog(reinterpret_cast<ArmEmitter*>(emitter), layout);
+  if (emitter->getArchInfo().isArmFamily())
+    return ArmInternal::emitEpilog(static_cast<ArmEmitter*>(emitter), layout);
 #endif // ASMJIT_BUILD_ARM
 
-  return DebugUtils::errored(kErrorInvalidArgument);
+  return DebugUtils::errored(kErrorInvalidArch);
 }
 
-Error FuncUtils::insertEpilog(CodeEmitter* emitter, const FuncLayout& layout) {
+ASMJIT_FAVOR_SIZE Error FuncUtils::allocArgs(CodeEmitter* emitter, const FuncFrameLayout& layout, const FuncArgsMapper& args) {
 #if defined(ASMJIT_BUILD_X86)
-  if (emitter->getArch().isX86Family())
-    return X86FuncUtils::insertEpilog(reinterpret_cast<X86Emitter*>(emitter), layout);
+  if (emitter->getArchInfo().isX86Family())
+    return X86Internal::allocArgs(static_cast<X86Emitter*>(emitter), layout, args);
 #endif // ASMJIT_BUILD_X86
 
 #if defined(ASMJIT_BUILD_ARM)
-  if (emitter->getArch().isArmFamily())
-    return ArmFuncUtils::insertEpilog(reinterpret_cast<ArmEmitter*>(emitter), layout);
+  if (emitter->getArchInfo().isArmFamily())
+    return ArmInternal::allocArgs(static_cast<ArmEmitter*>(emitter), layout, args);
 #endif // ASMJIT_BUILD_ARM
 
-  return DebugUtils::errored(kErrorInvalidArgument);
+  return DebugUtils::errored(kErrorInvalidArch);
 }
 
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

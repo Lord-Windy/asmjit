@@ -13,7 +13,7 @@
 #if !defined(ASMJIT_API_SCOPE)
 # define ASMJIT_API_SCOPE
 #else
-# error "[asmjit] Api-Scope is already active, previous scope not closed by apiend.h?"
+# error "[asmjit] api-scope is already active, previous scope not closed by asmjit_apiend.h?"
 #endif // ASMJIT_API_SCOPE
 
 // [NoExcept]
@@ -34,7 +34,7 @@
 # define ASMJIT_UNDEF_OVERRIDE
 #endif // !ASMJIT_CC_HAS_OVERRIDE && !override
 
-// [CLang]
+// [Clang]
 #if ASMJIT_CC_CLANG
 # pragma clang diagnostic push
 # pragma clang diagnostic ignored "-Wc++11-extensions"
@@ -63,15 +63,15 @@
 # pragma warning(disable: 4480) // specifying underlying type for enum
 # pragma warning(disable: 4800) // forcing value to bool 'true' or 'false'
 
-// TODO: Check if these defines are needed and for which version of MSC. There are
-// news about these as they are part of C99.
-# if !defined(vsnprintf)
-#  define ASMJIT_UNDEF_VSNPRINTF
-#  define vsnprintf _vsnprintf
-# endif // !vsnprintf
-# if !defined(snprintf)
-#  define ASMJIT_UNDEF_SNPRINTF
-#  define snprintf _snprintf
-# endif // !snprintf
+# if _MSC_VER < 1900
+#  if !defined(vsnprintf)
+#   define ASMJIT_UNDEF_VSNPRINTF
+#   define vsnprintf _vsnprintf
+#  endif // !vsnprintf
+#  if !defined(snprintf)
+#   define ASMJIT_UNDEF_SNPRINTF
+#   define snprintf _snprintf
+#  endif // !snprintf
+# endif
 
 #endif // ASMJIT_CC_MSC

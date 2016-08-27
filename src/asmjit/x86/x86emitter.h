@@ -14,7 +14,7 @@
 #include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -36,8 +36,10 @@ namespace asmjit {
 
 #define INST_1i(NAME, ID, T0) \
   ASMJIT_INLINE Error NAME(const T0& o0) { return THIS()->emit(X86Inst::kId##ID, o0); } \
-  template<typename Int> \
-  ASMJIT_INLINE Error NAME(Int o0) { return THIS()->emit(X86Inst::kId##ID, Utils::asInt(o0)); }
+  ASMJIT_INLINE Error NAME(int o0) { return THIS()->emit(X86Inst::kId##ID, Utils::asInt(o0)); } \
+  ASMJIT_INLINE Error NAME(unsigned int o0) { return THIS()->emit(X86Inst::kId##ID, Utils::asInt(o0)); } \
+  ASMJIT_INLINE Error NAME(int64_t o0) { return THIS()->emit(X86Inst::kId##ID, Utils::asInt(o0)); } \
+  ASMJIT_INLINE Error NAME(uint64_t o0) { return THIS()->emit(X86Inst::kId##ID, Utils::asInt(o0)); }
 
 #define INST_1c(NAME, ID, _Translate_, T0) \
   ASMJIT_INLINE Error NAME(uint32_t cc, const T0& o0) { return THIS()->emit(_Translate_(cc), o0); } \
@@ -79,8 +81,10 @@ namespace asmjit {
 
 #define INST_2i(NAME, ID, T0, T1) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1) { return THIS()->emit(X86Inst::kId##ID, o0, o1); } \
-  template<typename Int> \
-  ASMJIT_INLINE Error NAME(const T0& o0, Int o1) { return THIS()->emit(X86Inst::kId##ID, o0, Utils::asInt(o1)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, int o1) { return THIS()->emit(X86Inst::kId##ID, o0, Utils::asInt(o1)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, unsigned int o1) { return THIS()->emit(X86Inst::kId##ID, o0, Utils::asInt(o1)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, int64_t o1) { return THIS()->emit(X86Inst::kId##ID, o0, Utils::asInt(o1)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, uint64_t o1) { return THIS()->emit(X86Inst::kId##ID, o0, Utils::asInt(o1)); }
 
 #define INST_2c(NAME, ID, _Translate_, T0, T1) \
   ASMJIT_INLINE Error NAME(uint32_t cc, const T0& o0, const T1& o1) { \
@@ -123,34 +127,38 @@ namespace asmjit {
 
 #define INST_3i(NAME, ID, T0, T1, T2) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2); } \
-  template<typename Int> \
-  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, Int o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Utils::asInt(o2)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, int o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Utils::asInt(o2)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, unsigned int o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Utils::asInt(o2)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, int64_t o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Utils::asInt(o2)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, uint64_t o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Utils::asInt(o2)); }
 
 #define INST_3ii(NAME, ID, T0, T1, T2) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2); } \
-  template<typename Int1, typename Int2> \
-  ASMJIT_INLINE Error NAME(const T0& o0, Int1 o1, Int2 o2) { return THIS()->emit(X86Inst::kId##ID, o0, Imm(o1), Utils::asInt(o2)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, int o1, int o2) { return THIS()->emit(X86Inst::kId##ID, o0, Imm(o1), Utils::asInt(o2)); }
 
 #define INST_4x(NAME, ID, T0, T1, T2, T3) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3); }
 
 #define INST_4i(NAME, ID, T0, T1, T2, T3) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3); } \
-  template<typename Int> \
-  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, Int o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, Utils::asInt(o3)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, int o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, Utils::asInt(o3)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, unsigned int o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, Utils::asInt(o3)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, int64_t o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, Utils::asInt(o3)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, uint64_t o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, Utils::asInt(o3)); }
 
 #define INST_4ii(NAME, ID, T0, T1, T2, T3) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3); } \
-  template<typename Int2, typename Int3> \
-  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, Int2 o2, Int3 o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Imm(o2), Utils::asInt(o3)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, int o2, int o3) { return THIS()->emit(X86Inst::kId##ID, o0, o1, Imm(o2), Utils::asInt(o3)); }
 
 #define INST_5x(NAME, ID, T0, T1, T2, T3, T4) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4); }
 
 #define INST_5i(NAME, ID, T0, T1, T2, T3, T4) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4); } \
-  template<typename Int> \
-  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, Int o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); }
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, int o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, unsigned int o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, int64_t o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); } \
+  ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, uint64_t o4) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, Utils::asInt(o4)); }
 
 #define INST_6x(NAME, ID, T0, T1, T2, T3, T4, T5) \
   ASMJIT_INLINE Error NAME(const T0& o0, const T1& o1, const T2& o2, const T3& o3, const T4& o4, const T5& o5) { return THIS()->emit(X86Inst::kId##ID, o0, o1, o2, o3, o4, o5); }
@@ -212,7 +220,7 @@ struct X86EmitterBaseT {
     return x86::ptr(base, index, shift, disp, THIS_C()->getGpSize());
   }
   //! \overload
-  ASMJIT_INLINE X86Mem intptr_ptr(const X86Gp& base, const X86Xyz& index, uint32_t shift = 0, int32_t disp = 0) const noexcept {
+  ASMJIT_INLINE X86Mem intptr_ptr(const X86Gp& base, const X86Vec& index, uint32_t shift = 0, int32_t disp = 0) const noexcept {
     return x86::ptr(base, index, shift, disp, THIS_C()->getGpSize());
   }
   //! \overload
@@ -224,7 +232,7 @@ struct X86EmitterBaseT {
     return x86::ptr(base, index, shift, disp, THIS_C()->getGpSize());
   }
   //! \overload
-  ASMJIT_INLINE X86Mem intptr_ptr(const Label& base, const X86Xyz& index, uint32_t shift, int32_t disp = 0) const noexcept {
+  ASMJIT_INLINE X86Mem intptr_ptr(const Label& base, const X86Vec& index, uint32_t shift, int32_t disp = 0) const noexcept {
     return x86::ptr(base, index, shift, disp, THIS_C()->getGpSize());
   }
   //! \overload
@@ -5112,7 +5120,7 @@ class X86Emitter
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_X86_X86EMITTER_H

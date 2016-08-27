@@ -8,14 +8,14 @@
 #ifndef _ASMJIT_BASE_LOGGING_H
 #define _ASMJIT_BASE_LOGGING_H
 
-#include "../build.h"
+#include "../asmjit_build.h"
 
 // [Dependencies]
 #include "../base/string.h"
 #include <stdarg.h>
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -284,7 +284,7 @@ class Logger;
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_LOGGER_H

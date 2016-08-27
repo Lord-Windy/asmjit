@@ -5,7 +5,7 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Dependencies]
-#include "../asmjit/asmjit.h"
+#include "./asmjit.h"
 
 using namespace asmjit;
 
@@ -203,11 +203,13 @@ static void dumpSizeOf(void) {
 
   INFO("Size of Func:");
   DUMP_TYPE(CallConv);
-  DUMP_TYPE(FuncDecl);
-  DUMP_TYPE(FuncFrameInfo);
-  DUMP_TYPE(FuncInOut);
-  DUMP_TYPE(FuncLayout);
   DUMP_TYPE(FuncSignature);
+  DUMP_TYPE(FuncDetail);
+  DUMP_TYPE(FuncDetail::Value);
+  DUMP_TYPE(FuncArgsMapper);
+  DUMP_TYPE(FuncArgsMapper::Value);
+  DUMP_TYPE(FuncFrameInfo);
+  DUMP_TYPE(FuncFrameLayout);
 
   INFO("Size of CodeBuilder:");
   DUMP_TYPE(CodeBuilder);

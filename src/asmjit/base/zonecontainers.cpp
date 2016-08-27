@@ -13,7 +13,7 @@
 #include "../base/zoneheap.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -236,4 +236,4 @@ ZoneHashNode* ZoneHashBase::_del(ZoneHashNode* node) noexcept {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
