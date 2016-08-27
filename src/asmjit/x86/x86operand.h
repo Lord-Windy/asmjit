@@ -288,9 +288,9 @@ public:
   //! Get if the register is a debug register.
   ASMJIT_INLINE bool isDr() const noexcept { return hasSignature(kOpReg, kRegDr, kKindDr, 8); }
 
-  template<uint32_t RegType>
+  template<uint32_t Type>
   ASMJIT_INLINE void setX86RegT(uint32_t id) noexcept {
-    setSignature(X86RegTraits<RegType>::kSignature);
+    setSignature(X86RegTraits<Type>::kSignature);
     setId(id);
   }
 
@@ -301,12 +301,12 @@ public:
   }
 
   static ASMJIT_INLINE uint32_t kindOf(uint32_t regType) noexcept;
-  template<uint32_t RegType>
-  static ASMJIT_INLINE uint32_t kindOf() noexcept { return X86RegTraits<RegType>::kKind; }
+  template<uint32_t Type>
+  static ASMJIT_INLINE uint32_t kindOf() noexcept { return X86RegTraits<Type>::kKind; }
 
   static ASMJIT_INLINE uint32_t signatureOf(uint32_t regType) noexcept;
-  template<uint32_t RegType>
-  static ASMJIT_INLINE uint32_t signatureOf() noexcept { return X86RegTraits<RegType>::kSignature; }
+  template<uint32_t Type>
+  static ASMJIT_INLINE uint32_t signatureOf() noexcept { return X86RegTraits<Type>::kSignature; }
 
   static ASMJIT_INLINE uint32_t signatureOfVecByType(uint32_t typeId) noexcept {
     return typeId <= TypeId::_kVec128End ? signatureOf<kRegXmm>() :
