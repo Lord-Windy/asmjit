@@ -402,6 +402,7 @@
 
 // [@CC_FEATURES{@]
 #if ASMJIT_CC_CLANG
+# define ASMJIT_CC_HAS_ATTRIBUTE               (1)
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALIGNED       (__has_attribute(__aligned__))
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALWAYS_INLINE (__has_attribute(__always_inline__))
 # define ASMJIT_CC_HAS_ATTRIBUTE_NOINLINE      (__has_attribute(__noinline__))
@@ -459,6 +460,7 @@
 #endif
 
 #if ASMJIT_CC_GCC
+# define ASMJIT_CC_HAS_ATTRIBUTE               (1)
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALIGNED       (ASMJIT_CC_GCC_GE(2, 7, 0))
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALWAYS_INLINE (ASMJIT_CC_GCC_GE(4, 4, 0) && !ASMJIT_CC_MINGW)
 # define ASMJIT_CC_HAS_ATTRIBUTE_NOINLINE      (ASMJIT_CC_GCC_GE(3, 4, 0) && !ASMJIT_CC_MINGW)
@@ -490,6 +492,7 @@
 #endif
 
 #if ASMJIT_CC_INTEL
+# define ASMJIT_CC_HAS_ATTRIBUTE               (ASMJIT_CC_INTEL_COMPAT_MODE)
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALIGNED       (ASMJIT_CC_INTEL_COMPAT_MODE)
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALWAYS_INLINE (ASMJIT_CC_INTEL_COMPAT_MODE)
 # define ASMJIT_CC_HAS_ATTRIBUTE_NOINLINE      (ASMJIT_CC_INTEL_COMPAT_MODE)
@@ -564,6 +567,9 @@
 #endif
 
 // Fixup compilers that don't support '__attribute__'.
+#if !defined(ASMJIT_CC_HAS_ATTRIBUTE)
+# define ASMJIT_CC_HAS_ATTRIBUTE               (0)
+#endif
 #if !defined(ASMJIT_CC_HAS_ATTRIBUTE_ALIGNED)
 # define ASMJIT_CC_HAS_ATTRIBUTE_ALIGNED       (0)
 #endif
@@ -743,7 +749,7 @@
 // [@CC_REGPARM{@]
 // \def ASMJIT_REGPARM(n)
 // A custom calling convention which passes n arguments in registers.
-#if ASMJIT_ARCH_X86 && (ASMJIT_CC_GCC || ASMJIT_CC_CLANG)
+#if ASMJIT_ARCH_X86 && ASMJIT_CC_HAS_ATTRIBUTE
 # define ASMJIT_REGPARM(n) __attribute__((__regparm__(n)))
 #else
 # define ASMJIT_REGPARM(n)
