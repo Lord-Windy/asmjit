@@ -160,7 +160,7 @@ enum ODATA_ {
   (X86Inst::kInstFlagEvex              | \
    X86Inst::kInstFlagEvexSet_##CPU     | \
    (VL ? X86Inst::kInstFlagEvexVL : 0) | \
-   X86Inst::kInstFlagEvex##MASKING     | \
+   (X86Inst::kInstFlagEvex##MASKING ? (X86Inst::kInstFlagEvex##MASKING | X86Inst::kInstFlagEvexK_) : 0) | \
    X86Inst::kInstFlagEvex##SAE_ER      | \
    X86Inst::kInstFlagEvexB##BROADCAST  )
 
@@ -3253,7 +3253,7 @@ static const X86ValidationData _x64ValidationData = {
   (1U << X86Reg::kRegXmm) | (1U << X86Reg::kRegYmm) | (1U << X86Reg::kRegZmm)
 };
 
-Error X86Inst::validate(
+ASMJIT_FAVOR_SIZE Error X86Inst::validate(
   uint32_t archType,
   uint32_t instId, uint32_t options,
   const Operand_& opExtra, const Operand_* opArray, uint32_t opCount) noexcept {
@@ -3298,11 +3298,11 @@ Error X86Inst::validate(
     switch (op.getOp()) {
       case Operand::kOpReg: {
         uint32_t regType = static_cast<const Reg&>(op).getRegType();
-        if (regType >= X86Reg::kRegCount)
+        if (ASMJIT_UNLIKELY(regType >= X86Reg::kRegCount))
           return DebugUtils::errored(kErrorInvalidRegType);
 
         opFlags = _x86OpFlagFromRegType[regType];
-        if (opFlags == 0)
+        if (ASMJIT_UNLIKELY(opFlags == 0))
           return DebugUtils::errored(kErrorInvalidRegType);
 
         // If `regId` is equal or greater than Operand::kPackedIdMin it means
@@ -3312,11 +3312,11 @@ Error X86Inst::validate(
         // TODO: We need an option to refuse virtual regs here.
         regId = op.getId();
         if (regId < Operand::kPackedIdMin) {
-          if (regId >= 32)
+          if (ASMJIT_UNLIKELY(regId >= 32))
             return DebugUtils::errored(kErrorInvalidPhysId);
 
           uint32_t regMask = Utils::mask(regId);
-          if ((vd->allowedRegMask[regType] & regMask) == 0)
+          if (ASMJIT_UNLIKELY((vd->allowedRegMask[regType] & regMask) == 0))
             return DebugUtils::errored(kErrorInvalidPhysId);
 
           combinedRegMask |= regMask;
@@ -3335,12 +3335,12 @@ Error X86Inst::validate(
 
         // TODO: Validate base and index and combine with `combinedRegMask`.
         if (baseType) {
-          if ((vd->allowedMemBaseRegs & (1U << baseType)) == 0)
+          if (ASMJIT_UNLIKELY((vd->allowedMemBaseRegs & (1U << baseType)) == 0))
             return DebugUtils::errored(kErrorInvalidAddress);
         }
 
         if (indexType) {
-          if ((vd->allowedMemIndexRegs & (1U << indexType)) == 0)
+          if (ASMJIT_UNLIKELY((vd->allowedMemIndexRegs & (1U << indexType)) == 0))
             return DebugUtils::errored(kErrorInvalidAddress);
 
           if (indexType == X86Reg::kRegXmm) {
@@ -3404,19 +3404,19 @@ Error X86Inst::validate(
   // validate that there are no gaps (like [reg, none, reg] or [none, reg]).
   if (i < opCount) {
     while (--opCount > i)
-      if (!opArray[opCount].isNone())
+      if (ASMJIT_UNLIKELY(!opArray[opCount].isNone()))
         return DebugUtils::errored(kErrorInvalidState);
   }
 
   // Validate X86 and X64 specific cases.
   if (archMask == kArchMaskX86) {
     // Illegal use of 64-bit register in 32-bit mode.
-    if ((combinedOpFlags & X86Inst::kOpGpq) != 0)
+    if (ASMJIT_UNLIKELY((combinedOpFlags & X86Inst::kOpGpq) != 0))
       return DebugUtils::errored(kErrorInvalidUseOfGpq);
   }
   else {
-    // Illegal use of a high 8-bit register together with register(s) that require REX.W prefix.
-    if ((combinedOpFlags & X86Inst::kOpGpbHi) != 0 && (combinedRegMask & 0xFFFFFF00U) != 0)
+    // Illegal use of a high 8-bit register with REX prefix.
+    if (ASMJIT_UNLIKELY((combinedOpFlags & X86Inst::kOpGpbHi) != 0 && (combinedRegMask & 0xFFFFFF00U) != 0))
       return DebugUtils::errored(kErrorInvalidUseOfGpbHi);
   }
 
@@ -3502,25 +3502,40 @@ Next:
   }
 
   // Validate AVX-512 options:
-  const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
-                                  X86Inst::kOption1ToX           |
-                                  X86Inst::kOptionKZ             |
-                                  X86Inst::kOptionSAE            |
-                                  X86Inst::kOptionER             ;
+  const uint32_t kAvx512Options = X86Inst::kOptionK    |
+                                  X86Inst::kOption1ToX |
+                                  X86Inst::kOptionKZ   |
+                                  X86Inst::kOptionSAE  |
+                                  X86Inst::kOptionER   ;
   if (options & kAvx512Options) {
-    // Validate AVX-512 {k} and/or {k}{z}.
+    // Validate AVX-512 {k} and {k}{z}.
+    if (options & (X86Inst::kOptionK | X86Inst::kOptionKZ)) {
+      // Zero {z} without a mask register is invalid.
+      if (ASMJIT_UNLIKELY(!(options & X86Inst::kOptionK)))
+        return DebugUtils::errored(kErrorInvalidKZeroUse);
+
+      // Mask can only be specified by 'k' register.
+      if (ASMJIT_UNLIKELY(!x86::isK(opExtra)))
+        return DebugUtils::errored(kErrorInvalidKMaskReg);
+
+      if (ASMJIT_UNLIKELY(!iExtData->hasFlag(kInstFlagEvexK_)))
+        return DebugUtils::errored(kErrorInvalidKMaskUse);
+
+      if (ASMJIT_UNLIKELY((options & X86Inst::kOptionKZ) != 0 && !iExtData->hasFlag(X86Inst::kInstFlagEvexKZ)))
+        return DebugUtils::errored(kErrorInvalidKZeroUse);
+    }
 
     // Validate AVX-512 broadcast {1tox}.
     if (options & X86Inst::kOption1ToX) {
-      if (!memOp)
+      if (ASMJIT_UNLIKELY(!memOp))
         return DebugUtils::errored(kErrorInvalidBroadcast);
 
       uint32_t size = memOp->getSize();
       if (size != 0) {
-        if ((iExtData->getFlags() & X86Inst::kInstFlagEvexB4) && size != 4)
+        if (ASMJIT_UNLIKELY(iExtData->hasFlag(X86Inst::kInstFlagEvexB4) && size != 4))
           return DebugUtils::errored(kErrorInvalidBroadcast);
 
-        if ((iExtData->getFlags() & X86Inst::kInstFlagEvexB8) && size != 8)
+        if (ASMJIT_UNLIKELY(iExtData->hasFlag(X86Inst::kInstFlagEvexB8) && size != 8))
           return DebugUtils::errored(kErrorInvalidBroadcast);
       }
     }
@@ -3528,13 +3543,13 @@ Next:
     // Validate AVX-512 {sae} and {er}.
     if (options & (X86Inst::kOptionSAE | X86Inst::kOptionER)) {
       // Rounding control is impossible if the instruction is not reg-to-reg.
-      if (memOp)
+      if (ASMJIT_UNLIKELY(memOp))
         return DebugUtils::errored(kErrorInvalidSAEOrER);
 
       // Check if {sae} or {er} is supported by the instruction.
       if (options & X86Inst::kOptionER) {
         // NOTE: if both {sae} and {er} are set, we don't care, as {sae} is implied.
-        if (!(iExtData->getFlags() & X86Inst::kInstFlagEvexER))
+        if (ASMJIT_UNLIKELY(!(iExtData->getFlags() & X86Inst::kInstFlagEvexER)))
           return DebugUtils::errored(kErrorInvalidSAEOrER);
 
         // {er} is defined for scalar ops or vector ops using zmm (LL = 10). We
@@ -3547,15 +3562,15 @@ Next:
           // have to be zmm registers used.
 
           // If we went here it must be true as there is no {er} enabled
-          // instruction with that has less than two operands.
+          // instruction that has less than two operands.
           ASMJIT_ASSERT(opCount >= 2);
-          if (!x86::isZmm(opArray[0]) && !x86::isZmm(opArray[1]))
+          if (ASMJIT_UNLIKELY(!x86::isZmm(opArray[0]) && !x86::isZmm(opArray[1])))
             return DebugUtils::errored(kErrorInvalidSAEOrER);
         }
       }
       else {
         // {sae} doesn't have the same limitations as {er}, this is enough.
-        if (!(iExtData->getFlags() & X86Inst::kInstFlagEvexSAE))
+        if (ASMJIT_UNLIKELY(!(iExtData->getFlags() & X86Inst::kInstFlagEvexSAE)))
           return DebugUtils::errored(kErrorInvalidSAEOrER);
       }
     }

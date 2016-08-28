@@ -260,7 +260,7 @@ ASMJIT_FAVOR_SIZE Error X86Formatter::formatInstruction(
 
     // Support AVX-512 {k}{z}.
     if (i == 0) {
-      if (options & CodeEmitter::kOptionHasOpExtra) {
+      if (options & X86Inst::kOptionK) {
         out.appendString(" {");
         formatOperand(out, logOptions, opExtra);
         out.appendChar('}');

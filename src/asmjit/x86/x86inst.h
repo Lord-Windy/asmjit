@@ -1569,6 +1569,8 @@ struct X86Inst {
     kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
     kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).
 
+    kOptionK              = CodeEmitter::kOptionHasOpExtra,
+
     kOptionShortForm      = 0x00000400U, //!< Emit short-form of the instruction.
     kOptionLongForm       = 0x00000800U, //!< Emit long-form of the instruction.
 
@@ -1577,15 +1579,15 @@ struct X86Inst {
     kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
     kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
 
-    kOptionSAE            = 0x00020000U, //!< EVEX 'suppress-all-exceptions' {sae}.
-    kOptionER             = 0x00040000U, //!< EVEX 'rounding-control' {rc} and {sae}.
+    kOptionSAE            = 0x00020000U, //!< AVX-512: 'suppress-all-exceptions' {sae}.
+    kOptionER             = 0x00040000U, //!< AVX-512: 'rounding-control' {rc} and {sae}.
 
-    kOption1ToX           = 0x00100000U, //!< EVEX broadcast the first element to all {1tox}.
-    kOptionRN_SAE         = 0x00000000U, //!< EVEX 'round-to-nearest' (even)      {rn-sae} (bits 00).
-    kOptionRD_SAE         = 0x00200000U, //!< EVEX 'round-down' (toward -inf)     {rd-sae} (bits 01).
-    kOptionRU_SAE         = 0x00400000U, //!< EVEX 'round-up' (toward +inf)       {ru-sae} (bits 10).
-    kOptionRZ_SAE         = 0x00600000U, //!< EVEX 'round-toward-zero' (truncate) {rz-sae} (bits 11).
-    kOptionKZ             = 0x00800000U, //!< EVEX use zeroing instead of merging {z}.
+    kOption1ToX           = 0x00100000U, //!< AVX-512: broadcast the first element to all {1tox}.
+    kOptionRN_SAE         = 0x00000000U, //!< AVX-512: round-to-nearest (even)      {rn-sae} (bits 00).
+    kOptionRD_SAE         = 0x00200000U, //!< AVX-512: round-down (toward -inf)     {rd-sae} (bits 01).
+    kOptionRU_SAE         = 0x00400000U, //!< AVX-512: round-up (toward +inf)       {ru-sae} (bits 10).
+    kOptionRZ_SAE         = 0x00600000U, //!< AVX-512: round-toward-zero (truncate) {rz-sae} (bits 11).
+    kOptionKZ             = 0x00800000U, //!< AVX-512: Use zeroing {k}{z} instead of merging {k}.
 
     _kOptionInvalidRex    = 0x01000000U, //!< REX prefix can't be emitted (internal).
     kOptionOpCodeB        = 0x02000000U, //!< REX.B and/or VEX.B field (X64).
@@ -1768,7 +1770,7 @@ struct X86Inst {
     kInstFlagEvex0        = 0U,          //!< Used inside macros.
 
     kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
-    kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0z..k7z}.
+    kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0..k7}{z}.
     kInstFlagEvexB0       = 0x00000000U, //!< No broadcast (used by instruction tables).
     kInstFlagEvexB4       = 0x00080000U, //!< Supports broadcast 'b32'.
     kInstFlagEvexB8       = 0x00100000U, //!< Supports broadcast 'b64'.

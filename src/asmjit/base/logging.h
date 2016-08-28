@@ -109,9 +109,6 @@ public:
 //! This class can be inherited and reimplemented to fit into your logging
 //! subsystem. When reimplementing use `Logger::log()` method to log into
 //! a custom stream.
-//!
-//! This class also contain `_enabled` member that can be used to enable
-//! or disable logging.
 class ASMJIT_VIRTAPI Logger {
 public:
   ASMJIT_NONCOPYABLE(Logger)

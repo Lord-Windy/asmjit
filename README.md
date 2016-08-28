@@ -12,7 +12,6 @@ Complete x86/x64 JIT and Remote Assembler for C++.
 
   * This README contains outdated code and is not complete.
   * Only the first section works atm.
-  * AVX512 validation not supported yet.
   * AVX512 {sae} and {er} not supported yet.
 
 Introduction
@@ -21,6 +20,9 @@ Introduction
 AsmJit is a complete JIT and remote assembler for C++ language. It can generate native code for x86 and x64 architectures and supports the whole x86/x64 instruction set - from legacy MMX to the newest AVX512. It has a type-safe API that allows C++ compiler to do semantic checks at compile-time even before the assembled code is generated and/or executed.
 
 AsmJit, as the name implies, started as a project that provided JIT code-generation and execution. However, AsmJit evolved and it now contains features that are far beyond the scope of a simple JIT compilation. To keep the library small and lightweight the functionality not strictly related to JIT is provided by a sister project called [asmtk](https://github.com/asmjit/asmtk).
+
+Minimal Example
+---------------
 
 ```c++
 #include <asmjit/asmjit.h>
@@ -38,7 +40,7 @@ int main(int argc, char* argv[]) {
   code.init(rt.getCodeInfo());            // Initialize to the same arch as JIT runtime.
 
   X86Assembler a(&code);                  // Create and attach X86Assembler to `code`.
-  a.mov(x86::eax, 0);                     // Move zero to 'eax' register.
+  a.mov(x86::eax, 1);                     // Move one to 'eax' register.
   a.ret();                                // Return from function.
   // ----> X86Assembler is no longer needed from here and can be destroyed <----
 
@@ -59,8 +61,8 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-Features
---------
+AsmJit Summary
+--------------
 
   * Complete x86/x64 instruction set - MMX, SSEx, BMIx, ADX, TBM, XOP, AVXx, FMAx, and AVX512.
   * Assembler, CodeBuilder, and CodeCompiler emitters - each suitable for different tasks.
@@ -69,8 +71,19 @@ Features
   * Virtual memory management similar to malloc/free for JIT code-generation and execution.
   * Lightweight and embeddable - 200-250kB compiled with all built-in features.
   * Modularity - unneeded features can be disabled at compile-time to make the library smaller.
-  * Zero dependencies - no external libraries, no STL/RTTI.
+  * Zero dependencies - no external libraries, no STL/RTTI - easy to embed and/or link statically.
   * Doesn't use exceptions internally, but allows to attach a "throwable" error handler (your choice).
+
+Advanced Features
+-----------------
+
+  * AsmJit contains a highly compressed instruction database:
+    * Instruction names - allows to convert instruction id to its name and vice versa.
+    * Instruction metadata - access (read|write|rw) of all operand combinations of all instructions.
+    * Instruction signatures - allows to strictly validate if an instruction (with all its operands) is valid.
+  * AsmJit allows to precisely control how instructions are encoded if there are multiple variations.
+  * AsmJit is highly dynamic, constructing operands at runtime is a common practice.
+  * Multiple emitters with the same interface - emit machine code directly or to a representation that can be processed afterwards.
 
 Important
 ---------

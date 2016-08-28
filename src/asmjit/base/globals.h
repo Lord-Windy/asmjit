@@ -142,6 +142,12 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidPhysId,
   //! Invalid register's virtual id.
   kErrorInvalidVirtId,
+  //! Invalid mask register (not 'k').
+  kErrorInvalidKMaskReg,
+  //! Invalid {k} use (not supported by the instruction).
+  kErrorInvalidKMaskUse,
+  //! Invalid {k}{z} use (not supported by the instruction).
+  kErrorInvalidKZeroUse,
   //! Invalid broadcast - Currently only related to invalid use of AVX-512 {1tox}.
   kErrorInvalidBroadcast,
   //! Invalid 'suppress-all-exceptions' {sae} or 'rounding-control' {rc} (AVX-512).

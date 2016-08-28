@@ -3849,9 +3849,9 @@ EmitVexEvexR:
     opReg &= 0x7;
 
     // Handle AVX512 options by a single branch.
-    const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
-                                    X86Inst::kOption1ToX           |
+    const uint32_t kAvx512Options = X86Inst::kOptionK              |
                                     X86Inst::kOptionKZ             |
+                                    X86Inst::kOption1ToX           |
                                     X86Inst::kOptionSAE            |
                                     X86Inst::kOptionER             ;
     if (options & kAvx512Options) {
@@ -3864,7 +3864,7 @@ EmitVexEvexR:
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything should be zeroed. It's valid EVEX.
-      if (options & CodeEmitter::kOptionHasOpExtra) x |= _opExtra.getId() << 16;
+      if (options & X86Inst::kOptionK) x |= _opExtra.getId() << 16;
       x |= options & X86Inst::kOptionKZ;                 // [........|zLL..aaa|Vvvvv..R|RBBmmmmm].
     }
 
@@ -3958,7 +3958,7 @@ EmitVexEvexM:
     opReg &= 0x07U;
 
     // Handle AVX512 options by a single branch.
-    const uint32_t kAvx512Options = CodeEmitter::kOptionHasOpExtra |
+    const uint32_t kAvx512Options = X86Inst::kOptionK              |
                                     X86Inst::kOption1ToX           |
                                     X86Inst::kOptionKZ             |
                                     X86Inst::kOptionSAE            |
@@ -3971,7 +3971,7 @@ EmitVexEvexM:
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
       // `k0` and basically everything would be zeroed. It's a valid EVEX.
-      if (options & CodeEmitter::kOptionHasOpExtra) x |= _opExtra.getId() << 16;
+      if (options & X86Inst::kOptionK) x |= _opExtra.getId() << 16;
 
       x |= options & (X86Inst::kOption1ToX |             // [........|.LLbXaaa|Vvvvv..R|RXBmmmmm].
                       X86Inst::kOptionKZ   );            // [........|zLLbXaaa|Vvvvv..R|RXBmmmmm].

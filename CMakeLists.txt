@@ -40,8 +40,9 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang)$")
     "-fno-tree-vectorize"
     "-fvisibility=hidden"
     "-Winconsistent-missing-override")
-  list(APPEND ASMJIT_PRIVATE_CFLAGS_REL
+  cxx_detect_cflags(ASMJIT_PRIVATE_CFLAGS_REL
     "-O2" # CMake by default uses -O3, which does nothing useful.
+    "-fno-keep-static-consts"
     "-fmerge-all-constants")
 endif()
 
@@ -64,15 +65,18 @@ if(NOT ASMJIT_EMBED)
   list(INSERT ASMJIT_LIBS 0 asmjit)
 endif()
 
-if(ASMJIT_BUILD_ARM)
-  List(APPEND ASMJIT_CFLAGS         "${CXX_DEFINE}ASMJIT_BUILD_ARM")
-  List(APPEND ASMJIT_PRIVATE_CFLAGS "${CXX_DEFINE}ASMJIT_BUILD_ARM")
-endif()
-
-if(ASMJIT_BUILD_X86)
-  List(APPEND ASMJIT_CFLAGS         "${CXX_DEFINE}ASMJIT_BUILD_X86")
-  List(APPEND ASMJIT_PRIVATE_CFLAGS "${CXX_DEFINE}ASMJIT_BUILD_X86")
-endif()
+foreach(BUILD_OPTION
+    ASMJIT_BUILD_ARM
+    ASMJIT_BUILD_X86
+    ASMJIT_DISABLE_COMPILER
+    ASMJIT_DISABLE_TEXT
+    ASMJIT_DISABLE_LOGGING
+    ASMJIT_DISABLE_VALIDATION)
+  if(${BUILD_OPTION})
+    List(APPEND ASMJIT_CFLAGS         "${CXX_DEFINE}${BUILD_OPTION}")
+    List(APPEND ASMJIT_PRIVATE_CFLAGS "${CXX_DEFINE}${BUILD_OPTION}")
+  endif()
+endforeach()
 
 cxx_project_info(asmjit)
 

@@ -112,6 +112,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (options & kOptionHasOp4) opCount = 5;
     if (options & kOptionHasOp5) opCount = 6;
 
+#if !defined(ASMJIT_DISABLE_VALIDATION)
     // Strict validation.
     if (options & kOptionStrictValidation) {
       Operand opArray[] = {
@@ -129,6 +130,7 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
       // Clear it as it must be enabled explicitly on assembler side.
       options &= ~kOptionStrictValidation;
     }
+#endif // ASMJIT_DISABLE_VALIDATION
   }
 
   resetOptions();
