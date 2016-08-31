@@ -2616,6 +2616,7 @@ uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
 
       nameLower[i++] = c;
     }
+    len = i;
   }
   else {
     size_t i;
