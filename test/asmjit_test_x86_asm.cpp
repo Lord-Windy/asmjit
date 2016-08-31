@@ -11,29 +11,24 @@
 #include <setjmp.h>
 
 #include "./asmjit.h"
-#include "./asmjit_test_misc.h"
 
 using namespace asmjit;
 
+// Signature of the generated function.
 typedef void (*SumIntsFunc)(int* dst, const int* a, const int* b);
 
-int main(int argc, char* argv[]) {
-  JitRuntime rt;                          // Create JIT Runtime
-
-  CodeHolder code;                        // Create a CodeHolder.
-  code.init(rt.getCodeInfo());            // Initialize it to match `rt`.
-  X86Assembler a(&code);                  // Create and attach X86Assembler to `code`.
-
-  FileLogger logger(stderr);
-  code.setLogger(&logger);
-
+// This function works for both X86Assembler and X86Builder. It shows how
+// `X86Emitter` can be used to make your code more generic.
+static void makeFunc(X86Emitter* emitter) {
   // Decide which registers will be mapped to function arguments. Try changing
   // registers of `dst`, `src_a`, and `src_b` and see what happens in function's
   // prolog and epilog.
-  X86Gp dst   = a.zax();
-  X86Gp src_a = a.zcx();
-  X86Gp src_b = a.zdx();
+  X86Gp dst   = emitter->zax();
+  X86Gp src_a = emitter->zcx();
+  X86Gp src_b = emitter->zdx();
 
+  // Decide which vector registers to use. We use these to keep the code generic,
+  // you can switch to any other registers when needed.
   X86Xmm vec0 = x86::xmm0;
   X86Xmm vec1 = x86::xmm1;
 
@@ -53,13 +48,30 @@ int main(int argc, char* argv[]) {
   FuncFrameLayout layout;                 // Create the FuncFrameLayout, which
   layout.init(func, ffi);                 // contains metadata of prolog/epilog.
 
-  FuncUtils::emitProlog(&a, layout);      // Emit function prolog.
-  FuncUtils::allocArgs(&a, layout, args); // Allocate arguments to registers.
-  a.movdqu(vec0, x86::ptr(src_a));        // Load 4 ints from [src_a] to XMM0.
-  a.movdqu(vec1, x86::ptr(src_b));        // Load 4 ints from [src_b] to XMM1.
-  a.paddd(vec0, vec1);                    // Add 4 ints in XMM1 to XMM0.
-  a.movdqu(x86::ptr(dst), vec0);          // Store the result to [dst].
-  FuncUtils::emitEpilog(&a, layout);      // Emit function epilog and return.
+  // Emit function prolog and allocate arguments to registers.
+  FuncUtils::emitProlog(emitter, layout);
+  FuncUtils::allocArgs(emitter, layout, args);
+
+  emitter->movdqu(vec0, x86::ptr(src_a)); // Load 4 ints from [src_a] to XMM0.
+  emitter->movdqu(vec1, x86::ptr(src_b)); // Load 4 ints from [src_b] to XMM1.
+  emitter->paddd(vec0, vec1);             // Add 4 ints in XMM1 to XMM0.
+  emitter->movdqu(x86::ptr(dst), vec0);   // Store the result to [dst].
+
+  // Emit function epilog and return.
+  FuncUtils::emitEpilog(emitter, layout);
+}
+
+int main(int argc, char* argv[]) {
+  JitRuntime rt;                          // Create JIT Runtime
+
+  CodeHolder code;                        // Create a CodeHolder.
+  code.init(rt.getCodeInfo());            // Initialize it to match `rt`.
+  X86Assembler a(&code);                  // Create and attach X86Assembler to `code`.
+
+  FileLogger logger(stderr);
+  code.setLogger(&logger);
+
+  makeFunc(a.asEmitter());
 
   SumIntsFunc fn;
   Error err = rt.add(&fn, &code);         // Add the code generated to the runtime.

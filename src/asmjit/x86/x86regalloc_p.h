@@ -293,7 +293,7 @@ public:
   // [Interface]
   // --------------------------------------------------------------------------
 
-  virtual Error process(CodeBuilder* cb, Zone* zone) noexcept override;
+  virtual Error process(Zone* zone) noexcept override;
   virtual Error prepare(CCFunc* func) noexcept override;
 
   // --------------------------------------------------------------------------
@@ -307,7 +307,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Get compiler as `X86Compiler`.
-  ASMJIT_INLINE X86Compiler* cc() const noexcept { return static_cast<X86Compiler*>(_cc); }
+  ASMJIT_INLINE X86Compiler* cc() const noexcept { return static_cast<X86Compiler*>(_cb); }
   //! Get clobbered registers (global).
   ASMJIT_INLINE uint32_t getClobberedRegs(uint32_t kind) noexcept { return _clobberedRegs.get(kind); }
 

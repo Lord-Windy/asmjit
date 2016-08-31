@@ -9,7 +9,7 @@
 
 // [Guard]
 #include "../asmjit_build.h"
-#if !defined(ASMJIT_DISABLE_COMPILER)
+#if !defined(ASMJIT_DISABLE_BUILDER)
 
 // [Dependencies]
 #include "../base/codebuilder.h"
@@ -23,22 +23,19 @@ namespace asmjit {
 // [asmjit::CodeBuilder - Construction / Destruction]
 // ============================================================================
 
-CodeBuilder::CodeBuilder(CodeHolder* code) noexcept
+CodeBuilder::CodeBuilder() noexcept
   : CodeEmitter(kTypeBuilder),
     _cbBaseZone(32768 - Zone::kZoneOverhead),
     _cbDataZone(16384 - Zone::kZoneOverhead),
     _cbPassZone(32768 - Zone::kZoneOverhead),
     _cbHeap(&_cbBaseZone),
+    _cbPasses(&_cbHeap),
     _cbLabels(&_cbHeap),
     _nodeFlowId(0),
     _nodeFlags(0),
     _firstNode(nullptr),
     _lastNode(nullptr),
-    _cursor(nullptr) {
-
-  if (code)
-    code->attach(this);
-}
+    _cursor(nullptr) {}
 CodeBuilder::~CodeBuilder() noexcept {}
 
 // ============================================================================
@@ -50,6 +47,7 @@ Error CodeBuilder::onAttach(CodeHolder* code) noexcept {
 }
 
 Error CodeBuilder::onDetach(CodeHolder* code) noexcept {
+  _cbPasses.reset(&_cbHeap);
   _cbLabels.reset(&_cbHeap);
   _cbHeap.reset(&_cbBaseZone);
 
@@ -156,7 +154,125 @@ CBComment* CodeBuilder::newCommentNode(const char* s, size_t len) noexcept {
 }
 
 // ============================================================================
-// [asmjit::CodeBuilder - Code-Management]
+// [asmjit::CodeBuilder - Code-Emitter]
+// ============================================================================
+
+Label CodeBuilder::newLabel() {
+  uint32_t id = kInvalidValue;
+
+  if (!_lastError) {
+    CBLabel* node = newNodeT<CBLabel>(id);
+    if (ASMJIT_UNLIKELY(!node)) {
+      setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    }
+    else {
+      Error err = registerLabelNode(node);
+      if (ASMJIT_UNLIKELY(err))
+        setLastError(err);
+      else
+        id = node->getId();
+    }
+  }
+
+  return Label(id);
+}
+
+Label CodeBuilder::newNamedLabel(const char* name, size_t nameLength, uint32_t type, uint32_t parentId) {
+  uint32_t id = kInvalidValue;
+
+  if (!_lastError) {
+    CBLabel* node = newNodeT<CBLabel>(id);
+    if (ASMJIT_UNLIKELY(!node)) {
+      setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    }
+    else {
+      Error err = _code->newNamedLabelId(id, name, nameLength, type, parentId);
+      if (ASMJIT_UNLIKELY(err))
+        setLastError(err);
+      else
+        id = node->getId();
+    }
+  }
+
+  return Label(id);
+}
+
+Error CodeBuilder::bind(const Label& label) {
+  if (_lastError) return _lastError;
+
+  CBLabel* node;
+  Error err = getCBLabel(&node, label);
+  if (ASMJIT_UNLIKELY(err))
+    return setLastError(err);
+
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::align(uint32_t mode, uint32_t alignment) {
+  if (_lastError) return _lastError;
+
+  CBAlign* node = newAlignNode(mode, alignment);
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::embed(const void* data, uint32_t size) {
+  if (_lastError) return _lastError;
+
+  CBData* node = newDataNode(data, size);
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::embedLabel(const Label& label) {
+  if (_lastError) return _lastError;
+
+  CBLabelData* node = newNodeT<CBLabelData>(label.getId());
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
+  if (_lastError) return _lastError;
+
+  if (!isLabelValid(label))
+    return setLastError(DebugUtils::errored(kErrorInvalidLabel));
+
+  ASMJIT_PROPAGATE(align(kAlignData, static_cast<uint32_t>(pool.getAlignment())));
+  ASMJIT_PROPAGATE(bind(label));
+
+  CBData* node = newDataNode(nullptr, static_cast<uint32_t>(pool.getSize()));
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  pool.fill(node->getData());
+  addNode(node);
+  return kErrorOk;
+}
+
+Error CodeBuilder::comment(const char* s, size_t len) {
+  if (_lastError) return _lastError;
+
+  CBComment* node = newCommentNode(s, len);
+  if (ASMJIT_UNLIKELY(!node))
+    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+
+  addNode(node);
+  return kErrorOk;
+}
+
+// ============================================================================
+// [asmjit::CodeBuilder - Node-Management]
 // ============================================================================
 
 CBNode* CodeBuilder::addNode(CBNode* node) noexcept {
@@ -331,125 +447,58 @@ CBNode* CodeBuilder::setCursor(CBNode* node) noexcept {
 }
 
 // ============================================================================
-// [asmjit::CodeBuilder - Code-Generation]
+// [asmjit::CodeBuilder - Passes]
 // ============================================================================
 
-Label CodeBuilder::newLabel() {
-  uint32_t id = kInvalidValue;
-
-  if (!_lastError) {
-    CBLabel* node = newNodeT<CBLabel>(id);
-    if (ASMJIT_UNLIKELY(!node)) {
-      setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-    }
-    else {
-      Error err = registerLabelNode(node);
-      if (ASMJIT_UNLIKELY(err))
-        setLastError(err);
-      else
-        id = node->getId();
-    }
+ASMJIT_FAVOR_SIZE CBPass* CodeBuilder::getPassByName(const char* name) const noexcept {
+  for (size_t i = 0, len = _cbPasses.getLength(); i < len; i++) {
+    CBPass* pass = _cbPasses[i];
+    if (::strcmp(pass->getName(), name) == 0)
+      return pass;
   }
 
-  return Label(id);
+  return nullptr;
 }
 
-Label CodeBuilder::newNamedLabel(const char* name, size_t nameLength, uint32_t type, uint32_t parentId) {
-  uint32_t id = kInvalidValue;
-
-  if (!_lastError) {
-    CBLabel* node = newNodeT<CBLabel>(id);
-    if (ASMJIT_UNLIKELY(!node)) {
-      setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-    }
-    else {
-      Error err = _code->newNamedLabelId(id, name, nameLength, type, parentId);
-      if (ASMJIT_UNLIKELY(err))
-        setLastError(err);
-      else
-        id = node->getId();
-    }
+ASMJIT_FAVOR_SIZE Error CodeBuilder::addPass(CBPass* pass) noexcept {
+  if (ASMJIT_UNLIKELY(pass == nullptr)) {
+    // Since this is directly called by `addPassT()` we treat `null` argument
+    // as out-of-memory condition. Otherwise it would be API misuse.
+    return DebugUtils::errored(kErrorNoHeapMemory);
+  }
+  else if (ASMJIT_UNLIKELY(pass->_cb)) {
+    // Kind of weird, but okay...
+    if (pass->_cb == this)
+      return kErrorOk;
+    return DebugUtils::errored(kErrorInvalidState);
   }
 
-  return Label(id);
-}
-
-Error CodeBuilder::bind(const Label& label) {
-  if (_lastError) return _lastError;
-
-  CBLabel* node;
-  Error err = getCBLabel(&node, label);
-  if (ASMJIT_UNLIKELY(err))
-    return setLastError(err);
-
-  addNode(node);
+  ASMJIT_PROPAGATE(_cbPasses.append(pass));
+  pass->_cb = this;
   return kErrorOk;
 }
 
-Error CodeBuilder::align(uint32_t mode, uint32_t alignment) {
-  if (_lastError) return _lastError;
+ASMJIT_FAVOR_SIZE Error CodeBuilder::deletePass(CBPass* pass) noexcept {
+  if (ASMJIT_UNLIKELY(pass == nullptr))
+    return DebugUtils::errored(kErrorInvalidArgument);
 
-  CBAlign* node = newAlignNode(mode, alignment);
-  if (ASMJIT_UNLIKELY(!node))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  if (pass->_cb != nullptr) {
+    if (pass->_cb != this)
+      return DebugUtils::errored(kErrorInvalidState);
 
-  addNode(node);
-  return kErrorOk;
-}
+    size_t index = _cbPasses.indexOf(pass);
+    ASMJIT_ASSERT(index != kInvalidIndex);
 
-Error CodeBuilder::embed(const void* data, uint32_t size) {
-  if (_lastError) return _lastError;
+    pass->_cb = nullptr;
+    _cbPasses.removeAt(index);
+  }
 
-  CBData* node = newDataNode(data, size);
-  if (ASMJIT_UNLIKELY(!node))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-
-  addNode(node);
-  return kErrorOk;
-}
-
-Error CodeBuilder::embedLabel(const Label& label) {
-  if (_lastError) return _lastError;
-
-  CBLabelData* node = newNodeT<CBLabelData>(label.getId());
-  if (ASMJIT_UNLIKELY(!node))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-
-  addNode(node);
-  return kErrorOk;
-}
-
-Error CodeBuilder::embedConstPool(const Label& label, const ConstPool& pool) {
-  if (_lastError) return _lastError;
-
-  if (!isLabelValid(label))
-    return setLastError(DebugUtils::errored(kErrorInvalidLabel));
-
-  ASMJIT_PROPAGATE(align(kAlignData, static_cast<uint32_t>(pool.getAlignment())));
-  ASMJIT_PROPAGATE(bind(label));
-
-  CBData* node = newDataNode(nullptr, static_cast<uint32_t>(pool.getSize()));
-  if (ASMJIT_UNLIKELY(!node))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-
-  pool.fill(node->getData());
-  addNode(node);
-  return kErrorOk;
-}
-
-Error CodeBuilder::comment(const char* s, size_t len) {
-  if (_lastError) return _lastError;
-
-  CBComment* node = newCommentNode(s, len);
-  if (ASMJIT_UNLIKELY(!node))
-    return setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-
-  addNode(node);
+  pass->~CBPass();
   return kErrorOk;
 }
 
 // ============================================================================
-// [asmjit::CodeBuilder - Code-Serialization]
+// [asmjit::CodeBuilder - Serialization]
 // ============================================================================
 
 Error CodeBuilder::serialize(CodeEmitter* dst) {
@@ -542,7 +591,9 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
 // [asmjit::CBPass]
 // ============================================================================
 
-CBPass::CBPass() noexcept {}
+CBPass::CBPass(const char* name) noexcept
+  : _cb(nullptr),
+    _name(name) {}
 CBPass::~CBPass() noexcept {}
 
 } // asmjit namespace
@@ -551,4 +602,4 @@ CBPass::~CBPass() noexcept {}
 #include "../asmjit_apiend.h"
 
 // [Guard]
-#endif // !ASMJIT_DISABLE_COMPILER
+#endif // !ASMJIT_DISABLE_BUILDER

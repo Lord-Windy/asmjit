@@ -287,10 +287,12 @@ struct Operand_ {
     return _any.op >= kOpReg && _any.op <= kOpMem;
   }
 
+  //! Cast this operand to `T` type.
   template<typename T>
-  ASMJIT_INLINE T& getData() noexcept { return reinterpret_cast<T&>(_any); }
+  ASMJIT_INLINE T& as() noexcept { return static_cast<T&>(*this); }
+  //! Cast this operand to `T` type (const).
   template<typename T>
-  ASMJIT_INLINE const T& getData() const noexcept { return reinterpret_cast<const T&>(_any); }
+  ASMJIT_INLINE const T& as() const noexcept { return static_cast<const T&>(*this); }
 
   // --------------------------------------------------------------------------
   // [Reset]
@@ -586,20 +588,20 @@ public:
   //! Get the register kind.
   ASMJIT_INLINE uint32_t getRegKind() const noexcept { return _reg.regKind; }
 
+  //! Clone the register operand.
+  ASMJIT_INLINE Reg clone() const noexcept { return Reg(*this); }
+
   //! Cast this register to `RegT` by also changing its signature.
   //!
-  //! NOTE: Improper use of `as()` can lead to hard-to-debug errors.
+  //! NOTE: Improper use of `cloneAs()` can lead to hard-to-debug errors.
   template<typename RegT>
-  ASMJIT_INLINE RegT as() const noexcept { return RegT(Init, RegTraits<RegT>::kSignature, getId()); }
+  ASMJIT_INLINE RegT cloneAs() const noexcept { return RegT(Init, RegTraits<RegT>::kSignature, getId()); }
 
   //! Cast this register to `other` by also changing its signature.
   //!
-  //! NOTE: Improper use of `as()` can lead to hard-to-debug errors.
+  //! NOTE: Improper use of `cloneAs()` can lead to hard-to-debug errors.
   template<typename RegT>
-  ASMJIT_INLINE RegT as(const RegT& other) const noexcept { return RegT(Init, other.getSignature(), getId()); }
-
-  //! Clone the register operand.
-  ASMJIT_INLINE Reg clone() const noexcept { return Reg(*this); }
+  ASMJIT_INLINE RegT cloneAs(const RegT& other) const noexcept { return RegT(Init, other.getSignature(), getId()); }
 
   //! Set the register id to `id`.
   ASMJIT_INLINE void setId(uint32_t id) noexcept { _reg.id = id; }

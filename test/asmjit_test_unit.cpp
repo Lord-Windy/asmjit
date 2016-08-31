@@ -238,9 +238,9 @@ static void dumpSizeOf(void) {
   DUMP_TYPE(X86Compiler);
 #endif // !ASMJIT_DISABLE_COMPILER
   DUMP_TYPE(X86Inst);
+  DUMP_TYPE(X86Inst::CommonData);
   DUMP_TYPE(X86Inst::ISignature);
   DUMP_TYPE(X86Inst::OSignature);
-  DUMP_TYPE(X86Inst::ExtendedData);
   INFO("");
 #endif // ASMJIT_BUILD_X86
 }

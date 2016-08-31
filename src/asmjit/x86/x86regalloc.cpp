@@ -9,7 +9,7 @@
 
 // [Guard]
 #include "../asmjit_build.h"
-#if !defined(ASMJIT_DISABLE_COMPILER) && defined(ASMJIT_BUILD_X86)
+#if defined(ASMJIT_BUILD_X86) && !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
 #include "../base/cpuinfo.h"
@@ -351,14 +351,14 @@ X86RAPass::~X86RAPass() noexcept {}
 // [asmjit::X86RAPass - Interface]
 // ============================================================================
 
-Error X86RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
-  return Base::process(cb, zone);
+Error X86RAPass::process(Zone* zone) noexcept {
+  return Base::process(zone);
 }
 
 Error X86RAPass::prepare(CCFunc* func) noexcept {
   ASMJIT_PROPAGATE(Base::prepare(func));
 
-  uint32_t archType = _cc->getArchType();
+  uint32_t archType = cc()->getArchType();
   _regCount._gp  = archType == ArchInfo::kTypeX86 ? 8 : 16;
   _regCount._mm  = 8;
   _regCount._k   = 8;
@@ -1662,14 +1662,14 @@ _NextGroup:
 
         RA_DECLARE();
         if (opCount) {
-          const X86Inst::ExtendedData& extendedData = X86Inst::getInst(instId).getExtData();
+          const X86Inst::CommonData& commonData = X86Inst::getInst(instId).getCommonData();
           const X86SpecialInst* special = nullptr;
 
           // Collect instruction flags and merge all 'TiedReg's.
-          if (extendedData.isFp())
+          if (commonData.isFp())
             flags |= CBNode::kFlagIsFp;
 
-          if (extendedData.isSpecial() && (special = X86SpecialInst_get(instId, opArray, opCount)) != nullptr)
+          if (commonData.isSpecial() && (special = X86SpecialInst_get(instId, opArray, opCount)) != nullptr)
             flags |= CBNode::kFlagIsSpecial;
 
           uint32_t gpAllowedMask = 0xFFFFFFFF;
@@ -1746,14 +1746,14 @@ _NextGroup:
                     // Manually forcing write-only.
                     combinedFlags = outFlags;
                   }
-                  else if (extendedData.isWO()) {
+                  else if (commonData.isWO()) {
                     // Write-only instruction.
-                    uint32_t movSize = extendedData.getWriteSize();
+                    uint32_t movSize = commonData.getWriteSize();
                     uint32_t regSize = vreg->getSize();
 
                     // Exception - If the source operand is a memory location
                     // promote move size into 16 bytes.
-                    if (extendedData.isZeroIfMem() && opArray[1].isMem())
+                    if (commonData.isZeroIfMem() && opArray[1].isMem())
                       movSize = 16;
 
                     if (static_cast<const X86Reg*>(op)->isGp()) {
@@ -1778,7 +1778,7 @@ _NextGroup:
                       combinedFlags = outFlags;
                     }
                   }
-                  else if (extendedData.isRO()) {
+                  else if (commonData.isRO()) {
                     // Comparison/Test instructions don't modify any operand.
                     combinedFlags = inFlags;
                   }
@@ -1795,7 +1795,7 @@ _NextGroup:
                   ASMJIT_ASSERT(instId != X86Inst::kIdIdiv);
 
                   // Xchg/Xadd/Imul.
-                  if (extendedData.isXchg() || (instId == X86Inst::kIdImul && opCount == 3 && i == 1))
+                  if (commonData.isXchg() || (instId == X86Inst::kIdImul && opCount == 3 && i == 1))
                     combinedFlags = inFlags | outFlags;
                 }
                 tied->flags |= combinedFlags;
@@ -1820,17 +1820,17 @@ _NextGroup:
                         // Default for the first operand.
                         combinedFlags = inFlags | outFlags;
 
-                        if (extendedData.isWO()) {
+                        if (commonData.isWO()) {
                           // Move to memory - setting the right flags is important
                           // as if it's just move to the register. It's just a bit
                           // simpler as there are no special cases.
-                          uint32_t movSize = Utils::iMax<uint32_t>(extendedData.getWriteSize(), m->getSize());
+                          uint32_t movSize = Utils::iMax<uint32_t>(commonData.getWriteSize(), m->getSize());
                           uint32_t regSize = vreg->getSize();
 
                           if (movSize >= regSize)
                             combinedFlags = outFlags;
                         }
-                        else if (extendedData.isRO()) {
+                        else if (commonData.isRO()) {
                           // Comparison/Test instructions don't modify any operand.
                           combinedFlags = inFlags;
                         }
@@ -1840,7 +1840,7 @@ _NextGroup:
                         combinedFlags = inFlags;
 
                         // Handle Xchg instruction (modifies both operands).
-                        if (extendedData.isXchg())
+                        if (commonData.isXchg())
                           combinedFlags = inFlags | outFlags;
                       }
 
@@ -4441,4 +4441,4 @@ _Done:
 #include "../asmjit_apiend.h"
 
 // [Guard]
-#endif // !ASMJIT_DISABLE_COMPILER && ASMJIT_BUILD_X86
+#endif // ASMJIT_BUILD_X86 && !ASMJIT_DISABLE_COMPILER

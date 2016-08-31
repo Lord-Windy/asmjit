@@ -9,24 +9,21 @@
 // NOTE: This script now relies on 'asmdb' package. Either install it by using
 // node.js package manager (npm) or copy x86data.js and x86util.js files into
 // the asmjit/tools directory.
-
-// IMPORTANT: THIS SCRIPT WILL BE CLEANED UP, IT CONTAINS A LOT OF STUFF FROM
-// AVX-512 SCRIPTING, WHICH IS NO LONGER NEEDED.
-
 "use strict";
 
 const fs = require("fs");
 const hasOwn = Object.prototype.hasOwnProperty;
 
-// Prefer a local asmdb copy package if possible;
 const asmdb = (function() {
   try {
+    // Prefer a local asmdb copy package if possible;
     return {
       x86data: require("./x86data.js"),
       x86util: require("./x86util.js")
     };
   }
   catch (ex) {
+    // Okay, so global then...
     return require("asmdb.js");
   }
 })();
@@ -86,17 +83,69 @@ class Utils {
     return s;
   }
 
+  static decToHex(n, nPad) {
+    var hex = Number(n < 0 ? 0x100000000 + n : n).toString(16);
+    while (nPad > hex.length)
+      hex = "0" + hex;
+    return "0x" + hex.toUpperCase();
+  }
+
+  static format(array, indent, showIndex, mapFn) {
+    if (!mapFn)
+      mapFn = function(x) { return String(x); }
+
+    const commentSize = showIndex ? String(array.length).length : 0;
+
+    var s = "";
+    for (var i = 0; i < array.length; i++) {
+      const last = i === array.length - 1;
+      s += `${indent}${mapFn(array[i])}`;
+
+      if (commentSize)
+        s += `${last ? " " : ","} // #${i}`;
+      else if (!last)
+        s += ",";
+
+      if (!last) s += "\n";
+    }
+    return s;
+  }
+
   static inject(s, start, end, code) {
     var iStart = s.indexOf(start);
     var iEnd   = s.indexOf(end);
 
     if (iStart === -1)
-      throw new Error(`Couldn't locate start mark`);
+      throw new Error(`Utils.inject(): Couldn't locate start mark '${start}'`);
 
     if (iEnd === -1)
-      throw new Error(`Couldn't locate end mark`);
+      throw new Error(`Utils.inject(): Couldn't locate end mark '${end}'`);
 
     return s.substr(0, iStart + start.length) + code + s.substr(iEnd);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// [IndexedArray]
+// ----------------------------------------------------------------------------
+
+class IndexedArray extends Array {
+  constructor() {
+    super();
+    this._index = Object.create(null);
+  }
+
+  addIndexed(element) {
+    const key = typeof element === "string" ? element : JSON.stringify(element);
+    var idx = this._index[key];
+
+    if (idx !== undefined)
+      return idx;
+
+    idx = this.length;
+    this._index[key] = idx;
+    this.push(element);
+    return idx;
   }
 }
 
@@ -107,8 +156,8 @@ class Utils {
 class IndexedString {
   constructor() {
     this.map = Object.create(null);
-    this.size = -1;
     this.array = [];
+    this.size = -1;
   }
 
   add(s) {
@@ -164,7 +213,7 @@ class IndexedString {
 
   format(indent, justify) {
     if (this.size === -1)
-      throw new Error(`IndexedString - not indexed yet, call index()`);
+      throw new Error(`IndexedString.format(): not indexed yet, call index()`);
 
     const array = this.array;
     if (!justify) justify = 0;
@@ -187,36 +236,54 @@ class IndexedString {
       }
     }
 
-    s += line + "\n";
-    return s;
+    return s + line;
   }
 
   getSize() {
     if (this.size === -1)
-      throw new Error(`IndexedString - not indexed yet, call index()`);
+      throw new Error(`IndexedString.getSize(): Not indexed yet, call index()`);
     return this.size;
   }
 
   getIndex(k) {
     if (this.size === -1)
-      throw new Error(`IndexedString - not indexed yet, call index()`);
+      throw new Error(`IndexedString.getIndex(): Not indexed yet, call index()`);
 
     if (!hasOwn.call(this.map, k))
-      throw new Error(`IndexedString - key '${k}' not found.`);
+      throw new Error(`IndexedString.getIndex(): Key '${k}' not found.`);
 
     return this.map[k];
   }
 }
+
+// ----------------------------------------------------------------------------
+// [X86Utils]
+// ----------------------------------------------------------------------------
+
+class X86Utils {
+  // Get if a group of instructions is either MMX or SSE.
+  static isMmxOrSseInsts(insts) {
+    var n = 0;
+    for (var i = 0; i < insts.length; i++) {
+      const inst = insts[i];
+      if (/^(VEX|XOP|EVEX)$/.test(inst.prefix))
+        return false;
+
+      const ops = inst.operands;
+      for (var j = 0; j < ops.length; j++) {
+        if (/^(mm|xmm)$/.test(ops[j].reg)) {
+          n++;
+          break;
+        }
+      }
+    }
+    return n === insts.length;
+  }
+};
+
 // ----------------------------------------------------------------------------
 // [Generate]
 // ----------------------------------------------------------------------------
-
-function decToHex(n, nPad) {
-  var hex = Number(n < 0 ? 0x100000000 + n : n).toString(16);
-  while (nPad > hex.length)
-    hex = "0" + hex;
-  return "0x" + hex.toUpperCase();
-}
 
 function getEFlagsMask(eflags, passing) {
   var msk = 0x0;
@@ -257,18 +324,6 @@ function composeOpCode(obj) {
   var ew = obj.ew;
 
   return `${obj.type}(${obj.prefix},${obj.opcode},${obj.o},${obj.l},${w},${ew},${obj.en})`;
-}
-
-function isAVXGroup(insts) {
-  for (var i = 0; i < insts.length; i++) {
-    const inst = insts[i];
-    const operands = inst.operands;
-    for (var j = 0; j < operands.length; j++) {
-      if (/^(?:xmm|ymm|zmm)$/.test(operands[i]))
-        return true;
-    }
-  }
-  return false;
 }
 
 const MapW = {
@@ -679,7 +734,7 @@ class OSignature {
               console.log(`UNKNOWN OPERAND '${k}'`);
           }
           if (oldRegIndex !== "0xFF" && oldRegIndex !== sRegIndex)
-            throw new Error(`Register index collission ${oldRegIndex} vs ${sRegIndex}`);
+            throw new Error(`Register index collision ${oldRegIndex} vs ${sRegIndex}`);
         }
       }
     }
@@ -869,117 +924,9 @@ class X86Generator {
     return signatures;
   }
 
-  /*
-  newInstFromInsts(insts) {
-    function GetAccess(inst) {
-      var operands = inst.operands;
-      if (!operands.length) return "";
-
-      var op = operands[0];
-      if (op.read && op.write)
-        return "RW";
-      else if (op.read)
-        return "RO";
-      else
-        return "WO";
-    }
-
-    var inst = insts[0];
-
-    var id       = this.instArray.length;
-    var name     = inst.name;
-    var enum_    = kX86InstPrefix + name[0].toUpperCase() + name.substr(1);
-
-    var opcode   = inst.opcode;
-    var rm       = inst.rm;
-    var mm       = inst.mm;
-    var pp       = inst.pp;
-    var encoding = inst.encoding;
-    var prefix   = inst.prefix;
-
-    var access   = GetAccess(inst);
-
-    var eflags = ["_", "_", "_", "_", "_", "_", "_", "_"];
-
-    for (var flag in inst.eflags) {
-      var fOp = inst.eflags[flag];
-      var fIndex = flag === "OF" ? 0 :
-                   flag === "SF" ? 1 :
-                   flag === "ZF" ? 2 :
-                   flag === "AF" ? 3 :
-                   flag === "PF" ? 4 :
-                   flag === "CF" ? 5 :
-                   flag === "DF" ? 6 : 7;
-      var fChar = fOp === "W" ? "W" :
-                  fOp === "R" ? "R" :
-                  fOp === "X" ? "X" :
-                  fOp === "0" ? "W" :
-                  fOp === "1" ? "W" :
-                  fOp === "U" ? "U" : "#";
-      eflags[fIndex] = fChar;
-    }
-
-    var vexL     = undefined;
-    var vexW     = undefined;
-    var evexW    = undefined;
-
-    for (var i = 1; i < insts.length; i++) {
-      inst = insts[i];
-
-      if (opcode   !== inst.opcode    ) return null;
-      if (rm       !== inst.rm        ) return null;
-      if (mm       !== inst.mm        ) return null;
-      if (pp       !== inst.pp        ) return null;
-      if (encoding !== inst.encoding  ) return null;
-      if (prefix   !== inst.prefix    ) return null;
-      if (access   !== GetAccess(inst)) return null;
-    }
-
-    var obj = AVX512Flags(insts);
-    if (obj) {
-      vexL = obj.vexL;
-      vexW = obj.vexW;
-      evexW = obj.evexW;
-    }
-
-    var ppmm = Utils.padLeft(pp, 2).replace(/ /g, "0") +
-               Utils.padLeft(mm, 4).replace(/ /g, "0") ;
-
-    var composed = composeOpCode({
-      type  : prefix === "VEX" || prefix === "EVEX" ? "V" : "O",
-      prefix: ppmm,
-      opcode: opcode,
-      o     : rm === "r" ? "_" : (rm ? rm : "_"),
-      l     : vexL,
-      w     : vexW,
-      ew    : evexW
-    });
-
-    var iflags = [];
-
-    if (access)
-      iflags.push("F(" + access + ")");
-
-    if (insts[0].prefix === "VEX")
-      iflags.push("F(Vex)");
-
-    return {
-      id            : id,
-      name          : name,
-      enum          : enum_,
-      encoding      : "Enc(?" + encoding + "?)",
-      opcode0       : composed,
-      opcode1       : "U",
-      iflags        : iflags.join(""),
-      eflags        : eflags.join(""),
-      writeIndex    : "0",
-      writeSize     : "0",
-      signatures    : this.signaturesFromInsts(insts),
-      nameIndex     : -1,
-      extendedIndex : ""
-    };
-  }
-  */
+  // --------------------------------------------------------------------------
+  // [Parse]
+  // --------------------------------------------------------------------------
 
   parse(data) {
     // Create database.
@@ -993,8 +940,11 @@ class X86Generator {
       "\\s*EF\\(([A-Z_]+)\\)\\s*," +        // [07] EFLAGS.
       "([^,]+)," +                          // [08] Write-Index.
       "([^,]+)," +                          // [09] Write-Size.
-      "([^\\)]+)," +                        // [10] NameIndex (auto-generated).
-      "([^\\)]+)\\)",                       // [11] ExtIndex  (auto-generated).
+      // --- autogenerated ---
+      "([^\\)]+)," +                        // [10] FamilyType.
+      "([^\\)]+)," +                        // [11] FamilyIndex.
+      "([^\\)]+)," +                        // [12] NameIndex.
+      "([^\\)]+)\\)",                       // [13] ExtIndex.
       "g");
 
     var id = 0;
@@ -1011,19 +961,10 @@ class X86Generator {
       var writeIndex  = Utils.trimLeft(m[8]);
       var writeSize   = Utils.trimLeft(m[9]);
 
-      // opcode1 = "0";
-      //if (iflags.indexOf("|A512") !== -1)
-      //  iflags = iflags.substr(0, iflags.indexOf("|A512")).trim();
+      // if (iflags.indexOf("|A512") !== -1)
+      //   iflags = iflags.substr(0, iflags.indexOf("|A512")).trim();
 
-/*
-      if (iflags.indexOf("A512(") !== -1) {
-        var x = iflags.indexOf("A512(") + 12;
-        opcode0 = opcode0.replace(",_  ", "," + Utils.padLeft(iflags.substr(x, 3), 3));
-        opcode1 = opcode1.replace(",_  ", "," + Utils.padLeft(iflags.substr(x, 3), 3));
-        iflags = iflags.substr(0, x) + iflags.substr(x + 4);
-      }
-*/
-      const insts = x86db.map[name];
+      const insts = x86db.getGroup(name);
       if (!insts) {
         console.log(`INSTRUCTION '${name}' not found in asmdb`);
       }
@@ -1056,8 +997,13 @@ class X86Generator {
         writeIndex    : writeIndex,
         writeSize     : writeSize,
         signatures    : signatures,   // Rows containing instruction signatures.
+
+        familyType    : "kFamilyNone",// Family type.
+        familyIndex   : 0,            // Index to a family-specific data.
+
         nameIndex     : -1,           // Instruction name-index.
-        extendedIndex : "",
+        altOpCodeIndex: -1,           // Index to X86InstDB::altOpCodeTable.
+        commonIndex   : -1,
         signatureIndex: -1,
         signatureCount: -1
       }
@@ -1072,34 +1018,34 @@ class X86Generator {
     console.log("Number of Instructions: " + this.instArray.length);
   }
 
+  // --------------------------------------------------------------------------
+  // [Generate - All]
+  // --------------------------------------------------------------------------
+
   generate(oldData) {
     var data = oldData;
 
-    // Generate new tables.
-    const nameData = this.generateNameData();
-    const signatureData = this.generateSignatureData();
-    const extendedData = this.generateExtendedData();
-    const instData = this.generateInstData();
+    function myInject(key, str) {
+      data = Utils.inject(data,
+        "// ${" + key + ":Begin}\n",
+        "// ${" + key + ":End}\n", str);
+    }
 
-    // Inject auto-generated tables back to the input data.
-    data = Utils.inject(data,
-      "// ${X86InstNameData:Begin}\n",
-      "// ${X86InstNameData:End}\n", nameData);
-
-    data = Utils.inject(data,
-      "// ${X86InstSignatureData:Begin}\n",
-      "// ${X86InstSignatureData:End}\n", signatureData);
-
-    data = Utils.inject(data,
-      "// ${X86InstExtendedData:Begin}\n",
-      "// ${X86InstExtendedData:End}\n", extendedData);
-
-    data = Utils.inject(data,
-      "// ${X86InstData:Begin}\n",
-      "// ${X86InstData:End}\n", instData);
+    // Order doesn't matter here.
+    myInject("nameData"      , this.generateNameData());
+    myInject("sseData"       , this.generateSseData());
+    myInject("altOpCodeData" , this.generateAltOpCodeData());
+    myInject("signatureData" , this.generateSignatureData());
+    // These must be last.
+    myInject("commonData"    , this.generateCommonData());
+    myInject("instData"      , this.generateInstData());
 
     return data;
   }
+
+  // --------------------------------------------------------------------------
+  // [Generate - NameData]
+  // --------------------------------------------------------------------------
 
   generateNameData() {
     const instArray = this.instArray;
@@ -1107,9 +1053,12 @@ class X86Generator {
     const instNames = new IndexedString();
     const instAlpha = new Array(26);
 
+    var maxLength = 0;
+
     for (var i = 0; i < instArray.length; i++) {
       const inst = instArray[i];
       instNames.add(inst.name);
+      maxLength = Math.max(maxLength, inst.name.length);
     }
     instNames.index();
 
@@ -1131,6 +1080,10 @@ class X86Generator {
     s += kDisclaimerStart;
     s += `const char X86InstDB::nameData[] =\n${instNames.format(kIndent, kJustify)}\n`;
     s += `\n`;
+    s += `enum {\n`;
+    s += `  kX86InstMaxLength = ${maxLength}\n`;
+    s += `};\n`;
+    s += `\n`;
     s += `enum X86InstAlphaIndex {\n`;
     s += `  kX86InstAlphaIndexFirst   = 'a',\n`;
     s += `  kX86InstAlphaIndexLast    = 'z',\n`;
@@ -1149,9 +1102,175 @@ class X86Generator {
     s += `};\n`;
     s += kDisclaimerEnd;
 
-    this.sizeStats.InstructionNames = instNames.getSize() + instAlpha.length * 2;
+    this.sizeStats.NameData = instNames.getSize() + instAlpha.length * 2;
     return s;
   }
+
+  // --------------------------------------------------------------------------
+  // [Generate - AltOpCodeData]
+  // --------------------------------------------------------------------------
+
+  generateAltOpCodeData() {
+    const table = new IndexedArray();
+    for (var i = 0; i < this.instArray.length; i++) {
+      const inst = this.instArray[i];
+      inst.altOpCodeIndex = table.addIndexed(Utils.padLeft(inst.opcode1, 26));
+    }
+    this.sizeStats.AltOpCodeData = table.length * 4;
+
+    return kDisclaimerStart +
+           `const uint32_t X86InstDB::altOpCodeData[] = {\n${Utils.format(table, kIndent, true)}\n};\n` +
+           kDisclaimerEnd;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Generate - SseData]
+  // --------------------------------------------------------------------------
+
+  generateSseData() {
+    const instArray = this.instArray;
+    const instMap = this.instMap;
+
+    const table = new IndexedArray();
+
+    function eqOps(aOps, aFrom, bOps, bFrom) {
+      var x = 0;
+      for (;;) {
+        const aIndex = x + aFrom;
+        const bIndex = x + bFrom;
+
+        const aOut = aIndex >= aOps.length;
+        const bOut = bIndex >= bOps.length;
+
+        if (aOut || bOut)
+          return !!(aOut && bOut);
+
+        const aOp = aOps[aIndex];
+        const bOp = bOps[bIndex];
+
+        if (aOp.data !== bOp.data)
+          return false;
+
+        x++;
+      }
+    }
+
+    function getSseToAvxInsts(insts) {
+      const combinations = [];
+      for (var x = 0; x < insts.length; x++) {
+        const inst = insts[x];
+        const ops = inst.operands;
+
+        // SSE instruction does never share its name with AVX one.
+        if (/^(VEX|XOP|EVEX)$/.test(inst.prefix))
+          return null;
+
+        var ok = false;
+        for (var y = 0; y < ops.length; y++) {
+          if (ops[y].reg === "xmm")
+            ok = true;
+
+          // There is no AVX instruction that works with MMX regs.
+          if (ops[y].reg === "mm") {
+            ok = false;
+            break;
+          }
+        }
+
+        if (ok) combinations.push(inst);
+      }
+
+      return combinations.length ? combinations : null;
+    }
+
+    function calcSseToAvxData(insts, out) {
+      const sseInsts = getSseToAvxInsts(insts);
+      if (!sseInsts) return 0;
+
+      const sseName = sseInsts[0].name;
+      const avxName = "v" + sseName;
+      const avxInsts = x86db.getGroup(avxName);
+
+      if (!avxInsts) {
+        console.log(`SseToAvx: Instruction '${sseName}' has no AVX counterpart`);
+        return null;
+      }
+
+      if (avxName === "vblendvpd" || avxName === "vblendvps" || avxName === "vpblendvb") {
+        // Special cases first.
+        out.avxConv = "kAvxConvBlend";
+      }
+      else {
+        // Common case, deduce conversion mode by checking both SSE and AVX instructions' operands.
+        const map = Object.create(null);
+        for (var sseIndex = 0; sseIndex < sseInsts.length; sseIndex++) {
+          const sseInst = sseInsts[sseIndex];
+          var match = false;
+
+          for (var avxIndex = 0; avxIndex < avxInsts.length; avxIndex++) {
+            const avxInst = avxInsts[avxIndex];
+
+            // Select only VEX instructions.
+            if (avxInst.prefix !== "VEX") continue;
+
+            // Check if the AVX version is the same.
+            if (eqOps(avxInst.operands, 0, sseInst.operands, 0)) {
+              map.raw = true;
+              match = true;
+            }
+            else if (avxInst.operands[0].data === "xmm" && eqOps(avxInst.operands, 1, sseInst.operands, 0)) {
+              map.nds = true;
+              match = true;
+            }
+          }
+
+          if (!match) {
+            const signature = sseInst.operands.map(function(op) { return op.data; }).join(", ");
+            console.log(`SseToAvx: Instruction '${sseName}(${signature})' has no AVX counterpart`);
+            return null;
+          }
+        }
+
+        out.avxConv = (map.raw && !map.nds) ? "kAvxConvMove" :
+                      (map.raw &&  map.nds) ? "kAvxConvMoveIfMem" : "kAvxConvNonDestructive";
+      }
+      out.avxDelta = instMap[avxName].id - instMap[sseName].id;
+    }
+
+    for (var i = 0; i < instArray.length; i++) {
+      const inst = instArray[i];
+      const insts = x86db.getGroup(inst.name);
+      if (!insts) continue;
+
+      if (X86Utils.isMmxOrSseInsts(insts)) {
+        if (inst.familyIndex !== 0)
+          throw new Error(`X86Generator.generateSseData(): Instruction '${inst.name}' has already ${inst.familyType}(${inst.familyIndex})`);
+
+        const prefix = "X86Inst::SseData::";
+        const data = {
+          avxConv : "kAvxConvNone", // No conversion by default.
+          avxDelta: 0               // 0 if no conversion is possible.
+        };
+        calcSseToAvxData(insts, data);
+
+        inst.familyType = "kFamilySse";
+        inst.familyIndex = table.addIndexed(
+          "{ " + "0" + ", " +
+                 Utils.padLeft(prefix + data.avxConv, 40) + ", " +
+                 Utils.padLeft(data.avxDelta        ,  4) + " }"
+        );
+      }
+    }
+    this.sizeStats.SseData = table.length * 2;
+
+    return kDisclaimerStart +
+           `const X86Inst::SseData X86InstDB::sseData[] = {\n${Utils.format(table, kIndent, true)}\n};\n` +
+           kDisclaimerEnd;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Generate - SignatureData]
+  // --------------------------------------------------------------------------
 
   generateSignatureData() {
     const instArray = this.instArray;
@@ -1302,72 +1421,44 @@ class X86Generator {
     return s;
   }
 
-  generateExtendedData() {
-    const instArray = this.instArray;
+  // --------------------------------------------------------------------------
+  // [Generate - CommonData]
+  // --------------------------------------------------------------------------
 
-    const extendedMap = Object.create(null);
-    const extendedData = [];
+  generateCommonData() {
+    const table = new IndexedArray();
+    for (var i = 0; i < this.instArray.length; i++) {
+      const inst = this.instArray[i];
 
-    for (var i = 0; i < instArray.length; i++) {
-      const inst = instArray[i];
+      const eflagsIn    = Utils.decToHex(getEFlagsMask(inst.eflags, "RX" ), 2);
+      const eflagsOut   = Utils.decToHex(getEFlagsMask(inst.eflags, "WXU"), 2);
 
-      const encoding    = inst.encoding;
-      const opcode1     = inst.opcode1;
-      const iflags      = inst.iflags;
-      const eflagsIn    = decToHex(getEFlagsMask(inst.eflags, "RX" ), 2);
-      const eflagsOut   = decToHex(getEFlagsMask(inst.eflags, "WXU"), 2);
-      const writeIndex  = inst.writeIndex;
-      const writeSize   = inst.writeSize;
-      const signIndex   = inst.signatureIndex;
-      const signCount   = inst.signatureCount;
-
-      var extData = Utils.padLeft(encoding   , 24) + ", " +
-                    Utils.padLeft(writeIndex ,  3) + ", " +
-                    Utils.padLeft(writeSize  ,  3) + ", " +
-                    eflagsIn                       + ", " +
-                    eflagsOut                      + ", " +
-                    Utils.padLeft(signIndex  ,  3) + ", " +
-                    Utils.padLeft(signCount  ,  2) + ", " +
-                    "0"                            + ", " +
-                    Utils.padLeft(iflags     , 38) + ", " +
-                    Utils.padLeft(opcode1    , 26) ;
-      var extIndex = -1;
-
-      if (hasOwn.call(extendedMap, extData)) {
-        extIndex = extendedMap[extData];
-      }
-      else {
-        extIndex = extendedData.length;
-        extendedData.push(extData);
-        extendedMap[extData] = extIndex;
-      }
-
-      inst.extendedIndex = extIndex;
+      const item = "{ " + Utils.padLeft(inst.iflags        , 38) + ", " +
+                          Utils.padLeft(inst.writeIndex    ,  3) + ", " +
+                          Utils.padLeft(inst.writeSize     ,  3) + ", " +
+                          eflagsIn                               + ", " +
+                          eflagsOut                              + ", " +
+                          Utils.padLeft(inst.altOpCodeIndex,  3) + ", " +
+                          Utils.padLeft(inst.signatureIndex,  3) + ", " +
+                          Utils.padLeft(inst.signatureCount,  2) + ", 0 }";
+      inst.commonIndex = table.addIndexed(item);
     }
+    this.sizeStats.CommonData = table.length * 12;
 
-    var s = "";
-
-    s += kDisclaimerStart;
-    s += "const X86Inst::ExtendedData X86InstDB::iExtData[] = {\n";
-    for (i = 0; i < extendedData.length; i++) {
-      s += `${kIndent}{ ${extendedData[i]} }`;
-      s += (i === extendedData.length - 1) ? "\n" : ",\n";
-    }
-    s += "};\n";
-    s += kDisclaimerEnd;
-
-    this.sizeStats.ExtendedData = extendedData.length * 16;
-    return s;
+    return kDisclaimerStart +
+           `const X86Inst::CommonData X86InstDB::commonData[] = {\n${Utils.format(table, kIndent, true)}\n};\n` +
+           kDisclaimerEnd;
   }
 
+  // --------------------------------------------------------------------------
+  // [Generate - InstData]
+  // --------------------------------------------------------------------------
+
   generateInstData() {
-    const instArray = this.instArray;
-    var s = "";
+    this.sizeStats.InstData = this.instArray.length * 12;
 
-    for (var i = 0; i < instArray.length; i++) {
-      const inst = instArray[i];
-
-      s += "  INST(" +
+    return Utils.format(this.instArray, kIndent, false, function(inst) {
+      return "INST(" +
         Utils.padLeft(inst.enum.substr(kX86InstPrefix.length), 16) + ", " +
         Utils.padLeft(`"${inst.name}"`   , 18) + ", " +
         Utils.padLeft(inst.encoding      , 23) + ", " +
@@ -1377,17 +1468,18 @@ class X86Generator {
         "EF(" + inst.eflags + "), " +
         Utils.padLeft(inst.writeIndex    ,  1) + ", " +
         Utils.padLeft(inst.writeSize     ,  1) + ", " +
+        Utils.padLeft(inst.familyType    , 11) + ", " +
+        Utils.padLeft(inst.familyIndex   ,  3) + ", " +
         Utils.padLeft(inst.nameIndex     ,  4) + ", " +
-        Utils.padLeft(inst.extendedIndex ,  3) + ")";
-      s += (i === instArray.length - 1) ? "\n" : ",\n";
-    }
-
-    this.sizeStats.InstructionData = instArray.length * 8;
-    return s;
+        Utils.padLeft(inst.commonIndex   ,  3) + ")";
+    }) + "\n  ";
   }
 
+  // --------------------------------------------------------------------------
+  // [Print]
+  // --------------------------------------------------------------------------
+
   printMissing() {
-    const instMap = this.instMap;
     const instArray = this.instArray;
 
     var out = "";
@@ -1404,7 +1496,7 @@ class X86Generator {
 
     x86db.getInstructionNames().forEach(function(name) {
       var insts = x86db.getGroup(name);
-      if (!instMap[name]) {
+      if (!this.instMap[name]) {
         console.log(`MISSING INSTRUCTION '${name}'`);
         /*
         var inst = this.newInstFromInsts(insts);
@@ -1449,6 +1541,48 @@ class X86Generator {
 // ----------------------------------------------------------------------------
 // [Main]
 // ----------------------------------------------------------------------------
+
+function main() {
+  var g = new X86Generator();
+  var data = fs.readFileSync(kFileName, "utf8").replace(/\r\n/g, "\n");
+
+  g.parse(data);
+  g.printMissing();
+  var newData = g.generate(data);
+  g.printStats();
+
+  // Save only if modified.
+  if (newData !== data) {
+    fs.writeFileSync(kFileName + ".backup", data, "utf8");
+    fs.writeFileSync(kFileName, newData, "utf8");
+  }
+}
+main();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 function genAPI() {
   var asm = fs.readFileSync("../src/asmjit/x86/x86assembler.h", "utf8");
@@ -1769,21 +1903,115 @@ function genOpcodeH() {
   console.log(out);
 }
 */
-function main() {
-  var g = new X86Generator();
-  var data = fs.readFileSync(kFileName, "utf8").replace(/\r\n/g, "\n");
 
-  g.parse(data);
-  g.printMissing();
-  var newData = g.generate(data);
-  g.printStats();
-
-  // Save only if modified.
   /*
-  if (newData !== data) {
-    fs.writeFileSync(kFileName + ".backup", data, "utf8");
-    fs.writeFileSync(kFileName, newData, "utf8");
+  newInstFromInsts(insts) {
+    function GetAccess(inst) {
+      var operands = inst.operands;
+      if (!operands.length) return "";
+
+      var op = operands[0];
+      if (op.read && op.write)
+        return "RW";
+      else if (op.read)
+        return "RO";
+      else
+        return "WO";
+    }
+
+    var inst = insts[0];
+
+    var id       = this.instArray.length;
+    var name     = inst.name;
+    var enum_    = kX86InstPrefix + name[0].toUpperCase() + name.substr(1);
+
+    var opcode   = inst.opcode;
+    var rm       = inst.rm;
+    var mm       = inst.mm;
+    var pp       = inst.pp;
+    var encoding = inst.encoding;
+    var prefix   = inst.prefix;
+
+    var access   = GetAccess(inst);
+
+    var eflags = ["_", "_", "_", "_", "_", "_", "_", "_"];
+
+    for (var flag in inst.eflags) {
+      var fOp = inst.eflags[flag];
+      var fIndex = flag === "OF" ? 0 :
+                   flag === "SF" ? 1 :
+                   flag === "ZF" ? 2 :
+                   flag === "AF" ? 3 :
+                   flag === "PF" ? 4 :
+                   flag === "CF" ? 5 :
+                   flag === "DF" ? 6 : 7;
+      var fChar = fOp === "W" ? "W" :
+                  fOp === "R" ? "R" :
+                  fOp === "X" ? "X" :
+                  fOp === "0" ? "W" :
+                  fOp === "1" ? "W" :
+                  fOp === "U" ? "U" : "#";
+      eflags[fIndex] = fChar;
+    }
+
+    var vexL     = undefined;
+    var vexW     = undefined;
+    var evexW    = undefined;
+
+    for (var i = 1; i < insts.length; i++) {
+      inst = insts[i];
+
+      if (opcode   !== inst.opcode    ) return null;
+      if (rm       !== inst.rm        ) return null;
+      if (mm       !== inst.mm        ) return null;
+      if (pp       !== inst.pp        ) return null;
+      if (encoding !== inst.encoding  ) return null;
+      if (prefix   !== inst.prefix    ) return null;
+      if (access   !== GetAccess(inst)) return null;
+    }
+
+    var obj = AVX512Flags(insts);
+    if (obj) {
+      vexL = obj.vexL;
+      vexW = obj.vexW;
+      evexW = obj.evexW;
+    }
+
+    var ppmm = Utils.padLeft(pp, 2).replace(/ /g, "0") +
+               Utils.padLeft(mm, 4).replace(/ /g, "0") ;
+
+    var composed = composeOpCode({
+      type  : prefix === "VEX" || prefix === "EVEX" ? "V" : "O",
+      prefix: ppmm,
+      opcode: opcode,
+      o     : rm === "r" ? "_" : (rm ? rm : "_"),
+      l     : vexL,
+      w     : vexW,
+      ew    : evexW
+    });
+
+    var iflags = [];
+
+    if (access)
+      iflags.push("F(" + access + ")");
+
+    if (insts[0].prefix === "VEX")
+      iflags.push("F(Vex)");
+
+    return {
+      id            : id,
+      name          : name,
+      enum          : enum_,
+      encoding      : "Enc(?" + encoding + "?)",
+      opcode0       : composed,
+      opcode1       : "U",
+      iflags        : iflags.join(""),
+      eflags        : eflags.join(""),
+      writeIndex    : "0",
+      writeSize     : "0",
+      signatures    : this.signaturesFromInsts(insts),
+      nameIndex     : -1,
+      commonIndex   : -1
+    };
   }
   */
-}
-main();

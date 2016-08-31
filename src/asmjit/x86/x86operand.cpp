@@ -135,12 +135,12 @@ UNIT(x86_operand) {
   INFO("Checking XYZ register properties");
   EXPECT(X86Vec().isReg() == false);
   // Converts a XYZ register to a type of the passed register, but keeps the ID.
-  EXPECT(x86::xmm4.as(x86::ymm10) == x86::ymm4);
-  EXPECT(x86::xmm4.as(x86::zmm11) == x86::zmm4);
-  EXPECT(x86::ymm5.as(x86::xmm12) == x86::xmm5);
-  EXPECT(x86::ymm5.as(x86::zmm13) == x86::zmm5);
-  EXPECT(x86::zmm6.as(x86::xmm14) == x86::xmm6);
-  EXPECT(x86::zmm6.as(x86::ymm15) == x86::ymm6);
+  EXPECT(x86::xmm4.cloneAs(x86::ymm10) == x86::ymm4);
+  EXPECT(x86::xmm4.cloneAs(x86::zmm11) == x86::zmm4);
+  EXPECT(x86::ymm5.cloneAs(x86::xmm12) == x86::xmm5);
+  EXPECT(x86::ymm5.cloneAs(x86::zmm13) == x86::zmm5);
+  EXPECT(x86::zmm6.cloneAs(x86::xmm14) == x86::xmm6);
+  EXPECT(x86::zmm6.cloneAs(x86::ymm15) == x86::ymm6);
 
   INFO("Checking if default constructed regs behave as expected");
   EXPECT(X86Reg().isValid() == false);

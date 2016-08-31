@@ -98,7 +98,7 @@ Label CodeEmitter::getLabelByName(const char* name, size_t nameLength, uint32_t 
 // ============================================================================
 
 Error CodeEmitter::finalize() {
-  // Finalization does nothing by default, overridden by `X86Compiler`.
+  // Finalization does nothing by default, overridden by `CodeBuilder`.
   return kErrorOk;
 }
 

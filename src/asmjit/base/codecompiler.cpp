@@ -102,6 +102,51 @@ CCHint* CodeCompiler::newHintNode(Reg& r, uint32_t hint, uint32_t value) noexcep
 // [asmjit::CodeCompiler - Func]
 // ============================================================================
 
+CCFunc* CodeCompiler::newFunc(const FuncSignature& sign) noexcept {
+  Error err;
+
+  CCFunc* func = newNodeT<CCFunc>();
+  if (!func) goto _NoMemory;
+
+  err = registerLabelNode(func);
+  if (ASMJIT_UNLIKELY(err)) {
+    // TODO: Calls setLastError, maybe rethink noexcept?
+    setLastError(err);
+    return nullptr;
+  }
+
+  // Create helper nodes.
+  func->_end = newNodeT<CBSentinel>();
+  func->_exitNode = newLabelNode();
+  if (!func->_exitNode || !func->_end) goto _NoMemory;
+
+  // Function prototype.
+  err = func->getDetail().init(sign);
+  if (err != kErrorOk) {
+    setLastError(err);
+    return nullptr;
+  }
+
+  // Override the natural stack alignment of the calling convention to what's
+  // specified by CodeInfo.
+  func->_funcDetail._callConv.setNaturalStackAlignment(_codeInfo.getStackAlignment());
+
+  // Allocate space for function arguments.
+  func->_args = nullptr;
+  if (func->getArgCount() != 0) {
+    func->_args = _cbHeap.allocT<VirtReg*>(func->getArgCount() * sizeof(VirtReg*));
+    if (!func->_args) goto _NoMemory;
+
+    ::memset(func->_args, 0, func->getArgCount() * sizeof(VirtReg*));
+  }
+
+  return func;
+
+_NoMemory:
+  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  return nullptr;
+}
+
 CCFunc* CodeCompiler::addFunc(CCFunc* func) {
   ASMJIT_ASSERT(_func == nullptr);
   _func = func;
@@ -113,6 +158,121 @@ CCFunc* CodeCompiler::addFunc(CCFunc* func) {
 
   _setCursor(cursor);
   return func;
+}
+
+CCFunc* CodeCompiler::addFunc(const FuncSignature& sign) {
+  CCFunc* func = newFunc(sign);
+
+  if (!func) {
+    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    return nullptr;
+  }
+
+  return addFunc(func);
+}
+
+CBSentinel* CodeCompiler::endFunc() {
+  CCFunc* func = getFunc();
+  if (!func) {
+    // TODO:
+    return nullptr;
+  }
+
+  // Add the local constant pool at the end of the function (if exist).
+  setCursor(func->getExitNode());
+
+  if (_localConstPool) {
+    addNode(_localConstPool);
+    _localConstPool = nullptr;
+  }
+
+  // Mark as finished.
+  func->_isFinished = true;
+  _func = nullptr;
+
+  setCursor(func->getEnd());
+  return func->getEnd();
+}
+
+// ============================================================================
+// [asmjit::CodeCompiler - Ret]
+// ============================================================================
+
+CCFuncRet* CodeCompiler::newRet(const Operand_& o0, const Operand_& o1) noexcept {
+  CCFuncRet* node = newNodeT<CCFuncRet>(o0, o1);
+  if (!node) {
+    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+    return nullptr;
+  }
+  return node;
+}
+
+CCFuncRet* CodeCompiler::addRet(const Operand_& o0, const Operand_& o1) noexcept {
+  CCFuncRet* node = newRet(o0, o1);
+  if (!node) return nullptr;
+  return static_cast<CCFuncRet*>(addNode(node));
+}
+
+// ============================================================================
+// [asmjit::CodeCompiler - Call]
+// ============================================================================
+
+CCFuncCall* CodeCompiler::newCall(uint32_t instId, const Operand_& o0, const FuncSignature& sign) noexcept {
+  Error err;
+  uint32_t nArgs;
+
+  CCFuncCall* node = _cbHeap.allocT<CCFuncCall>(sizeof(CCFuncCall) + sizeof(Operand));
+  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CCFuncCall));
+
+  if (ASMJIT_UNLIKELY(!node))
+    goto _NoMemory;
+
+  opArray[0].copyFrom(o0);
+  new (node) CCFuncCall(this, instId, 0, opArray, 1);
+
+  if ((err = node->getDetail().init(sign)) != kErrorOk) {
+    setLastError(err);
+    return nullptr;
+  }
+
+  // If there are no arguments skip the allocation.
+  if ((nArgs = sign.getArgCount()) == 0)
+    return node;
+
+  node->_args = static_cast<Operand*>(_cbHeap.alloc(nArgs * sizeof(Operand)));
+  if (!node->_args) goto _NoMemory;
+
+  ::memset(node->_args, 0, nArgs * sizeof(Operand));
+  return node;
+
+_NoMemory:
+  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  return nullptr;
+}
+
+CCFuncCall* CodeCompiler::addCall(uint32_t instId, const Operand_& o0, const FuncSignature& sign) noexcept {
+  CCFuncCall* node = newCall(instId, o0, sign);
+  if (!node) return nullptr;
+  return static_cast<CCFuncCall*>(addNode(node));
+}
+
+// ============================================================================
+// [asmjit::CodeCompiler - Vars]
+// ============================================================================
+
+Error CodeCompiler::setArg(uint32_t argIndex, const Reg& r) {
+  CCFunc* func = getFunc();
+
+  if (!func)
+    return setLastError(DebugUtils::errored(kErrorInvalidState));
+
+  if (!isVirtRegValid(r))
+    return setLastError(DebugUtils::errored(kErrorInvalidVirtId));
+
+  VirtReg* vr = getVirtReg(r);
+  func->setArg(argIndex, vr);
+
+  return kErrorOk;
 }
 
 // ============================================================================

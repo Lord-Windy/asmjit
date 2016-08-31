@@ -60,40 +60,37 @@ endfunction()
 set(CXX_DEFINE "-D")      # Define preprocessor macro: "${CXX_DEFINE}VAR=1"
 set(CXX_INCLUDE "-I")     # Define include directory : "${CXX_INCLUDE}PATH"
 
+set(CXX_CFLAGS_SSE    "") # Compiler flags to build a file that uses SSE    intrinsics.
+set(CXX_CFLAGS_SSE2   "") # Compiler flags to build a file that uses SSE2   intrinsics.
+set(CXX_CFLAGS_SSE3   "") # Compiler flags to build a file that uses SSE3   intrinsics.
+set(CXX_CFLAGS_SSSE3  "") # Compiler flags to build a file that uses SSSE3  intrinsics.
+set(CXX_CFLAGS_SSE4_1 "") # Compiler flags to build a file that uses SSE4.1 intrinsics.
+set(CXX_CFLAGS_SSE4_2 "") # Compiler flags to build a file that uses SSE4.2 intrinsics.
+set(CXX_CFLAGS_AVX    "") # Compiler flags to build a file that uses AVX    intrinsics.
+set(CXX_CFLAGS_AVX2   "") # Compiler flags to build a file that uses AVX2   intrinsics.
+
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   set(CXX_DEFINE "/D")
   set(CXX_INCLUDE "/I")
-endif()
 
-set(CXX_CFLAGS_SSE    "") # Cflags to build a file that uses SSE    intrinsics.
-set(CXX_CFLAGS_SSE2   "") # Cflags to build a file that uses SSE2   intrinsics.
-set(CXX_CFLAGS_SSE3   "") # Cflags to build a file that uses SSE3   intrinsics.
-set(CXX_CFLAGS_SSSE3  "") # Cflags to build a file that uses SSSE3  intrinsics.
-set(CXX_CFLAGS_SSE4_1 "") # Cflags to build a file that uses SSE4.1 intrinsics.
-set(CXX_CFLAGS_SSE4_2 "") # Cflags to build a file that uses SSE4.2 intrinsics.
-set(CXX_CFLAGS_AVX    "") # Cflags to build a file that uses AVX    intrinsics.
-set(CXX_CFLAGS_AVX2   "") # Cflags to build a file that uses AVX2   intrinsics.
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   if(CMAKE_CL_64)
+    # 64-bit MSVC compiler doesn't like /arch:SSE[2] as it's implicit.
     list(APPEND CXX_CFLAGS_SSE "${CXX_DEFINE}__SSE__=1")
     list(APPEND CXX_CFLAGS_SSE2 "${CXX_DEFINE}__SSE__=1;${CXX_DEFINE}__SSE2__=1")
   else()
     cxx_detect_cflags(CXX_CFLAGS_SSE "/arch:SSE")
-    if (CXX_CFLAGS_SSE)
+    if(CXX_CFLAGS_SSE)
       list(APPEND CXX_CFLAGS_SSE "${CXX_DEFINE}__SSE__=1")
     endif()
 
     cxx_detect_cflags(CXX_CFLAGS_SSE2 "/arch:SSE2")
-    if (CXX_CFLAGS_SSE2)
+    if(CXX_CFLAGS_SSE2)
       list(APPEND CXX_CFLAGS_SSE2 "${CXX_DEFINE}__SSE__=1;${CXX_DEFINE}__SSE2__=1")
     endif()
   endif()
 
-  cxx_detect_cflags(CXX_CFLAGS_AVX  "/arch:AVX")
-  cxx_detect_cflags(CXX_CFLAGS_AVX2 "/arch:AVX2")
-
-  # Unify definitions used by GCC and Clang with MSVC.
+  # MSVC doesn't provide any preprocessor definitions to detect SSE3+,
+  # these unify MSVC with definitions defined by Clang|GCC|Intel.
   if(CXX_CFLAGS_SSE2)
     list(APPEND CXX_CFLAGS_SSE3   "${CXX_CFLAGS_SSE2};${CXX_DEFINE}__SSE3__=1")
     list(APPEND CXX_CFLAGS_SSSE3  "${CXX_CFLAGS_SSE3};${CXX_DEFINE}__SSSE3__=1")
@@ -101,12 +98,31 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     list(APPEND CXX_CFLAGS_SSE4_2 "${CXX_CFLAGS_SSE4_1};${CXX_DEFINE}__SSE4_2__=1")
   endif()
 
+  # When using AVX and AVX2 MSVC does define '__AVX__' and '__AVX2__', respectively.
+  cxx_detect_cflags(CXX_CFLAGS_AVX  "/arch:AVX")
+  cxx_detect_cflags(CXX_CFLAGS_AVX2 "/arch:AVX2")
+
   if(CXX_CFLAGS_AVX)
     list(APPEND CXX_CFLAGS_AVX "${CXX_DEFINE}__SSE__=1;${CXX_DEFINE}__SSE2__=1;${CXX_DEFINE}__SSE3__=1;${CXX_DEFINE}__SSSE3__=1;${CXX_DEFINE}__SSE4_1__=1;${CXX_DEFINE}__SSE4_2__=1")
   endif()
   if(CXX_CFLAGS_AVX2)
     list(APPEND CXX_CFLAGS_AVX2 "${CXX_DEFINE}__SSE__=1;${CXX_DEFINE}__SSE2__=1;${CXX_DEFINE}__SSE3__=1;${CXX_DEFINE}__SSSE3__=1;${CXX_DEFINE}__SSE4_1__=1;${CXX_DEFINE}__SSE4_2__=1")
   endif()
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND WIN32)
+  # Intel on Windows uses CL syntax.
+  set(CXX_DEFINE "/D")
+  set(CXX_INCLUDE "/I")
+
+  # Intel deprecated /arch:SSE, so it's implicit. In contrast to MSVC, Intel
+  # also provides /arch:SSE3+ options and uses the same definitions as GCC
+  # and Clang, so no magic needed here.
+  cxx_detect_cflags(CXX_CFLAGS_SSE2   "/arch:SSE2")
+  cxx_detect_cflags(CXX_CFLAGS_SSE3   "/arch:SSE3")
+  cxx_detect_cflags(CXX_CFLAGS_SSSE3  "/arch:SSSE3")
+  cxx_detect_cflags(CXX_CFLAGS_SSE4_1 "/arch:SSE4.1")
+  cxx_detect_cflags(CXX_CFLAGS_SSE4_2 "/arch:SSE4.2")
+  cxx_detect_cflags(CXX_CFLAGS_AVX    "/arch:AVX")
+  cxx_detect_cflags(CXX_CFLAGS_AVX2   "/arch:AVX2")
 else()
   cxx_detect_cflags(CXX_CFLAGS_SSE    "-msse")
   cxx_detect_cflags(CXX_CFLAGS_SSE2   "-msse2")

@@ -139,9 +139,9 @@ ASMJIT_ENUM(X86FpCw) {
 // [asmjit::X86Inst]
 // ============================================================================
 
-//! X86/X64 instruction information.
+//! X86/X64 instruction data.
 struct X86Inst {
-  //! X86/X64 instruction id.
+  //! Instruction id.
   //!
   //! Note that these instruction codes are AsmJit specific. Each instruction
   //! has a unique ID that is used as an index to AsmJit instruction table. The
@@ -1552,55 +1552,16 @@ struct X86Inst {
 
     _kIdCount,
 
-    _kIdCmovcc            = kIdCmova,
-    _kIdJcc               = kIdJa,
-    _kIdSetcc             = kIdSeta,
+    _kIdCmovcc = kIdCmova,
+    _kIdJcc    = kIdJa,
+    _kIdSetcc  = kIdSeta,
 
-    _kIdJbegin            = kIdJa,
-    _kIdJend              = kIdJmp
+    _kIdJbegin = kIdJa,
+    _kIdJend   = kIdJmp
   };
 
-  //! X86/X64 instruction options.
-  ASMJIT_ENUM(Options) {
-    // NOTE: Don't collide with bits used by CodeEmitter::Options.
-
-    // CodeEmitter opts.  = 0x000003F3U
-
-    kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
-    kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).
-
-    kOptionK              = CodeEmitter::kOptionHasOpExtra,
-
-    kOptionShortForm      = 0x00000400U, //!< Emit short-form of the instruction.
-    kOptionLongForm       = 0x00000800U, //!< Emit long-form of the instruction.
-
-    kOptionTaken          = 0x00001000U, //!< JCC likely to be taken (historic, only takes effect on P4).
-    kOptionNotTaken       = 0x00002000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
-    kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
-    kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
-
-    kOptionSAE            = 0x00020000U, //!< AVX-512: 'suppress-all-exceptions' {sae}.
-    kOptionER             = 0x00040000U, //!< AVX-512: 'rounding-control' {rc} and {sae}.
-
-    kOption1ToX           = 0x00100000U, //!< AVX-512: broadcast the first element to all {1tox}.
-    kOptionRN_SAE         = 0x00000000U, //!< AVX-512: round-to-nearest (even)      {rn-sae} (bits 00).
-    kOptionRD_SAE         = 0x00200000U, //!< AVX-512: round-down (toward -inf)     {rd-sae} (bits 01).
-    kOptionRU_SAE         = 0x00400000U, //!< AVX-512: round-up (toward +inf)       {ru-sae} (bits 10).
-    kOptionRZ_SAE         = 0x00600000U, //!< AVX-512: round-toward-zero (truncate) {rz-sae} (bits 11).
-    kOptionKZ             = 0x00800000U, //!< AVX-512: Use zeroing {k}{z} instead of merging {k}.
-
-    _kOptionInvalidRex    = 0x01000000U, //!< REX prefix can't be emitted (internal).
-    kOptionOpCodeB        = 0x02000000U, //!< REX.B and/or VEX.B field (X64).
-    kOptionOpCodeX        = 0x04000000U, //!< REX.X and/or VEX.X field (X64).
-    kOptionOpCodeR        = 0x08000000U, //!< REX.R and/or VEX.R field (X64).
-    kOptionOpCodeW        = 0x10000000U, //!< REX.W and/or VEX.W field (X64).
-    kOptionRex            = 0x80000000U  //!< Use REX prefix (X64) (must be 0x80000000).
-  };
-
-  //! \internal
-  //!
-  //! X86/X64 instruction encoding, used by \ref X86Assembler.
-  ASMJIT_ENUM(Encoding) {
+  //! Instruction encodings, used by \ref X86Assembler.
+  ASMJIT_ENUM(EncodingType) {
     kEncodingNone = 0,                   //!< Never used.
     kEncodingX86Op,                      //!< X86 [OP].
     kEncodingX86Op_O,                    //!< X86 [OP] (opcode and /0-7).
@@ -1720,9 +1681,19 @@ struct X86Inst {
     _kEncodingCount                      //!< Count of instruction encodings.
   };
 
+  //! Instruction family.
+  //!
+  //! Specifies which table should be used to interpret `_familyDataIndex`.
+  ASMJIT_ENUM(FamilyType) {
+    kFamilyNone           = 0,           //!< General purpose or special instruction.
+    kFamilyFpu            = 1,           //!< FPU family instruction.
+    kFamilySse            = 2,           //!< MMX+/SSE+ family instruction (including SHA/SSE4A).
+    kFamilyAvx            = 3            //!< AVX+/FMA+ family instruction (including AVX-512).
+  };
+
   //! \internal
   //!
-  //! X86/X64 instruction flags.
+  //! Instruction flags.
   ASMJIT_ENUM(InstFlags) {
     kInstFlagNone         = 0x00000000U, //!< No flags.
 
@@ -1790,9 +1761,7 @@ struct X86Inst {
     kInstFlagEvexSet_VBMI = 0x07000000U  //!< Supported by AVX512-VBMI.
   };
 
-  //! \internal
-  //!
-  //! X86/X64 instruction opcode data.
+  //! Specifies meaning of all bits in an opcode (AsmJit specific).
   //!
   //! This schema is AsmJit specific and has been designed to allow encoding of
   //! all X86 instructions available. X86, MMX, and SSE+ instructions always use
@@ -2041,7 +2010,44 @@ struct X86Inst {
     kOpCode_LL_512        = 0x02U << kOpCode_LL_Shift
   };
 
-  //! X86/X64 condition codes.
+  //! Instruction options.
+  ASMJIT_ENUM(Options) {
+    // NOTE: Don't collide with bits used by CodeEmitter::Options.
+
+    // CodeEmitter opts.  = 0x000003F3U
+
+    kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
+    kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).
+
+    kOptionK              = CodeEmitter::kOptionHasOpExtra,
+
+    kOptionShortForm      = 0x00000400U, //!< Emit short-form of the instruction.
+    kOptionLongForm       = 0x00000800U, //!< Emit long-form of the instruction.
+
+    kOptionTaken          = 0x00001000U, //!< JCC likely to be taken (historic, only takes effect on P4).
+    kOptionNotTaken       = 0x00002000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
+    kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
+    kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
+
+    kOptionSAE            = 0x00020000U, //!< AVX-512: 'suppress-all-exceptions' {sae}.
+    kOptionER             = 0x00040000U, //!< AVX-512: 'rounding-control' {rc} and {sae}.
+
+    kOption1ToX           = 0x00100000U, //!< AVX-512: broadcast the first element to all {1tox}.
+    kOptionRN_SAE         = 0x00000000U, //!< AVX-512: round-to-nearest (even)      {rn-sae} (bits 00).
+    kOptionRD_SAE         = 0x00200000U, //!< AVX-512: round-down (toward -inf)     {rd-sae} (bits 01).
+    kOptionRU_SAE         = 0x00400000U, //!< AVX-512: round-up (toward +inf)       {ru-sae} (bits 10).
+    kOptionRZ_SAE         = 0x00600000U, //!< AVX-512: round-toward-zero (truncate) {rz-sae} (bits 11).
+    kOptionKZ             = 0x00800000U, //!< AVX-512: Use zeroing {k}{z} instead of merging {k}.
+
+    _kOptionInvalidRex    = 0x01000000U, //!< REX prefix can't be emitted (internal).
+    kOptionOpCodeB        = 0x02000000U, //!< REX.B and/or VEX.B field (X64).
+    kOptionOpCodeX        = 0x04000000U, //!< REX.X and/or VEX.X field (X64).
+    kOptionOpCodeR        = 0x08000000U, //!< REX.R and/or VEX.R field (X64).
+    kOptionOpCodeW        = 0x10000000U, //!< REX.W and/or VEX.W field (X64).
+    kOptionRex            = 0x80000000U  //!< Use REX prefix (X64) (must be 0x80000000).
+  };
+
+  //! Condition codes.
   ASMJIT_ENUM(Cond) {
     kCondA                = 0x07U,       // CF==0 & ZF==0          (unsigned)
     kCondAE               = 0x03U,       // CF==0                  (unsigned)
@@ -2108,7 +2114,7 @@ struct X86Inst {
     kCondNone             = 0x12
   };
 
-  //! X86/X64 comparison predicate used by CMP[PD|PS|SD|SS] instructions.
+  //! Comparison predicate used by CMP[PD|PS|SD|SS] instructions.
   ASMJIT_ENUM(CmpPredicate) {
     kCmpEQ                = 0x00,        //!< Equal             (Quiet).
     kCmpLT                = 0x01,        //!< Less              (Signaling).
@@ -2120,7 +2126,7 @@ struct X86Inst {
     kCmpORD               = 0x07         //!< Ordered           (Quiet).
   };
 
-  //! X86/X64 comparison predicate used by VCMP[PD|PS|SD|SS] instructions.
+  //! Comparison predicate used by VCMP[PD|PS|SD|SS] instructions.
   //!
   //! The first 8 values are compatible with \ref CmpPredicate.
   ASMJIT_ENUM(VCmpPredicate) {
@@ -2158,17 +2164,17 @@ struct X86Inst {
     kVCmpTRUE_US          = 0x1F         //!< True              (Signaling, Unordered).
   };
 
-  //! X86/X64 round predicate used by ROUND[PD|PS|SD|SS] instructions.
+  //! Round predicate used by ROUND[PD|PS|SD|SS] instructions.
   ASMJIT_ENUM(RoundPredicate) {
     kRoundNearest         = 0x00,        //!< Round to nearest (even).
     kRoundDown            = 0x01,        //!< Round to down toward -INF (floor),
     kRoundUp              = 0x02,        //!< Round to up toward +INF (ceil).
     kRoundTrunc           = 0x03,        //!< Round toward zero (truncate).
     kRoundCurrent         = 0x04,        //!< Round to the current rounding mode set (ignores other RC bits).
-    kRoundInexact         = 0x08         //!< Avoid the inexact exception, if set.
+    kRoundInexact         = 0x08         //!< Avoids inexact exception, if set.
   };
 
-  //! X86/X64 prefetch hints used by PREFETCH instruction.
+  //! Prefetch hints used by PREFETCH instruction.
   ASMJIT_ENUM(PrefetchHint) {
     kPrefetchNTA          = 0,           //!< Prefetch by using NT hint.
     kPrefetchT0           = 1,           //!< Prefetch to L0 cache.
@@ -2177,7 +2183,7 @@ struct X86Inst {
   };
 
   //! Supported architectures.
-  enum ArchMask {
+  ASMJIT_ENUM(ArchMask) {
     kArchMaskX86          = 0x01,        //!< X86 encoding supported.
     kArchMaskX64          = 0x02         //!< X64 encoding supported.
   };
@@ -2243,42 +2249,16 @@ struct X86Inst {
     kMemOpAny             = 0x8000U      //!< Operand can be any scalar memory pointer.
   };
 
-  //! Instruction signature.
-  //!
-  //! Contains a sequence of operands' combinations and other metadata that define
-  //! a single instruction. This data is mostly used for instruction validation.
-  struct ISignature {
-    uint8_t opCount : 3;                 //!< Count of operands in `opIndex` (0..6).
-    uint8_t archMask : 2;                //!< Architecture mask of this record.
-    uint8_t implicit : 3;                //!< Number of implicit operands.
-    uint8_t reserved;                    //!< Reserved for future use.
-    uint8_t operands[6];                 //!< Indexes to `OSignature` array.
-  };
-
-  //! Operand signature, used by \ref ISignature.
-  //!
-  //! Contains all possible operand combinations, memory size information,
-  //! and register index (or \ref kInvalidReg if any register can be used).
-  struct OSignature {
-    uint32_t flags;                      //!< Operand flags.
-    uint16_t memFlags;                   //!< Memory flags.
-    uint8_t extFlags;                    //!< Extra flags.
-    uint8_t regId;                       //!< Register index or 0xFF (if not used).
-  };
-
-  //! Extended data shares common data used by 1 or more instructions.
-  struct ExtendedData {
+  //! Common data - aggregated data that is shared across many instructions.
+  struct CommonData {
     // ------------------------------------------------------------------------
     // [Accessors]
     // ------------------------------------------------------------------------
 
-    //! Get instruction encoding, see \ref Encoding.
-    ASMJIT_INLINE uint32_t getEncoding() const noexcept { return _encoding; }
-
     //! Get all instruction flags, see \ref InstFlags.
-    ASMJIT_INLINE uint32_t getFlags() const noexcept { return _instFlags; }
+    ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
     //! Get whether the instruction has a `flag`, see `InstFlags`.
-    ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_instFlags & flag) != 0; }
+    ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
 
     //! Get if the first operand is read-only.
     ASMJIT_INLINE bool isRO() const noexcept { return (getFlags() & kInstFlagRW) == kInstFlagRO; }
@@ -2334,70 +2314,136 @@ struct X86Inst {
     //! bytes.
     ASMJIT_INLINE uint32_t getWriteSize() const noexcept { return _writeSize; }
 
-    //! Get if the instruction defines secondary opcode.
-    ASMJIT_INLINE bool hasSecondaryOpcode() const noexcept { return _secondaryOpCode != 0; }
-
-    //! Get the secondary instruction opcode, see \ref OpCodeBits.
-    //!
-    //! See \ref X86Inst::getSecondaryOpCode() for more details.
-    ASMJIT_INLINE uint32_t getSecondaryOpCode() const noexcept { return _secondaryOpCode; }
+    //! Get if the instruction has alternative opcode.
+    ASMJIT_INLINE bool hasAltOpCode() const noexcept { return _altOpCodeIndex != 0; }
+    //! Get alternative opcode, see \ref OpCodeBits.
+    ASMJIT_INLINE uint32_t getAltOpCode() const noexcept;
 
     // ------------------------------------------------------------------------
     // [Members]
     // ------------------------------------------------------------------------
 
-    uint32_t _encoding        : 8;       //!< Instruction encoding.
+    uint32_t _flags;                     //!< Instruction flags.
+
     uint32_t _writeIndex      : 8;       //!< First DST byte of a WRITE operation (default 0).
     uint32_t _writeSize       : 8;       //!< number of bytes to be written in DST.
     uint32_t _eflagsIn        : 8;       //!< EFLAGS read by the instruction.
-
     uint32_t _eflagsOut       : 8;       //!< EFLAGS modified by the instruction.
+
+    uint32_t _altOpCodeIndex  : 8;       //!< Index to table with alternative opcodes.
     uint32_t _iSignatureIndex : 9;       //!< First `ISignature` entry in the database.
     uint32_t _iSignatureCount : 4;       //!< Number of relevant `ISignature` entries.
-    uint32_t _reserved        : 11;      //!< \internal
+    uint32_t _reserved        : 19;      //!< \internal
+  };
 
-    uint32_t _instFlags;                 //!< Instruction flags.
-    uint32_t _secondaryOpCode;           //!< Instruction's secondary opcode.
+  //! Data specific to FPU family instructions that access FPU stack.
+  struct FpuData {
+  };
+
+  //! Data specific to MMX+ and SSE+ family instructions.
+  struct SseData {
+    //! SSE to AVX conversion mode.
+    enum AvxConvMode {
+      kAvxConvNone           = 0,        //!< No translation possible (SHA/SSE4A or MMX register used).
+      kAvxConvNonDestructive = 1,        //!< The first SSE operand becomes first and second AVX operand.
+      kAvxConvMove           = 2,        //!< No change (no operands changed).
+      kAvxConvMoveIfMem      = 3,        //!< No change if second operand is memory, otherwise NonDestructive.
+      kAvxConvBlend          = 4         //!< Special case for 'vblendvpd', 'vblendvps', and 'vpblendvb'.
+    };
+
+    uint16_t unused : 13;
+    uint16_t avxConv : 3;                //!< SSE to AVX conversion mode, see \ref AvxConvMode.
+    int16_t avxDelta;                    //!< Delta to get a corresponding AVX instruction.
+  };
+
+  //! Data specific to AVX+ and FMA+ family instructions.
+  struct AvxData {
+  };
+
+  //! Instruction signature.
+  //!
+  //! Contains a sequence of operands' combinations and other metadata that defines
+  //! a single instruction. This data is used by instruction validator.
+  struct ISignature {
+    uint8_t opCount : 3;                 //!< Count of operands in `opIndex` (0..6).
+    uint8_t archMask : 2;                //!< Architecture mask of this record.
+    uint8_t implicit : 3;                //!< Number of implicit operands.
+    uint8_t reserved;                    //!< Reserved for future use.
+    uint8_t operands[6];                 //!< Indexes to `OSignature` table.
+  };
+
+  //! Operand signature, used by \ref ISignature.
+  //!
+  //! Contains all possible operand combinations, memory size information,
+  //! and register index (or \ref kInvalidReg if not mandatory).
+  struct OSignature {
+    uint32_t flags;                      //!< Operand flags.
+    uint16_t memFlags;                   //!< Memory flags.
+    uint8_t extFlags;                    //!< Extra flags.
+    uint8_t regId;                       //!< Register index or 0xFF (if not used).
   };
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
+  //! Get instruction's name (null terminated).
+  //!
+  //! NOTE: If AsmJit was compiled with `ASMJIT_DISABLE_TEXT` then this will
+  //! return an empty string (null terminated string of zero length).
+  ASMJIT_INLINE const char* getName() const noexcept;
   //! Get index to `X86InstDB::nameData` of this instruction.
   //!
   //! NOTE: If AsmJit was compiled with `ASMJIT_DISABLE_TEXT` then this will
   //! always return zero.
-  ASMJIT_INLINE uint32_t getNameIndex() const noexcept { return _nameIndex; }
-  //! Get instruction's name (null terminated).
+  ASMJIT_INLINE uint32_t getNameDataIndex() const noexcept { return _nameDataIndex; }
+
+  //! Get \ref CommonData of the instruction.
+  ASMJIT_INLINE const CommonData& getCommonData() const noexcept;
+  //! Get index to `X86InstDB::commonData` of this instruction.
+  ASMJIT_INLINE uint32_t getCommonDataIndex() const noexcept { return _commonDataIndex; }
+
+  //! Get instruction encoding, see \ref EncodingType.
+  ASMJIT_INLINE uint32_t getEncodingType() const noexcept { return _encodingType; }
+
+  //! Get instruction family, see \ref FamilyType.
+  ASMJIT_INLINE uint32_t getFamilyType() const noexcept { return _familyType; }
+  //! Get index to an instruction family dependent data.
+  ASMJIT_INLINE uint32_t getFamilyDataIndex() const noexcept { return _familyDataIndex; }
+
+  //! Get if the instruction's family is \ref kFamilyFpu.
+  ASMJIT_INLINE bool isFpuFamily() const noexcept { return _familyType == kFamilyFpu; }
+  //! Get if the instruction's family is \ref kFamilySse.
+  ASMJIT_INLINE bool isSseFamily() const noexcept { return _familyType == kFamilySse; }
+  //! Get if the instruction's family is \ref kFamilyAvx.
+  ASMJIT_INLINE bool isAvxFamily() const noexcept { return _familyType == kFamilyAvx; }
+
+  //! Get data specific to SSE instructions.
   //!
-  //! NOTE: If AsmJit was compiled with `ASMJIT_DISABLE_TEXT` then this will
-  //! return an empty string (null terminated, but zero length).
-  ASMJIT_INLINE const char* getName() const noexcept;
+  //! NOTE: Always check the instruction family, it will assert if it's not an SSE instruction.
+  ASMJIT_INLINE const SseData& getSseData() const noexcept;
 
-  //! Get index to `X86InstDB::iExtData` of this instruction.
-  ASMJIT_INLINE uint32_t getExtIndex() const noexcept { return _extIndex; }
-  //! Get \ref ExtendedData& of the instruction.
-  ASMJIT_INLINE const ExtendedData& getExtData() const noexcept;
-  //! Get \ref ExtendedData* of the instruction.
-  ASMJIT_INLINE const ExtendedData* getExtDataPtr() const noexcept;
+  //! Get if the instruction has main opcode (rare, but it's possible it doesn't have).
+  ASMJIT_INLINE bool hasMainOpCode() const noexcept { return _mainOpCode != 0; }
+  //! Get main opcode, see \ref OpCodeBits.
+  ASMJIT_INLINE uint32_t getMainOpCode() const noexcept { return _mainOpCode; }
 
-  //! Get instruction encoding, see \ref Encoding.
-  ASMJIT_INLINE uint32_t getEncoding() const noexcept { return getExtData().getEncoding(); }
-
-  //! Get the primary instruction opcode, see \ref OpCodeBits.
-  ASMJIT_INLINE uint32_t getPrimaryOpCode() const noexcept { return _primaryOpCode; }
-  //! Get the secondary instruction opcode, see \ref OpCodeBits.
-  ASMJIT_INLINE uint32_t getSecondaryOpCode() const noexcept { return getExtData().getSecondaryOpCode(); }
+  //! Get if the instruction has alternative opcode.
+  ASMJIT_INLINE bool hasAltOpCode() const noexcept { return getCommonData().hasAltOpCode(); }
+  //! Get alternative opcode, see \ref OpCodeBits.
+  ASMJIT_INLINE uint32_t getAltOpCode() const noexcept { return getCommonData().getAltOpCode(); }
 
   //! Get whether the instruction has flag `flag`, see \ref InstFlags.
-  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (getFlags() & flag) != 0; }
+  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return getCommonData().hasFlag(flag); }
   //! Get instruction flags, see \ref InstFlags.
-  ASMJIT_INLINE uint32_t getFlags() const noexcept { return getExtData().getFlags(); }
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return getCommonData().getFlags(); }
 
   // --------------------------------------------------------------------------
   // [Get]
   // --------------------------------------------------------------------------
+
+  //! Get if the `instId` is defined (counts also kInvalidInst, which is zero).
+  static ASMJIT_INLINE bool isDefinedId(uint32_t instId) noexcept { return instId < _kIdCount; }
 
   //! Get instruction information based on the instruction `instId`.
   //!
@@ -2483,16 +2529,21 @@ struct X86Inst {
   // [Members]
   // --------------------------------------------------------------------------
 
-  uint32_t _primaryOpCode;               //!< Instruction's primary opcode.
-  uint32_t _nameIndex : 14;              //!< Instruction's name index.
-  uint32_t _extIndex  : 10;              //!< Index to the `ExtendedData` table.
-  uint32_t _reserved  : 8;               //!< Reserved for future use.
+  uint32_t _encodingType    : 8;         //!< Instruction encoding.
+  uint32_t _nameDataIndex   : 14;        //!< Index to `X86InstDB::nameData` table.
+  uint32_t _commonDataIndex : 10;        //!< Index to `X86InstDB::commonData` table.
+  uint32_t _familyType      : 2;         //!< Instruction family type.
+  uint32_t _familyDataIndex : 8;         //!< Index to `fpuData`, `sseData`, or `avxData`.
+  uint32_t _reserved        : 22;
+  uint32_t _mainOpCode;                  //!< Instruction's primary opcode.
 };
 
 //! X86 instruction data under a single namespace.
 struct X86InstDB {
   ASMJIT_API static const X86Inst instData[];
-  ASMJIT_API static const X86Inst::ExtendedData iExtData[];
+  ASMJIT_API static const uint32_t altOpCodeData[];
+  ASMJIT_API static const X86Inst::SseData sseData[];
+  ASMJIT_API static const X86Inst::CommonData commonData[];
   ASMJIT_API static const char nameData[];
 };
 
@@ -2501,16 +2552,29 @@ ASMJIT_INLINE const X86Inst& X86Inst::getInst(uint32_t instId) noexcept {
   return X86InstDB::instData[instId];
 }
 
-ASMJIT_INLINE const char* X86Inst::getName() const noexcept { return &X86InstDB::nameData[_nameIndex]; }
-ASMJIT_INLINE const X86Inst::ExtendedData& X86Inst::getExtData() const noexcept { return X86InstDB::iExtData[_extIndex]; }
-ASMJIT_INLINE const X86Inst::ExtendedData* X86Inst::getExtDataPtr() const noexcept { return &X86InstDB::iExtData[_extIndex]; }
+ASMJIT_INLINE const char* X86Inst::getName() const noexcept {
+  return &X86InstDB::nameData[_nameDataIndex];
+}
+
+ASMJIT_INLINE const X86Inst::CommonData& X86Inst::getCommonData() const noexcept {
+  return X86InstDB::commonData[_commonDataIndex];
+}
+
+ASMJIT_INLINE const X86Inst::SseData& X86Inst::getSseData() const noexcept {
+  ASMJIT_ASSERT(isSseFamily());
+  return X86InstDB::sseData[_familyDataIndex];
+}
+
+ASMJIT_INLINE uint32_t X86Inst::CommonData::getAltOpCode() const noexcept {
+  return X86InstDB::altOpCodeData[_altOpCodeIndex];
+}
 
 // ============================================================================
 // [asmjit::X86Util]
 // ============================================================================
 
 struct X86Util {
-  //! Pack a shuffle constant to be used with multimedia instructions (2 values).
+  //! Pack a shuffle constant to be used with SSE/AVX instruction (2 values).
   //!
   //! \param a Position of the first  component [0, 1].
   //! \param b Position of the second component [0, 1].
@@ -2523,7 +2587,7 @@ struct X86Util {
     return static_cast<int>(result);
   }
 
-  //! Pack a shuffle constant to be used with multimedia instructions (4 values).
+  //! Pack a shuffle constant to be used with SSE/AVX instruction (4 values).
   //!
   //! \param a Position of the first  component [0, 3].
   //! \param b Position of the second component [0, 3].

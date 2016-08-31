@@ -336,7 +336,7 @@ public:
   // [Interface]
   // --------------------------------------------------------------------------
 
-  virtual Error process(CodeBuilder* cb, Zone* zone) noexcept override;
+  virtual Error process(Zone* zone) noexcept override;
 
   //! Run the register allocator for a given function `func`.
   virtual Error compile(CCFunc* func) noexcept;
@@ -353,6 +353,9 @@ public:
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
+
+  //! Get the associated `CodeCompiler`.
+  ASMJIT_INLINE CodeCompiler* cc() const noexcept { return static_cast<CodeCompiler*>(_cb); }
 
   //! Get function.
   ASMJIT_INLINE CCFunc* getFunc() const noexcept { return _func; }
@@ -518,7 +521,6 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  CodeCompiler* _cc;                     //!< CodeCompiler.
   Zone* _zone;                           //!< Zone passed to `process()`.
   ZoneHeap _heap;                        //!< ZoneHeap that uses `_zone`.
 

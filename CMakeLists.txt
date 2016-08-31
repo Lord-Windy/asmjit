@@ -68,6 +68,7 @@ endif()
 foreach(BUILD_OPTION
     ASMJIT_BUILD_ARM
     ASMJIT_BUILD_X86
+    ASMJIT_DISABLE_BUILDER
     ASMJIT_DISABLE_COMPILER
     ASMJIT_DISABLE_TEXT
     ASMJIT_DISABLE_LOGGING
@@ -90,10 +91,8 @@ cxx_add_source(asmjit ASMJIT_SRC asmjit
   asmjit.h
   asmjit_apibegin.h
   asmjit_apiend.h
-
+  asmjit_build.h
   base.h
-  build.h
-
   arm.h
   x86.h
 )
@@ -159,6 +158,8 @@ endif()
 cxx_add_source(asmjit ASMJIT_SRC asmjit/x86
   x86assembler.cpp
   x86assembler.h
+  x86builder.cpp
+  x86builder.h
   x86compiler.cpp
   x86compiler.h
   x86emitter.h
@@ -174,6 +175,8 @@ cxx_add_source(asmjit ASMJIT_SRC asmjit/x86
   x86operand.h
   x86regalloc.cpp
   x86regalloc_p.h
+  x86ssetoavxpass.cpp
+  x86ssetoavxpass_p.h
 )
 
 # =============================================================================

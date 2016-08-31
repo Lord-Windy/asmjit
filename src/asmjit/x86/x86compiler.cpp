@@ -9,11 +9,10 @@
 
 // [Guard]
 #include "../asmjit_build.h"
-#if !defined(ASMJIT_DISABLE_COMPILER) && defined(ASMJIT_BUILD_X86)
+#if defined(ASMJIT_BUILD_X86) && !defined(ASMJIT_DISABLE_COMPILER)
 
 // [Dependencies]
 #include "../base/utils.h"
-#include "../x86/x86assembler.h"
 #include "../x86/x86compiler.h"
 #include "../x86/x86regalloc_p.h"
 
@@ -41,18 +40,16 @@ Error X86Compiler::onAttach(CodeHolder* code) noexcept {
   if (!ArchInfo::isX86Family(archType))
     return DebugUtils::errored(kErrorInvalidArch);
 
+  ASMJIT_PROPAGATE(_cbPasses.willGrow(1));
   ASMJIT_PROPAGATE(Base::onAttach(code));
+
   if (archType == ArchInfo::kTypeX86)
     _nativeGpArray = x86OpData.gpd;
   else
     _nativeGpArray = x86OpData.gpq;
-
   _nativeGpReg = _nativeGpArray[0];
-  return kErrorOk;
-}
 
-Error X86Compiler::onDetach(CodeHolder* code) noexcept {
-  return Base::onDetach(code);
+  return addPassT<X86RAPass>();
 }
 
 // ============================================================================
@@ -68,8 +65,15 @@ Error X86Compiler::finalize() {
     _globalConstPool = nullptr;
   }
 
-  X86RAPass ra;
-  Error err = ra.process(this, &_cbPassZone);
+  Error err = kErrorOk;
+  ZoneVector<CBPass*>& passes = _cbPasses;
+
+  for (size_t i = 0, len = passes.getLength(); i < len; i++) {
+    CBPass* pass = passes[i];
+    err = pass->process(&_cbPassZone);
+    _cbPassZone.reset();
+    if (err) break;
+  }
 
   _cbPassZone.reset();
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);
@@ -213,174 +217,10 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
   }
 }
 
-// ============================================================================
-// [asmjit::X86Compiler - Func]
-// ============================================================================
-
-CCFunc* X86Compiler::newFunc(const FuncSignature& sign) noexcept {
-  Error err;
-
-  CCFunc* func = newNodeT<CCFunc>();
-  if (!func) goto _NoMemory;
-
-  err = registerLabelNode(func);
-  if (ASMJIT_UNLIKELY(err)) {
-    // TODO: Calls setLastError, maybe rethink noexcept?
-    setLastError(err);
-    return nullptr;
-  }
-
-  // Create helper nodes.
-  func->_end = newNodeT<CBSentinel>();
-  func->_exitNode = newLabelNode();
-  if (!func->_exitNode || !func->_end) goto _NoMemory;
-
-  // Function prototype.
-  err = func->getDetail().init(sign);
-  if (err != kErrorOk) {
-    setLastError(err);
-    return nullptr;
-  }
-
-  // Override the natural stack alignment of the calling convention to what's
-  // specified by CodeInfo.
-  func->_funcDetail._callConv.setNaturalStackAlignment(_codeInfo.getStackAlignment());
-
-  // Allocate space for function arguments.
-  func->_args = nullptr;
-  if (func->getArgCount() != 0) {
-    func->_args = _cbHeap.allocT<VirtReg*>(func->getArgCount() * sizeof(VirtReg*));
-    if (!func->_args) goto _NoMemory;
-
-    ::memset(func->_args, 0, func->getArgCount() * sizeof(VirtReg*));
-  }
-
-  return func;
-
-_NoMemory:
-  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-  return nullptr;
-}
-
-CCFunc* X86Compiler::addFunc(const FuncSignature& sign) {
-  CCFunc* func = newFunc(sign);
-
-  if (!func) {
-    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-    return nullptr;
-  }
-
-  return static_cast<CCFunc*>(addFunc(func));
-}
-
-CBSentinel* X86Compiler::endFunc() {
-  CCFunc* func = getFunc();
-  if (!func) {
-    // TODO:
-    return nullptr;
-  }
-
-  // Add the local constant pool at the end of the function (if exist).
-  setCursor(func->getExitNode());
-
-  if (_localConstPool) {
-    addNode(_localConstPool);
-    _localConstPool = nullptr;
-  }
-
-  // Mark as finished.
-  func->_isFinished = true;
-  _func = nullptr;
-
-  setCursor(func->getEnd());
-  return func->getEnd();
-}
-
-// ============================================================================
-// [asmjit::X86Compiler - Ret]
-// ============================================================================
-
-CCFuncRet* X86Compiler::newRet(const Operand_& o0, const Operand_& o1) noexcept {
-  CCFuncRet* node = newNodeT<CCFuncRet>(o0, o1);
-  if (!node) {
-    setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-    return nullptr;
-  }
-  return node;
-}
-
-CCFuncRet* X86Compiler::addRet(const Operand_& o0, const Operand_& o1) noexcept {
-  CCFuncRet* node = newRet(o0, o1);
-  if (!node) return nullptr;
-  return static_cast<CCFuncRet*>(addNode(node));
-}
-
-// ============================================================================
-// [asmjit::X86Compiler - Call]
-// ============================================================================
-
-CCFuncCall* X86Compiler::newCall(const Operand_& o0, const FuncSignature& sign) noexcept {
-  Error err;
-  uint32_t nArgs;
-
-  CCFuncCall* node = _cbHeap.allocT<CCFuncCall>(sizeof(CCFuncCall) + sizeof(Operand));
-  Operand* opArray = reinterpret_cast<Operand*>(reinterpret_cast<uint8_t*>(node) + sizeof(CCFuncCall));
-
-  if (ASMJIT_UNLIKELY(!node))
-    goto _NoMemory;
-
-  opArray[0].copyFrom(o0);
-  new (node) CCFuncCall(this, X86Inst::kIdCall, 0, opArray, 1);
-
-  if ((err = node->getDetail().init(sign)) != kErrorOk) {
-    setLastError(err);
-    return nullptr;
-  }
-
-  // If there are no arguments skip the allocation.
-  if ((nArgs = sign.getArgCount()) == 0)
-    return node;
-
-  node->_args = static_cast<Operand*>(_cbHeap.alloc(nArgs * sizeof(Operand)));
-  if (!node->_args) goto _NoMemory;
-
-  ::memset(node->_args, 0, nArgs * sizeof(Operand));
-  return node;
-
-_NoMemory:
-  setLastError(DebugUtils::errored(kErrorNoHeapMemory));
-  return nullptr;
-}
-
-CCFuncCall* X86Compiler::addCall(const Operand_& o0, const FuncSignature& sign) noexcept {
-  CCFuncCall* node = newCall(o0, sign);
-  if (!node) return nullptr;
-  return static_cast<CCFuncCall*>(addNode(node));
-}
-
-// ============================================================================
-// [asmjit::X86Compiler - Vars]
-// ============================================================================
-
-Error X86Compiler::setArg(uint32_t argIndex, const Reg& r) {
-  CCFunc* func = getFunc();
-
-  if (!func)
-    return setLastError(DebugUtils::errored(kErrorInvalidState));
-
-  if (!isVirtRegValid(r))
-    return setLastError(DebugUtils::errored(kErrorInvalidVirtId));
-
-  VirtReg* vr = getVirtReg(r);
-  func->setArg(argIndex, vr);
-
-  return kErrorOk;
-}
-
 } // asmjit namespace
 
 // [Api-End]
 #include "../asmjit_apiend.h"
 
 // [Guard]
-#endif // !ASMJIT_DISABLE_COMPILER && ASMJIT_BUILD_X86
+#endif // ASMJIT_BUILD_X86 && !ASMJIT_DISABLE_COMPILER

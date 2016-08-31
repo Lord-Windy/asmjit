@@ -14,7 +14,7 @@
 // [Dependencies]
 #include "../base/codecompiler.h"
 #include "../base/simdtypes.h"
-#include "../x86/x86assembler.h"
+#include "../x86/x86emitter.h"
 #include "../x86/x86misc.h"
 
 // [Api-Begin]
@@ -51,17 +51,21 @@ public:
   // [Compatibility]
   // --------------------------------------------------------------------------
 
+  //! Explicit cast to `X86Emitter`.
+  ASMJIT_INLINE X86Emitter* asEmitter() noexcept { return reinterpret_cast<X86Emitter*>(this); }
+  //! Explicit cast to `X86Emitter` (const).
+  ASMJIT_INLINE const X86Emitter* asEmitter() const noexcept { return reinterpret_cast<const X86Emitter*>(this); }
+
   //! Implicit cast to `X86Emitter`.
-  ASMJIT_INLINE operator X86Emitter*() noexcept { return reinterpret_cast<X86Emitter*>(this); }
+  ASMJIT_INLINE operator X86Emitter&() noexcept { return *asEmitter(); }
   //! Implicit cast to `X86Emitter` (const).
-  ASMJIT_INLINE operator const X86Emitter*() const noexcept { return reinterpret_cast<const X86Emitter*>(this); }
+  ASMJIT_INLINE operator const X86Emitter&() const noexcept { return *asEmitter(); }
 
   // --------------------------------------------------------------------------
   // [Events]
   // --------------------------------------------------------------------------
 
   ASMJIT_API virtual Error onAttach(CodeHolder* code) noexcept override;
-  ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
   // [Code-Generation]
@@ -74,46 +78,6 @@ public:
   // -------------------------------------------------------------------------
 
   ASMJIT_API virtual Error finalize() override;
-
-  // --------------------------------------------------------------------------
-  // [Func]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `CCFunc`.
-  ASMJIT_API CCFunc* newFunc(const FuncSignature& sign) noexcept;
-
-  using CodeCompiler::addFunc;
-
-  //! Add a new function.
-  ASMJIT_API CCFunc* addFunc(const FuncSignature& sign);
-
-  //! Emit a sentinel that marks the end of the current function.
-  ASMJIT_API CBSentinel* endFunc();
-
-  // --------------------------------------------------------------------------
-  // [Ret]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `CCFuncRet`.
-  ASMJIT_API CCFuncRet* newRet(const Operand_& o0, const Operand_& o1) noexcept;
-  //! Add a new `CCFuncRet`.
-  ASMJIT_API CCFuncRet* addRet(const Operand_& o0, const Operand_& o1) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Call]
-  // --------------------------------------------------------------------------
-
-  //! Create a new `CCFuncCall`.
-  ASMJIT_API CCFuncCall* newCall(const Operand_& o0, const FuncSignature& sign) noexcept;
-  //! Add a new `CCFuncCall`.
-  ASMJIT_API CCFuncCall* addCall(const Operand_& o0, const FuncSignature& sign) noexcept;
-
-  // --------------------------------------------------------------------------
-  // [Args]
-  // --------------------------------------------------------------------------
-
-  //! Set a function argument at `argIndex` to `reg`.
-  ASMJIT_API Error setArg(uint32_t argIndex, const Reg& reg);
 
   // --------------------------------------------------------------------------
   // [VirtReg]
@@ -287,15 +251,15 @@ public:
   // --------------------------------------------------------------------------
 
   //! Call a function.
-  ASMJIT_INLINE CCFuncCall* call(const X86Gp& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const X86Gp& dst, const FuncSignature& sign) { return addCall(X86Inst::kIdCall, dst, sign); }
   //! \overload
-  ASMJIT_INLINE CCFuncCall* call(const X86Mem& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const X86Mem& dst, const FuncSignature& sign) { return addCall(X86Inst::kIdCall, dst, sign); }
   //! \overload
-  ASMJIT_INLINE CCFuncCall* call(const Label& label, const FuncSignature& sign) { return addCall(label, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const Label& label, const FuncSignature& sign) { return addCall(X86Inst::kIdCall, label, sign); }
   //! \overload
-  ASMJIT_INLINE CCFuncCall* call(const Imm& dst, const FuncSignature& sign) { return addCall(dst, sign); }
+  ASMJIT_INLINE CCFuncCall* call(const Imm& dst, const FuncSignature& sign) { return addCall(X86Inst::kIdCall, dst, sign); }
   //! \overload
-  ASMJIT_INLINE CCFuncCall* call(uint64_t dst, const FuncSignature& sign) { return addCall(Imm(dst), sign); }
+  ASMJIT_INLINE CCFuncCall* call(uint64_t dst, const FuncSignature& sign) { return addCall(X86Inst::kIdCall, Imm(dst), sign); }
 
   //! Return.
   ASMJIT_INLINE CCFuncRet* ret() { return addRet(Operand(), Operand()); }

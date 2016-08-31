@@ -148,6 +148,15 @@ struct Utils {
   static ASMJIT_INLINE T iMax(const T& a, const T& b) noexcept { return a > b ? a : b; }
 
   // --------------------------------------------------------------------------
+  // [Lower/Upper]
+  // --------------------------------------------------------------------------
+
+  template<typename T>
+  static ASMJIT_INLINE T toLower(T c) noexcept { return c ^ (static_cast<T>(c >= T('A') && c <= T('Z')) << 5); }
+  template<typename T>
+  static ASMJIT_INLINE T toUpper(T c) noexcept { return c ^ (static_cast<T>(c >= T('a') && c <= T('z')) << 5); }
+
+  // --------------------------------------------------------------------------
   // [Hash]
   // --------------------------------------------------------------------------
 

@@ -2542,9 +2542,6 @@ const char X86InstDB::nameData[] =
   "wrgsbase\0" "xadd\0" "xgetbv\0" "xrstors\0" "xrstors64\0" "xsavec\0"
   "xsavec64\0" "xsaveopt\0" "xsaveopt64\0" "xsaves\0" "xsaves64\0" "xsetbv";
 
-enum {
-  kX86InstMaxLength = 16
-};
 
 enum X86InstAlphaIndex {
   kX86InstAlphaIndexFirst   = 'a',
@@ -2601,40 +2598,26 @@ static ASMJIT_INLINE int X86Inst_compareName(const char* a, const char* b, size_
 
 uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
   if (ASMJIT_UNLIKELY(!name))
-    return kInvalidInst;
-
-  char nameLower[kX86InstMaxLength];
-
-  if (len == kInvalidIndex) {
-    size_t i = 0;
-    for (;;) {
-      uint32_t c = Utils::toLower<uint32_t>(name[i]);
-      if (!c) break;
-
-      if (ASMJIT_UNLIKELY(i > kX86InstMaxLength))
-        return kInvalidInst;
-
-      nameLower[i++] = c;
-    }
-  }
-  else {
-    size_t i;
-    if (ASMJIT_UNLIKELY(len > kX86InstMaxLength))
-      return kInvalidInst;
-    for (i = 0; i < len; i++)
-      nameLower[i] = Utils::toLower<uint32_t>(name[i]);
-  }
+    return DebugUtils::errored(kInvalidInst);
+  if (len == kInvalidIndex) len = ::strlen(name);
 
   if (ASMJIT_UNLIKELY(len == 0))
+    return DebugUtils::errored(kInvalidInst);
+
+  if (ASMJIT_UNLIKELY(len > kX86InstMaxLength))
     return kInvalidInst;
 
-  uint32_t prefix = static_cast<uint32_t>(nameLower[0]) - kX86InstAlphaIndexFirst;
+  char lowercased[kX86InstMaxLength];
+  for (size_t i = 0; i < len; i++)
+    lowercased[i] = Utils::toLower(name[i]);
+
+  uint32_t prefix = static_cast<uint32_t>(name[0]) - kX86InstAlphaIndexFirst;
   if (ASMJIT_UNLIKELY(prefix > kX86InstAlphaIndexLast - kX86InstAlphaIndexFirst))
-    return kInvalidInst;
+    return DebugUtils::errored(kInvalidInst);
 
   uint32_t index = _x86InstAlphaIndex[prefix];
   if (ASMJIT_UNLIKELY(index == kX86InstAlphaIndexInvalid))
-    return kInvalidInst;
+    return DebugUtils::errored(kInvalidInst);
 
   const char* nameData = X86InstDB::nameData;
   const X86Inst* instData = X86InstDB::instData;
@@ -2658,7 +2641,7 @@ uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
 
   if (useLinearSearch) {
     while (base != end) {
-      if (X86Inst_compareName(nameData + base[0].getNameDataIndex(), nameLower, len) == 0)
+      if (X86Inst_compareName(nameData + base[0].getNameDataIndex(), name, len) == 0)
         return static_cast<uint32_t>((size_t)(base - instData));
       base++;
     }
@@ -2666,7 +2649,7 @@ uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
   else {
     for (size_t lim = (size_t)(end - base); lim != 0; lim >>= 1) {
       const X86Inst* cur = base + (lim >> 1);
-      int result = X86Inst_compareName(nameData + cur[0].getNameDataIndex(), nameLower, len);
+      int result = X86Inst_compareName(nameData + cur[0].getNameDataIndex(), name, len);
 
       if (result < 0) {
         base = cur + 1;
@@ -2681,7 +2664,7 @@ uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
     }
   }
 
-  return kInvalidInst;
+  return DebugUtils::errored(kInvalidInst);
 }
 
 const char* X86Inst::getNameById(uint32_t id) noexcept {

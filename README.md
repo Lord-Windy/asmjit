@@ -93,7 +93,7 @@ Important
 Supported Environments
 ----------------------
 
-### C++ Compilers
+### C++ Compilers:
 
   * Tested
     * **Clang** - tested by Travis-CI.
@@ -103,9 +103,9 @@ Supported Environments
   * Maybe
     * **CodeGear** - supported, but without maintainers.
     * **Intel** - supported, but not regularly tested.
-  * Other c++ compilers would require some testing and support in [asmjit_build.h](./asmjit/asmjit_build.h).
+  * Other c++ compilers would require some testing and support in [asmjit_build.h](./src/asmjit/asmjit_build.h).
 
-### Operating Systems
+### Operating Systems:
 
   * Tested
     * **Linux** - tested by Travis-CI.
@@ -113,9 +113,9 @@ Supported Environments
     * **Windows** - tested by AppVeyor.
   * Maybe
     * **BSDs** - supported, but without maintainers.
-  * Other operating systems would require some testing and support in [asmjit_build.h](./asmjit/asmjit_build.h) and [osutils.cpp](./asmjit/base/osutils.cpp).
+  * Other operating systems would require some testing and support in [asmjit_build.h](./src/asmjit/asmjit_build.h) and [osutils.cpp](./src/asmjit/base/osutils.cpp).
 
-### Backends
+### Backends:
 
   * **X86** - tested by both Travis-CI and AppVeyor.
   * **X64** - tested by both Travis-CI and AppVeyor.
@@ -127,52 +127,56 @@ Project Organization
   * **`/`**        - Project root
     * **src**      - Source code
       * **asmjit** - Source code and headers (always point include path in here)
-        * **base** - Generic API and interfaces, used by all backends
+        * **base** - Backend independent API
         * **arm**  - ARM specific API, used only by ARM32 and ARM64 backends
         * **x86**  - X86 specific API, used only by X86 and X64 backends
-      * **test**   - Unit and integration tests (don't embed in your project)
+    * **test**     - Unit and integration tests (don't embed in your project)
     * **tools**    - Tools used for configuring, documenting and generating files
 
 Configuring & Building
 ----------------------
 
-AsmJit is designed to be easy embeddable in any project. However, it depends on some compile-time macros that can be used to build a specific version of AsmJit that includes or excludes certain features. A typical way of building AsmJit is to use [cmake](http://www.cmake.org), but it's also possible to just include AsmJit source code in our project and just build it. The easiest way to include AsmJit in your project is to just include `src` directory in your project and to define `ASMJIT_STATIC` or `ASMJIT_EMBED`. AsmJit can be just updated from time to time without any changes to this integration process. Do not build AsmJit test files (`asmjit/test` directory) in such case.
+AsmJit is designed to be easy embeddable in any project. However, it depends on some compile-time macros that can be used to build a specific version of AsmJit that includes or excludes certain features. A typical way of building AsmJit is to use [cmake](https://www.cmake.org), but it's also possible to just include AsmJit source code in your project and just build it. The easiest way to include AsmJit in your project is to just include **src** directory in your project and to define **ASMJIT_STATIC** or **ASMJIT_EMBED**. AsmJit can be just updated from time to time without any changes to this integration process. Do not embed AsmJit's [/test](./test) files in such case as these are used for testing.
 
-### Build Type
+### Build Type:
 
-  * **ASMJIT_DEBUG** - Define to always turn debugging on (regardless of build-type).
-  * **ASMJIT_RELEASE** - Define to always turn debugging off (regardless of build-type).
+  * **ASMJIT_DEBUG** - Define to always turn debugging on (regardless of compile-time options detected).
+  * **ASMJIT_RELEASE** - Define to always turn debugging off (regardless of compiler-time options detected).
   * **ASMJIT_TRACE** - Define to enable AsmJit tracing. Tracing is used to catch bugs in AsmJit and it has to be enabled explicitly. When AsmJit is compiled with `ASMJIT_TRACE` it uses `stdout` to log information related to AsmJit execution. This log can be helpful AsmJit developers and users in case something goes wrong..
 
 By default none of these is defined, AsmJit detects build-type based on compile-time macros and supports most IDE and compiler settings out of box.
 
-### Build Mode
+### Build Mode:
 
   * **ASMJIT_STATIC** - Define to build AsmJit as a static library. No symbols are exported in such case.
-  * **ASMJIT_EMBED** - Define to embed AsmJit in another project. Embedding means that neither shared nor static library is created and AsmJit's source files and source files of the product that embeds AsmJit are part of the same target. This way of building AsmJit has certain advantages that are beyond this manual. `ASMJIT_EMBED` behaves identically to `ASMJIT_STATIC` (no API exports).
+  * **ASMJIT_EMBED** - Define to embed AsmJit in another project. Embedding means that neither shared nor static library is created and AsmJit's source files and source files of the product that embeds AsmJit are part of the same target. This way of building AsmJit has certain advantages that are beyond this manual. **ASMJIT_EMBED** behaves identically to **ASMJIT_STATIC** (no API exports).
 
-By default AsmJit build is configured to be built as a shared library, thus none of `ASMJIT_EMBED` and `ASMJIT_STATIC` is defined.
+By default AsmJit build is configured to be built as a shared library, thus note of **ASMJIT_EMBED** and **ASMJIT_STATIC** is defined.
 
-### Architectures
+### Build Backends:
 
   * **ASMJIT_BUILD_ARM** - Build ARM32 and ARM64 backends (work-in-progress).
   * **ASMJIT_BUILD_X86** - Build X86 and X64 backends.
   * **ASMJIT_BUILD_HOST** - Build only the host backend (default).
 
-If none of `ASMJIT_BUILD_...` is defined AsmJit bails to `ASMJIT_BUILD_HOST`, which will detect the target architecture at compile-time. Each backend automatically supports 32-bit and 64-bit targets, so for example AsmJit with X86 support can generate both 32-bit and 64-bit code.
+If none of **ASMJIT_BUILD_...** is defined AsmJit bails to **ASMJIT_BUILD_HOST**, which will detect the target architecture at compile-time. Each backend automatically supports 32-bit and 64-bit targets, so for example AsmJit with X86 support can generate both 32-bit and 64-bit code.
 
-### Features
+### Disabling Features:
 
-  * **ASMJIT_DISABLE_TEXT** - Disable everything that uses text-representation and that causes certain strings to be stored in the resulting binary. For example when this flag is enabled all instruction and error names (and related APIs) will not be available. This flag has to be disabled together with `ASMJIT_DISABLE_LOGGING`. This option is suitable for deployment builds or builds that don't want to reveal the use of AsmJit.
-  * **ASMJIT_DISABLE_LOGGING** - Disable `Logger` and `Formatter` features completely. Use this flag if you don't need `Logger` and `Formatter` classes, suitable for deployment builds.
-  * **ASMJIT_DISABLE_COMPILER** - Disable `CodeCompiler` completely. Use this flag if you don't use `CodeCompiler` and don't want it compiled in.
+  * **ASMJIT_DISABLE_BUILDER** - Disables both **CodeBuilder** and **CodeCompiler** emitters (only **Assembler** will be available). Ideal for users that don't use **CodeBuilder** concept and want to create smaller AsmJit.
+  * **ASMJIT_DISABLE_COMPILER** - Disables **CodeCompiler** emitter. For users that use **CodeBuilder**, but not **CodeCompiler**
+  * **ASMJIT_DISABLE_LOGGING** - Disables logging (**Logger** and all classes that inherit it) and formatting features.
+  * **ASMJIT_DISABLE_TEXT** - Disables everything that uses text-representation and that causes certain strings to be stored in the resulting binary. For example when this flag is enabled all instruction and error names (and related APIs) will not be available. This flag has to be disabled together with **ASMJIT_DISABLE_LOGGING**. This option is suitable for deployment builds or builds that don't want to reveal the use of AsmJit.
+  * **ASMJIT_DISABLE_VALIDATION** - Disables instruction validation. Saves around 5kB of space when used.
+
+NOTE: Please don't disable any features if you plan to build AsmJit as a shared library that will be used by multiple projects that you don't control (for example asmjit in a Linux distribution). The possibility to disable certain features exists mainly for static builds of AsmJit.
 
 Using AsmJit
 ------------
 
 AsmJit library uses one global namespace called `asmjit` that provides the whole functionality. Architecture specific code is prefixed by the architecture name and architecture specific registers and operand builders have their own namespace. For example API targeting both X86 and X64 architectures is prefixed with `X86` and registers & operand builders are accessible through `x86` namespace. This design is very different from the initial version of AsmJit and it seems now as the most convenient one.
 
-### CodeHolder <- CodeEmitter
+### CodeHolder & CodeEmitter
 
 AsmJit provides two classes that are used together for code generation:
 
@@ -201,20 +205,20 @@ Instructions specify operations performed by the CPU, and operands specify the o
 AsmJit's operands all inherit from a base class called `Operand` and then specialize its type to:
 
   * **None** (not used or uninitialized operand).
-  * **Register** (`Reg`) - Describes either physical or virtual register. Physical registers have id that matches the target's machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator pass. Each `Reg` provides:
+  * **Register** (**Reg**) - Describes either physical or virtual register. Physical registers have id that matches the target's machine id directly, whereas virtual registers must be allocated into physical registers by a register allocator pass. Each `Reg` provides:
     * *Register Type* - Unique id that describes each possible register provided by the target architecture - for example X86 backend provides `X86Reg::RegType`, which defines all variations of general purpose registers (GPB-LO, GPB-HI, GPW, GPD, and GPQ) and all types of other registers like K, MM, BND, XMM, YMM, and ZMM.
     * *Register Kind* - Groups multiple register types under a single kind - for example all general-purpose registers (of all sizes) on X86 are `X86Reg::kKindGp`, all SIMD registers (XMM, YMM, ZMM) are `X86Reg::kKindVec`, etc.
     * *Register Size* - Contains the size of the register in bytes. If the size depends on the mode (32-bit vs 64-bit) then generally the higher size is used (for example RIP register has size 8 by default).
     * *Register ID* - Contains physical or virtual id of the register.
-  * **Memory Address** (`Mem`) - Used to reference a memory location. Each `Mem` provides:
+  * **Memory Address** (**Mem**) - Used to reference a memory location. Each `Mem` provides:
     * *Base Register* - A base register id (physical or virtual).
     * *Index Register* - An index register id (physical or virtual).
     * *Offset* - Displacement or absolute address to be referenced (32-bit if base register is used and 64-bit if base register is not used).
     * *Flags* that can describe various architecture dependent information (like scale and segment-override on X86).
-  * **Immediate Value** (`Imm`) - Immediate values are usually part of instructions (encoded within the instruction itself) or data.
-  * **Label** (`Label)` - used to reference a location in code or data. Labels must be created by the `CodeEmitter` or by `CodeHolder`. Each label has its unique id per `CodeHolder` instance.
+  * **Immediate Value** (**Imm**) - Immediate values are usually part of instructions (encoded within the instruction itself) or data.
+  * **Label** - used to reference a location in code or data. Labels must be created by the `CodeEmitter` or by `CodeHolder`. Each label has its unique id per `CodeHolder` instance.
 
-AsmJit allows to construct operands dynamically, to store them, and to query a complete information about them at run-time. Operands are small (always 16 bytes per `Operand`) and should be always copied if you intend to store them (don't create operands by using `new` keyword, it's not recommended). Operands are safe to be `memcpy()`ed and `memset()`ed if you work with arrays of operands.
+AsmJit allows to construct operands dynamically, to store them, and to query a complete information about them at run-time. Operands are small (always 16 bytes per **Operand**) and should be always copied if you intend to store them (don't create operands by using `new` keyword, it's not recommended). Operands are safe to be `memcpy()`ed and `memset()`ed if you work with arrays of operands.
 
 Small example of manipulating and using operands:
 
@@ -225,32 +229,32 @@ X86Gp getDstRegByValue() { return x86::ecx; }
 
 void usingOperandsExample(X86Assembler& a) {
   // Create some operands.
-  X86Gp dst = getDstRegByValue();        // Get `ecx` register returned by a function.
-  X86Gp src = x86::rax;                  // Get `rax` register directly from the provided `x86` namespace.
-  X86Gp idx = x86::gpq(10);              // Construct `r10` dynamically.
-  X86Mem m = x86::ptr(src, idx);         // Construct [src + idx] memory address - referencing [rax + r10].
+  X86Gp dst = getDstRegByValue();         // Get `ecx` register returned by a function.
+  X86Gp src = x86::rax;                   // Get `rax` register directly from the provided `x86` namespace.
+  X86Gp idx = x86::gpq(10);               // Construct `r10` dynamically.
+  X86Mem m = x86::ptr(src, idx);          // Construct [src + idx] memory address - referencing [rax + r10].
 
   // Examine `m`:
-  m.getIndexType();                      // Returns `X86Reg::kRegGpq`.
-  m.getIndexId();                        // Returns 10 (`r10`).
+  m.getIndexType();                       // Returns `X86Reg::kRegGpq`.
+  m.getIndexId();                         // Returns 10 (`r10`).
 
   // Reconstruct `idx` stored in mem:
   X86Gp idx_2 = X86Gp::fromTypeAndId(m.getIndexType(), m.getIndexId());
-  idx == idx_2;                          // True, `idx` and idx_2` are identical.
+  idx == idx_2;                           // True, `idx` and idx_2` are identical.
 
-  Operand op = m;                        // Possible.
-  op.isMem();                            // True (can be casted to Mem and X86Mem).
+  Operand op = m;                         // Possible.
+  op.isMem();                             // True (can be casted to Mem and X86Mem).
 
-  m == op;                               // True, `op` is just a copy of `m`.
-  static_cast<Mem&>(op).addOffset(1);    // Static cast is fine and valid here.
-  m == op;                               // False, `op` now points to [rax + r10 + 1], which is not [rax + r10].
+  m == op;                                // True, `op` is just a copy of `m`.
+  static_cast<Mem&>(op).addOffset(1);     // Static cast is fine and valid here.
+  m == op;                                // False, `op` now points to [rax + r10 + 1], which is not [rax + r10].
 
   // Emitting 'mov'
-  a.mov(dst, m);                         // Type-safe way.
-  a.mov(dst, op);                        // Not possible, `mov` doesn't provide `X86Reg, Operand` overload.
+  a.mov(dst, m);                          // Type-safe way.
+  a.mov(dst, op);                         // Not possible, `mov` doesn't provide `X86Reg, Operand` overload.
 
-  a.emit(X86Inst::kIdMov, dst, m);       // Type-unsafe, but possible.
-  a.emit(X86Inst::kIdMov, dst, op);      // Also possible, `emit()` is typeless and can be used dynamically.
+  a.emit(X86Inst::kIdMov, dst, m);        // Type-unsafe, but possible.
+  a.emit(X86Inst::kIdMov, dst, op);       // Also possible, `emit()` is typeless and can be used dynamically.
 }
 ```
 
@@ -326,7 +330,7 @@ int main(int argc, char* argv[]) {
   int result = fn(array, 6);              // Execute the generated code.
   printf("%d\n", result);                 // Print sum of array (108).
 
-  rt.release(fn);                         // Remove the function from runtime
+  rt.release(fn);                         // Remove the function from the runtime.
   return 0;
 }
 ```
@@ -340,7 +344,7 @@ X86 provides a complex memory addressing model that allows to encode addresses h
 ```c++
 // Memory operand construction is provided by x86 namespace.
 using namespace asmjit;
-using namespace asmjit::x86;              // Make it easier to x86 regs.
+using namespace asmjit::x86;              // Easier to access x86 regs.
 
 // BASE + OFFSET.
 X86Mem a = ptr(rax);                      // a = [rax]
@@ -431,7 +435,7 @@ You can explore the possibilities by taking a look at [base/operand.h](./src/asm
 
 ### More About CodeInfo
 
-In the first complete example the `CodeInfo` is retrieved from `JitRuntime`. It's logical as `JitRuntime` will always return a `CodeInfo` that is compatible with the runtime environment. For example if your application runs in 64-bit mode the `CodeInfo` will specify `ArchInfo::kTypeX64` architecture, in contrary, if your application runs in 32-bit mode it would be `ArchInfo::kTypeX86`. It's logical, as JIT code must always generate code that is runnable within the host process. However, AsmJit allows to setup `CodeInfo` manually, and to select a different architecture when needed. So let's do something else this time, let's always generate a 32-bit code and print it's binary representation. To do that, we create our own `CodeInfo` and initialize it to `ArchInfo::kTypeX86` architecture. CodeInfo will populate all basic fields just based on the architecture we provide, so it's super-easy:
+In the first complete example the `CodeInfo` is retrieved from `JitRuntime`. It's logical as `JitRuntime` will always return a `CodeInfo` that is compatible with the runtime environment. For example if your application runs in 64-bit mode the `CodeInfo` will use `ArchInfo::kTypeX64` architecture in contrast to `ArchInfo::kTypeX86`, which will be used in 32-bit mode. AsmJit also allows to setup `CodeInfo` manually, and to select a different architecture when needed. So let's do something else this time, let's always generate a 32-bit code and print it's binary representation. To do that, we create our own `CodeInfo` and initialize it to `ArchInfo::kTypeX86` architecture. CodeInfo will populate all basic fields just based on the architecture we provide, so it's super-easy:
 
 ```c++
 using namespace asmjit;
@@ -636,12 +640,12 @@ int main(int argc, char* argv[]) {
   int result = fn();                      // Execute the generated code.
   printf("%d\n", result);                 // Print the resulting "0".
 
-  rt.release(fn);                         // Remove the function from runtime
+  rt.release(fn);                         // Remove the function from the runtime.
   return 0;
 }
 ```
 
-The example just return `0`, but the function generated contains a standard prolog and epilog sequence and the function itself reserves 32 bytes of local stack. The advantage is clear - a single code-base can handle multiple targets easily. If you want to create a register of native size dynamically by specifying its id it's also possible:
+The example just returns `0`, but the function generated contains a standard prolog and epilog sequence and the function itself reserves 32 bytes of local stack. The advantage is clear - a single code-base can handle multiple targets easily. If you want to create a register of native size dynamically by specifying its id it's also possible:
 
 ```c++
 void example(X86Assembler& a) {
@@ -725,7 +729,7 @@ int main(int argc, char* argv[]) {
   int result = fn();                      // Execute the generated code.
   printf("%d\n", result);                 // Print the resulting "0".
 
-  rt.release(fn);                         // Remove the function from runtime
+  rt.release(fn);                         // Remove the function from the runtime.
   return 0;
 }
 ```
@@ -738,17 +742,17 @@ In 64-bit mode there is one more thing to worry about when patching code - REX p
 
 AsmJit contains another instruction option that controls (forces) REX prefix - `rex()`. If you use it the instruction emitted will always use REX prefix even when it's encodable without it. The following list contains some instructions and their binary representations to illustrate when it's emitted:
 
-  * `  83C410` - `    add esp , 16` - 32-bit operation in 64-bit mode doesn't require REX prefix.
-  * `4083C410` - `rex add esp , 16` - 32-bit operation in 64-bit mode with forced REX prefix (0x40).
-  * `4883C410` - `    add rsp , 16` - 64-bit operation in 64-bit mode requires REX prefix (0x48).
-  * `4183C410` - `    add r12d, 16` - 32-bit operation in 64-bit mode using R12D requires REX prefix (0x41).
-  * `4983C410` - `    add r12 , 16` - 64-bit operation in 64-bit mode using R12  requires REX prefix (0x49).
+  * `__83C410` - `add esp, 16`     - 32-bit operation in 64-bit mode doesn't require REX prefix.
+  * `4083C410` - `rex add esp, 16` - 32-bit operation in 64-bit mode with forced REX prefix (0x40).
+  * `4883C410` - `add rsp, 16`     - 64-bit operation in 64-bit mode requires REX prefix (0x48).
+  * `4183C410` - `add r12d, 16`    - 32-bit operation in 64-bit mode using R12D requires REX prefix (0x41).
+  * `4983C410` - `add r12, 16`     - 64-bit operation in 64-bit mode using R12  requires REX prefix (0x49).
 
-### Functions API Overview
+### Using Func-API
 
 So far all examples shown above handled creating function prologs and epilogs manually. While it's possible to do it that way it's much better to automate such process as function calling conventions vary across architectures and also across operating systems.
 
-AsmJit contains a functionality that can be used to define function signatures and to calculate automatically optimal frame layout that can be used directly by a prolog and epilog inserter. This feature was exclusive to AsmJit's Compiler for a very long time, but was abstracted out and is now available for all users regardless of CodeEmitter they use. The design of handling functions prologs and epilogs allows generally two use cases:
+AsmJit contains a functionality that can be used to define function signatures and to calculate automatically optimal frame layout that can be used directly by a prolog and epilog inserter. This feature was exclusive to AsmJit's CodeCompiler for a very long time, but was abstracted out and is now available for all users regardless of CodeEmitter they use. The design of handling functions prologs and epilogs allows generally two use cases:
 
   * Calculate function layout before the function is generated - this is the only way if you use pure `Assembler` emitter and shown in the next example.
   * Calculate function layout after the function is generated - this way is generally used by `CodeBuilder` and `CodeCompiler` (will be described together with `X86Compiler`).
@@ -830,10 +834,50 @@ int main(int argc, char* argv[]) {
   // Prints {5 8 4 9}
   printf("{%d %d %d %d}\n", out[0], out[1], out[2], out[3]);
 
-  rt.release(fn);                         // Remove the function from runtime
+  rt.release(fn);                         // Remove the function from the runtime.
   return 0;
 }
 ```
+
+CodeBuilder & CodeCompiler
+--------------------------
+
+Both **CodeBuilder** and **CodeCompiler** are emitters that emit everything to a representation that allows further processing. The code stored in such representation is completely safe to be patched, simplified, reordered, obfuscated, removed, injected, analyzed, and 'think-of-something-else'. Each instruction (or label, directive, ...) is stored as **CBNode** (Code-Builder Node) and contains all the necessary information to emit machine code out of it later.
+
+There is a difference between **CodeBuilder** and **CodeCompiler**:
+
+  * **CodeBuilder** (low-level):
+    * Maximum compatibility with *Assembler**, easy to switch from **Assembler** to **CodeBuilder** and vice versa.
+    * Doesn't generate machine code directly, allows to serialize to **Assembler** when the whole code is ready to be encoded.
+
+  * **CodeCompiler** (high-level):
+    * Virtual registers - allows to use unlimited number of virtual registers which are allocated into physical registers by a built-in register allocator.
+    * Function nodes - allows to create functions by specifying their signatures and assigning virtual registers to function arguments and return value(s).
+    * Function calls - allows to call other functions withing the generated code by using the same interface for defining function signatures.
+
+There are multiple node types used by both:
+
+  * Basic Nodes:
+    * **CBNode** - Base class for all nodes.
+    * **CBInst** - Instruction node.
+    * **CBAlign** - Alignment directive (.align).
+    * **CBLabel** - Bound label.
+
+  * Data Nodes:
+    * **CBData** - Data embedded into the code.
+    * **CBConstPool** - Constant pool data.
+    * **CBLabelData** - Label address embedded as data.
+
+  * Informative Nodes:
+    * **CBComment** - Contains a comment string, doesn't affect code generation.
+    * **CBSentinel** - A marker that can be used to remember certain position, doesn't affect code generation.
+
+  * **CodeCompiler** Nodes:
+    * **CCFunc** - Start of a function.
+    * **CCFuncRet** - Return from a function.
+    * **CCFuncCall* - Function call.
+
+### Using CodeBuilder
 
 
 

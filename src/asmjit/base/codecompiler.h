@@ -592,10 +592,42 @@ public:
   // [Func]
   // --------------------------------------------------------------------------
 
-  //! Add a function `node` to the stream.
-  ASMJIT_API CCFunc* addFunc(CCFunc* func);
   //! Get the current function.
   ASMJIT_INLINE CCFunc* getFunc() const noexcept { return _func; }
+
+  //! Create a new `CCFunc`.
+  ASMJIT_API CCFunc* newFunc(const FuncSignature& sign) noexcept;
+  //! Add a function `node` to the stream.
+  ASMJIT_API CCFunc* addFunc(CCFunc* func);
+  //! Add a new function.
+  ASMJIT_API CCFunc* addFunc(const FuncSignature& sign);
+  //! Emit a sentinel that marks the end of the current function.
+  ASMJIT_API CBSentinel* endFunc();
+
+  // --------------------------------------------------------------------------
+  // [Ret]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `CCFuncRet`.
+  ASMJIT_API CCFuncRet* newRet(const Operand_& o0, const Operand_& o1) noexcept;
+  //! Add a new `CCFuncRet`.
+  ASMJIT_API CCFuncRet* addRet(const Operand_& o0, const Operand_& o1) noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Call]
+  // --------------------------------------------------------------------------
+
+  //! Create a new `CCFuncCall`.
+  ASMJIT_API CCFuncCall* newCall(uint32_t instId, const Operand_& o0, const FuncSignature& sign) noexcept;
+  //! Add a new `CCFuncCall`.
+  ASMJIT_API CCFuncCall* addCall(uint32_t instId, const Operand_& o0, const FuncSignature& sign) noexcept;
+
+  // --------------------------------------------------------------------------
+  // [Args]
+  // --------------------------------------------------------------------------
+
+  //! Set a function argument at `argIndex` to `reg`.
+  ASMJIT_API Error setArg(uint32_t argIndex, const Reg& reg);
 
   // --------------------------------------------------------------------------
   // [Hint]

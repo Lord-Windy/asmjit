@@ -25,7 +25,7 @@ namespace asmjit {
 // ============================================================================
 
 RAPass::RAPass() noexcept :
-  CBPass(),
+  CBPass("RA"),
   _varMapToVaListOffset(0) {}
 RAPass::~RAPass() noexcept {}
 
@@ -33,14 +33,13 @@ RAPass::~RAPass() noexcept {}
 // [asmjit::RAPass - Interface]
 // ============================================================================
 
-Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
-  _cc = static_cast<CodeCompiler*>(cb);
+Error RAPass::process(Zone* zone) noexcept {
   _zone = zone;
   _heap.reset(zone);
-  _emitComments = (cb->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
+  _emitComments = (cb()->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) != 0;
 
   Error err = kErrorOk;
-  CBNode* node = _cc->getFirstNode();
+  CBNode* node = cc()->getFirstNode();
   if (!node) return err;
 
   do {
@@ -60,8 +59,6 @@ Error RAPass::process(CodeBuilder* cb, Zone* zone) noexcept {
 
   _heap.reset(nullptr);
   _zone = nullptr;
-  _cc = nullptr;
-
   return err;
 }
 
@@ -80,7 +77,7 @@ Error RAPass::compile(CCFunc* func) noexcept {
     if (err) break;
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
-    if (_cc->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) {
+    if (cc()->getGlobalOptions() & CodeEmitter::kOptionLoggingEnabled) {
       err = annotate();
       if (err) break;
     }
@@ -94,7 +91,7 @@ Error RAPass::compile(CCFunc* func) noexcept {
   // We alter the compiler cursor, because it doesn't make sense to reference
   // it after compilation - some nodes may disappear and it's forbidden to add
   // new code after the compilation is done.
-  _cc->_setCursor(nullptr);
+  cc()->_setCursor(nullptr);
   return err;
 }
 
@@ -207,7 +204,7 @@ RACell* RAPass::_newVarCell(VirtReg* vreg) {
   return cell;
 
 _NoMemory:
-  _cc->setLastError(DebugUtils::errored(kErrorNoHeapMemory));
+  cc()->setLastError(DebugUtils::errored(kErrorNoHeapMemory));
   return nullptr;
 }
 
@@ -345,7 +342,7 @@ Error RAPass::removeUnreachableCode() {
             ASMJIT_TSEC({
               this->_traceNode(this, node, "[REMOVED UNREACHABLE] ");
             });
-            _cc->removeNode(node);
+            cc()->removeNode(node);
           }
 
           node = next;

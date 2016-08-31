@@ -9,7 +9,7 @@
 #define _ASMJIT_BASE_CODEBUILDER_H
 
 #include "../asmjit_build.h"
-#if !defined(ASMJIT_DISABLE_COMPILER)
+#if !defined(ASMJIT_DISABLE_BUILDER)
 
 // [Dependencies]
 #include "../base/assembler.h"
@@ -29,6 +29,8 @@ namespace asmjit {
 // ============================================================================
 
 class CBNode;
+class CBPass;
+
 class CBAlign;
 class CBComment;
 class CBConstPool;
@@ -56,7 +58,7 @@ public:
   // --------------------------------------------------------------------------
 
   //! Create a new `CodeBuilder` instance.
-  ASMJIT_API CodeBuilder(CodeHolder* code = nullptr) noexcept;
+  ASMJIT_API CodeBuilder() noexcept;
   //! Destroy the `CodeBuilder` instance.
   ASMJIT_API virtual ~CodeBuilder() noexcept;
 
@@ -68,7 +70,25 @@ public:
   ASMJIT_API virtual Error onDetach(CodeHolder* code) noexcept override;
 
   // --------------------------------------------------------------------------
-  // [Node-Factory]
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  //! Get a vector of CBPass objects that will be executed by `process()`.
+  ASMJIT_INLINE const ZoneVector<CBPass*>& getPasses() const noexcept { return _cbPasses; }
+
+  //! Get a vector of CBLabel nodes.
+  //!
+  //! NOTE: If a label of some index is not associated with `CodeBuilder` it
+  //! would be null, so always check for nulls if you iterate over the vector.
+  ASMJIT_INLINE const ZoneVector<CBLabel*>& getLabels() const noexcept { return _cbLabels; }
+
+  //! Get the first node.
+  ASMJIT_INLINE CBNode* getFirstNode() const noexcept { return _firstNode; }
+  //! Get the last node.
+  ASMJIT_INLINE CBNode* getLastNode() const noexcept { return _lastNode; }
+
+  // --------------------------------------------------------------------------
+  // [Node-Management]
   // --------------------------------------------------------------------------
 
   //! \internal
@@ -105,7 +125,20 @@ public:
   ASMJIT_API CBComment* newCommentNode(const char* s, size_t len) noexcept;
 
   // --------------------------------------------------------------------------
-  // [Code-Management]
+  // [Code-Emitter]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API virtual Label newLabel() override;
+  ASMJIT_API virtual Label newNamedLabel(const char* name, size_t nameLength = kInvalidIndex, uint32_t type = Label::kTypeGlobal, uint32_t parentId = kInvalidValue) override;
+  ASMJIT_API virtual Error bind(const Label& label) override;
+  ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
+  ASMJIT_API virtual Error embed(const void* data, uint32_t size) override;
+  ASMJIT_API virtual Error embedLabel(const Label& label) override;
+  ASMJIT_API virtual Error embedConstPool(const Label& label, const ConstPool& pool) override;
+  ASMJIT_API virtual Error comment(const char* s, size_t len = kInvalidIndex) override;
+
+  // --------------------------------------------------------------------------
+  // [Node-Management]
   // --------------------------------------------------------------------------
 
   //! Add `node` after the current and set current to `node`.
@@ -119,11 +152,6 @@ public:
   //! Remove multiple nodes.
   ASMJIT_API void removeNodes(CBNode* first, CBNode* last) noexcept;
 
-  //! Get the first node.
-  ASMJIT_INLINE CBNode* getFirstNode() const noexcept { return _firstNode; }
-  //! Get the last node.
-  ASMJIT_INLINE CBNode* getLastNode() const noexcept { return _lastNode; }
-
   //! Get current node.
   //!
   //! \note If this method returns null it means that nothing has been
@@ -135,20 +163,32 @@ public:
   ASMJIT_API CBNode* setCursor(CBNode* node) noexcept;
 
   // --------------------------------------------------------------------------
-  // [Code-Generation]
+  // [Passes]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API virtual Label newLabel() override;
-  ASMJIT_API virtual Label newNamedLabel(const char* name, size_t nameLength = kInvalidIndex, uint32_t type = Label::kTypeGlobal, uint32_t parentId = kInvalidValue) override;
-  ASMJIT_API virtual Error bind(const Label& label) override;
-  ASMJIT_API virtual Error align(uint32_t mode, uint32_t alignment) override;
-  ASMJIT_API virtual Error embed(const void* data, uint32_t size) override;
-  ASMJIT_API virtual Error embedLabel(const Label& label) override;
-  ASMJIT_API virtual Error embedConstPool(const Label& label, const ConstPool& pool) override;
-  ASMJIT_API virtual Error comment(const char* s, size_t len = kInvalidIndex) override;
+  template<typename T>
+  ASMJIT_INLINE T* newPassT() noexcept { return new(_cbBaseZone.alloc(sizeof(T))) T(); }
+  template<typename T, typename P0>
+  ASMJIT_INLINE T* newPassT(P0 p0) noexcept { return new(_cbBaseZone.alloc(sizeof(T))) T(p0); }
+  template<typename T, typename P0, typename P1>
+  ASMJIT_INLINE T* newPassT(P0 p0, P1 p1) noexcept { return new(_cbBaseZone.alloc(sizeof(T))) T(p0, p1); }
+
+  template<typename T>
+  ASMJIT_INLINE Error addPassT() noexcept { return addPass(newPassT<T>()); }
+  template<typename T, typename P0>
+  ASMJIT_INLINE Error addPassT(P0 p0) noexcept { return addPass(newPassT<P0>(p0)); }
+  template<typename T, typename P0, typename P1>
+  ASMJIT_INLINE Error addPassT(P0 p0, P1 p1) noexcept { return addPass(newPassT<P0, P1>(p0, p1)); }
+
+  //! Get a `CBPass` by name.
+  ASMJIT_API CBPass* getPassByName(const char* name) const noexcept;
+  //! Add `pass` to the list of passes.
+  ASMJIT_API Error addPass(CBPass* pass) noexcept;
+  //! Remove `pass` from the list of passes and delete it.
+  ASMJIT_API Error deletePass(CBPass* pass) noexcept;
 
   // --------------------------------------------------------------------------
-  // [Code-Serialization]
+  // [Serialization]
   // --------------------------------------------------------------------------
 
   ASMJIT_API virtual Error serialize(CodeEmitter* dst);
@@ -157,11 +197,12 @@ public:
   // [Members]
   // --------------------------------------------------------------------------
 
-  Zone _cbBaseZone;                      //!< Base zone used to allocate nodes.
+  Zone _cbBaseZone;                      //!< Base zone used to allocate nodes and `CBPass`.
   Zone _cbDataZone;                      //!< Data zone used to allocate data and names.
   Zone _cbPassZone;                      //!< Zone passed to `CBPass::process()`.
-
   ZoneHeap _cbHeap;                      //!< ZoneHeap that uses `_cbBaseZone`.
+
+  ZoneVector<CBPass*> _cbPasses;         //!< Array of `CBPass` objects.
   ZoneVector<CBLabel*> _cbLabels;        //!< Maps label indexes to `CBLabel` nodes.
 
   CBNode* _firstNode;                    //!< First node of the current section.
@@ -176,7 +217,7 @@ public:
 // [asmjit::CBPass]
 // ============================================================================
 
-//! Code builder pipeline used for code transformations and lowering.
+//! `CodeBuilder` pass used to  code transformations, analysis, and lowering.
 class ASMJIT_VIRTAPI CBPass {
 public:
   ASMJIT_NONCOPYABLE(CBPass);
@@ -185,7 +226,7 @@ public:
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API CBPass() noexcept;
+  ASMJIT_API CBPass(const char* name) noexcept;
   ASMJIT_API virtual ~CBPass() noexcept;
 
   // --------------------------------------------------------------------------
@@ -199,7 +240,21 @@ public:
   //! allocator `zone`, which will be reset after the `process()` returns. The
   //! allocator should be used for all allocations as it's fast and everything
   //! it allocates will be released at once when `process()` returns.
-  virtual Error process(CodeBuilder* cb, Zone* zone) noexcept = 0;
+  virtual Error process(Zone* zone) noexcept = 0;
+
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE const CodeBuilder* cb() const noexcept { return _cb; }
+  ASMJIT_INLINE const char* getName() const noexcept { return _name; }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  CodeBuilder* _cb;                      //!< CodeBuilder this pass is assigned to.
+  const char* _name;                     //!< Name of the pass.
 };
 
 // ============================================================================
@@ -253,10 +308,8 @@ public:
   ASMJIT_ENUM(Flags) {
     //! The node has been translated by the CodeCompiler.
     kFlagIsTranslated = 0x0001,
-
     //! If the node can be safely removed (has no effect).
     kFlagIsRemovable = 0x0004,
-
     //! If the node is informative only and can be safely removed.
     kFlagIsInformative = 0x0008,
 
@@ -509,12 +562,22 @@ Update:
   // [Members]
   // --------------------------------------------------------------------------
 
-  uint16_t _instId;                      //!< Instruction id, depends on the architecture.
+  uint16_t _instId;                      //!< Instruction id (architecture dependent).
   uint8_t _memOpIndex;                   //!< \internal
   uint8_t _reserved;                     //!< \internal
   uint32_t _options;                     //!< Instruction options.
   Operand _opExtra;                      //!< Extra operand (op-mask {k} on AVX-512).
   Operand* _opArray;                     //!< Instruction operands.
+};
+
+// ============================================================================
+// [asmjit::CBInstEx]
+// ============================================================================
+
+struct CBInstEx : public CBInst {
+  Operand _op4;
+  Operand _op5;
+  Operand _opExtra;
 };
 
 // ============================================================================
@@ -770,6 +833,13 @@ public:
   ASMJIT_INLINE ConstPool& getConstPool() noexcept { return _constPool; }
   ASMJIT_INLINE const ConstPool& getConstPool() const noexcept { return _constPool; }
 
+  //! Get whether the constant-pool is empty.
+  ASMJIT_INLINE bool isEmpty() const noexcept { return _constPool.isEmpty(); }
+  //! Get the size of the constant-pool in bytes.
+  ASMJIT_INLINE size_t getSize() const noexcept { return _constPool.getSize(); }
+  //! Get minimum alignment.
+  ASMJIT_INLINE size_t getAlignment() const noexcept { return _constPool.getAlignment(); }
+
   //! See \ref ConstPool::add().
   ASMJIT_INLINE Error add(const void* data, size_t size, size_t& dstOffset) noexcept {
     return _constPool.add(data, size, dstOffset);
@@ -835,5 +905,5 @@ public:
 #include "../asmjit_apiend.h"
 
 // [Guard]
-#endif // !ASMJIT_DISABLE_COMPILER
+#endif // !ASMJIT_DISABLE_BUILDER
 #endif // _ASMJIT_BASE_CODEBUILDER_H

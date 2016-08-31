@@ -681,9 +681,8 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
                      static_cast<uint32_t>((size_t)(_bufferEnd - cursor) < 16) |
                      getGlobalOptions() | getOptions();
 
-
-  const X86Inst* iData = X86InstDB::instData + instId;
-  const X86Inst::ExtendedData* iExtData;
+  const X86Inst* instData = X86InstDB::instData + instId;
+  const X86Inst::CommonData* commonData;
 
   // Handle failure and rare cases first.
   const uint32_t kErrorsAndSpecialCases =
@@ -720,28 +719,23 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
       ASMJIT_PROPAGATE(X86Assembler_validateInstruction(this, instId, options, o0, o1, o2, o3));
 #endif // !ASMJIT_DISABLE_VALIDATION
 
-    // Now it's safe to get extended-data.
-    iExtData = iData->getExtDataPtr();
-
     // Handle LOCK prefix.
     if (options & X86Inst::kOptionLock) {
-      if (!iExtData->isLockable())
+      if (!(instData->getFlags() & X86Inst::kInstFlagLock))
         goto InvalidInstruction;
       EMIT_BYTE(0xF0);
     }
-  }
-  else {
-    iExtData = iData->getExtDataPtr();
   }
 
   // --------------------------------------------------------------------------
   // [Encoding Scope]
   // --------------------------------------------------------------------------
 
-  opCode = iData->getPrimaryOpCode();
+  opCode = instData->getMainOpCode();
   opReg = x86ExtractO(opCode);
+  commonData = &instData->getCommonData();
 
-  switch (iExtData->getEncoding()) {
+  switch (instData->getEncodingType()) {
     case X86Inst::kEncodingNone:
       goto EmitDone;
 
@@ -1040,7 +1034,7 @@ CaseX86M_Bx_MulDiv:
       imVal = static_cast<const Imm&>(o1).getInt64();
       imLen = 1;
 
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
       opReg = x86ExtractO(opCode);
       ADD_PREFIX_BY_SIZE(o0.getSize());
 
@@ -1070,7 +1064,7 @@ CaseX86M_Bx_MulDiv:
       }
 
       // The following instructions use the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS1(Imm)) {
         imVal = static_cast<const Imm&>(o0).getInt64();
@@ -1286,7 +1280,7 @@ CaseX86M_Bx_MulDiv:
 
         if (is32Bit()) {
           // INC r16|r32 is only encodable in 32-bit mode (collides with REX).
-          opCode = iExtData->getSecondaryOpCode() + (rbReg & 0x07);
+          opCode = commonData->getAltOpCode() + (rbReg & 0x07);
           ADD_66H_P_BY_SIZE(o0.getSize());
           goto EmitX86Op;
         }
@@ -1790,7 +1784,7 @@ CaseX86Pop_Gp:
           if (ASMJIT_UNLIKELY(o0.getSize() < 2))
             goto InvalidInstruction;
 
-          opCode = iExtData->getSecondaryOpCode();
+          opCode = commonData->getAltOpCode();
           opReg = o0.getId();
 
           ADD_66H_P_BY_SIZE(o0.getSize());
@@ -1990,7 +1984,7 @@ CaseX86Pop_Gp:
       }
 
       // The following instructions use the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
       opReg = x86ExtractO(opCode);
 
       if (isign3 == ENC_OPS2(Reg, Imm)) {
@@ -2168,17 +2162,17 @@ CaseFpuArith_Mem:
       if (isign3 == ENC_OPS1(Mem)) {
         rmMem = x86OpMem(o0);
 
-        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
+        if (o0.getSize() == 4 && commonData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
+        if (o0.getSize() == 8 && commonData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
           opCode += 4;
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 10 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M10)) {
-          opCode = iExtData->getSecondaryOpCode();
+        if (o0.getSize() == 10 && commonData->hasFlag(X86Inst::kInstFlagFPU_M10)) {
+          opCode = commonData->getAltOpCode();
           opReg  = x86ExtractO(opCode);
           goto EmitX86M;
         }
@@ -2197,17 +2191,17 @@ CaseFpuArith_Mem:
         opCode &= ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
 
         rmMem = x86OpMem(o0);
-        if (o0.getSize() == 2 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M2)) {
+        if (o0.getSize() == 2 && commonData->hasFlag(X86Inst::kInstFlagFPU_M2)) {
           opCode += 4;
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 4 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
+        if (o0.getSize() == 4 && commonData->hasFlag(X86Inst::kInstFlagFPU_M4)) {
           goto EmitX86M;
         }
 
-        if (o0.getSize() == 8 && iExtData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
-          opCode = iExtData->getSecondaryOpCode() & ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
+        if (o0.getSize() == 8 && commonData->hasFlag(X86Inst::kInstFlagFPU_M8)) {
+          opCode = commonData->getAltOpCode() & ~static_cast<uint32_t>(X86Inst::kOpCode_CDSHL_Mask);
           opReg  = x86ExtractO(opCode);
           goto EmitX86M;
         }
@@ -2233,7 +2227,7 @@ CaseFpuArith_Mem:
         if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdAx))
           goto InvalidInstruction;
 
-        opCode = iExtData->getSecondaryOpCode();
+        opCode = commonData->getAltOpCode();
         goto EmitFpuOp;
       }
 
@@ -2264,7 +2258,7 @@ CaseFpuArith_Mem:
 
       if (isign3 == ENC_OPS3(Mem, Reg, Imm)) {
         // Secondary opcode of 'pextrw' instruction (SSE4.1).
-        opCode = iExtData->getSecondaryOpCode();
+        opCode = commonData->getAltOpCode();
         ADD_66H_P(x86::isXmm(o1));
 
         imVal = static_cast<const Imm&>(o2).getInt64();
@@ -2306,10 +2300,10 @@ CaseFpuArith_Mem:
         opReg = o0.getId();
         rbReg = o1.getId();
 
-        if (!(options & X86Inst::kOptionModMR) || !iExtData->hasSecondaryOpcode())
+        if (!(options & X86Inst::kOptionModMR) || !commonData->hasAltOpCode())
           goto EmitX86R;
 
-        opCode = iExtData->getSecondaryOpCode();
+        opCode = commonData->getAltOpCode();
         Utils::swap(opReg, rbReg);
         goto EmitX86R;
       }
@@ -2322,7 +2316,7 @@ CaseFpuArith_Mem:
       }
 
       // The following instruction uses opCode[1].
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       // Mem <- GP|MMX|XMM
       if (isign3 == ENC_OPS2(Mem, Reg)) {
@@ -2354,7 +2348,7 @@ CaseFpuArith_Mem:
       }
 
       // The following instruction uses the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS2(Mem, Reg)) {
         if (o1.getSize() == 1)
@@ -2385,7 +2379,7 @@ CaseExtMovd:
       }
 
       // The following instructions use the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
       opReg = o1.getId();
       ADD_66H_P(x86::isXmm(o1));
 
@@ -2547,7 +2541,7 @@ CaseExtRm:
       }
 
       // The following instruction uses the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
       opReg  = x86ExtractO(opCode);
 
       if (isign3 == ENC_OPS2(Reg, Imm)) {
@@ -2577,7 +2571,7 @@ CaseExtRm:
       }
 
       // The following instruction uses the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
       opReg  = x86ExtractO(opCode);
 
       if (isign3 == ENC_OPS2(Reg, Imm)) {
@@ -2641,7 +2635,7 @@ CaseExtRm:
         goto EmitX86R;
 
       // The following instruction uses the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS3(Reg, Imm, Imm)) {
         imVal = (static_cast<const Imm&>(o1).getUInt32()     ) +
@@ -2662,7 +2656,7 @@ CaseExtRm:
         goto EmitX86R;
 
       // The following instruction uses the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       if (isign4 == ENC_OPS4(Reg, Reg, Imm, Imm)) {
         imVal = (static_cast<const Imm&>(o2).getUInt32()     ) +
@@ -2711,13 +2705,13 @@ CaseExtRm:
 
         // Form 'k, reg'.
         if (x86::isGp(o1)) {
-          opCode = iExtData->getSecondaryOpCode();
+          opCode = commonData->getAltOpCode();
           goto EmitVexEvexR;
         }
 
         // Form 'reg, k'.
         if (x86::isGp(o0)) {
-          opCode = iExtData->getSecondaryOpCode() + 1;
+          opCode = commonData->getAltOpCode() + 1;
           goto EmitVexEvexR;
         }
 
@@ -2967,7 +2961,7 @@ CaseVexRvm_R:
 
     case X86Inst::kEncodingVexRmvRm_VM:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
-        opCode  = iExtData->getSecondaryOpCode();
+        opCode  = commonData->getAltOpCode();
         opCode |= Utils::iMax(x86OpCodeLByVMem(o1), x86OpCodeLBySize(o0.getSize()));
 
         opReg = o0.getId();
@@ -3010,7 +3004,7 @@ CaseVexRvm_R:
     case X86Inst::kEncodingVexMovDQ:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (x86::isGp(o0)) {
-          opCode = iExtData->getSecondaryOpCode();
+          opCode = commonData->getAltOpCode();
           opReg = o1.getId();
           rbReg = o0.getId();
           goto EmitVexEvexR;
@@ -3050,7 +3044,7 @@ CaseVexRmMr_AfterRegReg:
 
       // The following instruction uses the secondary opcode.
       opCode &= X86Inst::kOpCode_LL_Mask;
-      opCode |= iExtData->getSecondaryOpCode();
+      opCode |= commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS2(Mem, Reg)) {
         opReg = o1.getId();
@@ -3108,7 +3102,7 @@ CaseVexRmMr_AfterRegReg:
 
       // The following instructions use the secondary opcode.
       opCode &= X86Inst::kOpCode_LL_Mask;
-      opCode |= iExtData->getSecondaryOpCode();
+      opCode |= commonData->getAltOpCode();
 
       imVal = static_cast<const Imm&>(o2).getInt64();
       imLen = 1;
@@ -3157,7 +3151,7 @@ CaseVexRmMr_AfterRegReg:
       }
 
       // The following instructions use the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       imVal = static_cast<const Imm&>(o2).getInt64();
       imLen = 1;
@@ -3189,7 +3183,7 @@ CaseVexRmMr_AfterRegReg:
       }
 
       // The following instructions use the secondary opcode.
-      opCode = iExtData->getSecondaryOpCode();
+      opCode = commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         opReg = o1.getId();
@@ -3223,7 +3217,7 @@ CaseVexRmMr_AfterRegReg:
 
       // The following instruction uses the secondary opcode.
       opCode &= X86Inst::kOpCode_LL_Mask;
-      opCode |= iExtData->getSecondaryOpCode();
+      opCode |= commonData->getAltOpCode();
 
       if (isign3 == ENC_OPS3(Mem, Reg, Reg)) {
         opReg = x86PackRegAndVvvvv(o2.getId(), o1.getId());
@@ -3251,7 +3245,7 @@ CaseVexRmMr_AfterRegReg:
 
       // The following instruction uses the secondary opcode.
       opCode &= X86Inst::kOpCode_LL_Mask;
-      opCode |= iExtData->getSecondaryOpCode();
+      opCode |= commonData->getAltOpCode();
       opReg = x86ExtractO(opCode);
 
       imVal = static_cast<const Imm&>(o2).getInt64();
@@ -3403,7 +3397,7 @@ CaseVexRmMr_AfterRegReg:
       }
 
       if (isign3 == ENC_OPS2(Mem, Reg)) {
-        opCode = iExtData->getSecondaryOpCode();
+        opCode = commonData->getAltOpCode();
         opReg = o1.getId();
         rmMem = x86OpMem(o0);
         goto EmitVexEvexM;
@@ -4036,7 +4030,7 @@ EmitVexEvexM:
   }
 
   // MOD|SIB address.
-  if (!iExtData->hasFlag(X86Inst::kInstFlagVM))
+  if (!commonData->hasFlag(X86Inst::kInstFlagVM))
     goto EmitModSib;
 
   // MOD|VSIB address without INDEX is invalid.

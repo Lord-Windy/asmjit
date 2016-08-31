@@ -700,8 +700,8 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitRegMove(X86Emitter* emitter,
   // be really necessary, however, after this function was separated from Compiler
   // it's better to make sure that the size is always specified, as we can use
   // 'movzx' and 'movsx' that rely on it.
-  if (dst.isMem()) { memFlags |= kDstMem; static_cast<X86Mem&>(dst).setSize(src.getSize()); }
-  if (src.isMem()) { memFlags |= kSrcMem; static_cast<X86Mem&>(src).setSize(dst.getSize()); }
+  if (dst.isMem()) { memFlags |= kDstMem; dst.as<X86Mem>().setSize(src.getSize()); }
+  if (src.isMem()) { memFlags |= kSrcMem; src.as<X86Mem>().setSize(dst.getSize()); }
 
   switch (typeId) {
     case TypeId::kI8:
@@ -975,7 +975,7 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitArgMove(X86Emitter* emitter,
   }
 
   if (src.isMem())
-    static_cast<X86Mem&>(src).setSize(srcSize);
+    src.as<X86Mem>().setSize(srcSize);
 
   emitter->setInlineComment(comment);
   return emitter->emit(instId, dst, src);

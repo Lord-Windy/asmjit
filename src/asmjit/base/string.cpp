@@ -38,7 +38,7 @@ StringBuilder::~StringBuilder() noexcept {
 // [asmjit::StringBuilder - Prepare / Reserve]
 // ============================================================================
 
-char* StringBuilder::prepare(uint32_t op, size_t len) noexcept {
+ASMJIT_FAVOR_SIZE char* StringBuilder::prepare(uint32_t op, size_t len) noexcept {
   if (op == kStringOpSet) {
     // We don't care here, but we can't return a null pointer since it indicates
     // failure in memory allocation.
@@ -126,7 +126,7 @@ char* StringBuilder::prepare(uint32_t op, size_t len) noexcept {
   }
 }
 
-Error StringBuilder::reserve(size_t to) noexcept {
+ASMJIT_FAVOR_SIZE Error StringBuilder::reserve(size_t to) noexcept {
   if (_capacity >= to)
     return kErrorOk;
 
@@ -335,17 +335,14 @@ bool StringBuilder::eq(const char* str, size_t len) const noexcept {
 
   if (bLength == kInvalidIndex) {
     size_t i;
-    for (i = 0; i < aLength; i++) {
+    for (i = 0; i < aLength; i++)
       if (aData[i] != bData[i] || bData[i] == 0)
         return false;
-    }
-
     return bData[i] == 0;
   }
   else {
     if (aLength != bLength)
       return false;
-
     return ::memcmp(aData, bData, aLength) == 0;
   }
 }

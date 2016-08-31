@@ -183,13 +183,8 @@ struct CallConv {
   // [Utilities]
   // --------------------------------------------------------------------------
 
-  static ASMJIT_INLINE bool isX86Family(uint32_t ccId) noexcept {
-    return ccId >= _kIdX86Start && ccId <= _kIdX64End;
-  }
-
-  static ASMJIT_INLINE bool isArmFamily(uint32_t ccId) noexcept {
-    return ccId >= _kIdArmStart && ccId <= _kIdArmEnd;
-  }
+  static ASMJIT_INLINE bool isX86Family(uint32_t ccId) noexcept { return ccId >= _kIdX86Start && ccId <= _kIdX64End; }
+  static ASMJIT_INLINE bool isArmFamily(uint32_t ccId) noexcept { return ccId >= _kIdArmStart && ccId <= _kIdArmEnd; }
 
   // --------------------------------------------------------------------------
   // [Init / Reset]
@@ -221,14 +216,14 @@ struct CallConv {
   //! Set calling convention algorithm, see \ref Algorithm.
   ASMJIT_INLINE void setAlgorithm(uint32_t algorithm) noexcept { _algorithm = static_cast<uint8_t>(algorithm); }
 
+  //! Get if the calling convention has the given `flag` set.
+  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
   //! Get calling convention flags, see \ref Flags.
   ASMJIT_INLINE uint32_t getFlags() const noexcept { return _flags; }
   //! Add calling convention flags, see \ref Flags.
   ASMJIT_INLINE void setFlags(uint32_t flag) noexcept { _flags = flag; };
   //! Add calling convention flags, see \ref Flags.
   ASMJIT_INLINE void addFlags(uint32_t flag) noexcept { _flags |= flag; };
-  //! Get if the calling convention has the given `flag` set.
-  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_flags & flag) != 0; }
 
   //! Get a natural stack alignment.
   ASMJIT_INLINE uint32_t getNaturalStackAlignment() const noexcept { return _naturalStackAlignment; }
@@ -724,7 +719,6 @@ public:
   ASMJIT_INLINE uint32_t getFlags() const noexcept { return _callConv.getFlags(); }
   //! Check if a CallConv `flag` is set, see \ref CallConv::Flags.
   ASMJIT_INLINE bool hasFlag(uint32_t ccFlag) const noexcept { return _callConv.hasFlag(ccFlag); }
-
 
   // --------------------------------------------------------------------------
   // [Accessors - Arguments and Return]

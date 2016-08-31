@@ -37,6 +37,9 @@ class ZoneHeap {
   ASMJIT_NONCOPYABLE(ZoneHeap)
 
   enum {
+    // In short, we pool chunks of these sizes:
+    //   [32, 64, 96, 128, 192, 256, 320, 384, 448, 512]
+
     //! How many bytes per a low granularity pool (has to be at least 16).
     kLoGranularity = 32,
     //! Number of slots of a low granularity pool.
