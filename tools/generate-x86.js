@@ -31,14 +31,6 @@ const asmdb = (function() {
 // Special cases.
 const x86db = new asmdb.x86util.X86DataBase().addDefault();
 x86db.addInstructions([
-  // Call in [imm] form (absolute address handled by AsmJit).
-  ["call"  , "id"         , "D"    , "E8 cd"              , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
-  ["call"  , "iq"         , "D"    , "E8 cd"              , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
-
-  // Jmp in [imm] form (absolute address handled by AsmJit).
-  ["jmp"   , "id"         , "D"    , "E9 cd"              , "ANY VOLATILE"],
-  ["jmp"   , "iq"         , "D"    , "E9 cd"              , "ANY VOLATILE"],
-
   // Imul in [reg, imm] form (a signature expanded to [reg, reg, imm] by AsmJit).
   ["imul"  , "r16, ib"    , "RM"   , "66 6B /r ib"        , "ANY OF=W SF=W ZF=U AF=U PF=U CF=W"],
   ["imul"  , "r32, ib"    , "RM"   , "6B /r ib"           , "ANY OF=W SF=W ZF=U AF=U PF=U CF=W"],
@@ -591,18 +583,6 @@ class OSignature {
     if (flags.eax && flags.r32) delete flags["eax"];
     if (flags.rax && flags.r64) delete flags["rax"];
 
-    // Individual segment registers used by push/pop/...
-    if (flags.es && flags.fs && flags.gs) {
-      delete flags["cs"];
-      delete flags["ss"];
-      delete flags["ds"];
-      delete flags["es"];
-      delete flags["fs"];
-      delete flags["gs"];
-      delete flags["es"];
-      flags.sreg = true;
-    }
-
     // 32-bit register or 16-bit memory implies also 16-bit reg.
     if (flags.r32 && flags.m16) {
       flags.r16 = true;
@@ -640,7 +620,7 @@ class OSignature {
     var mFlags = Object.create(null);
     var mMemFlags = Object.create(null);
     var mExtFlags = Object.create(null);
-    var sRegIndex = "0xFF";
+    var sRegMask = 0;
 
     if (flags.read && flags.write)
       mFlags.rw = true;
@@ -669,72 +649,80 @@ class OSignature {
         case "mm"      :
         case "xmm"     :
         case "ymm"     :
-        case "zmm"     : mFlags[k]    = true; break;
+        case "zmm"     : mFlags[k] = true; break;
 
-        case "m8"      : mFlags.mem   = true; mMemFlags.m8    = true; break;
-        case "m16"     : mFlags.mem   = true; mMemFlags.m16   = true; break;
-        case "m32"     : mFlags.mem   = true; mMemFlags.m32   = true; break;
-        case "m64"     : mFlags.mem   = true; mMemFlags.m64   = true; break;
-        case "m80"     : mFlags.mem   = true; mMemFlags.m80   = true; break;
-        case "m128"    : mFlags.mem   = true; mMemFlags.m128  = true; break;
-        case "m256"    : mFlags.mem   = true; mMemFlags.m256  = true; break;
-        case "m512"    : mFlags.mem   = true; mMemFlags.m512  = true; break;
-        case "m1024"   : mFlags.mem   = true; mMemFlags.m1024 = true; break;
-        case "mib"     : mFlags.mem   = true; mMemFlags.mib   = true; break;
-        case "mem"     : mFlags.mem   = true; mMemFlags.mAny  = true; break;
+        case "m8"      : mFlags.mem = true; mMemFlags.m8    = true; break;
+        case "m16"     : mFlags.mem = true; mMemFlags.m16   = true; break;
+        case "m32"     : mFlags.mem = true; mMemFlags.m32   = true; break;
+        case "m64"     : mFlags.mem = true; mMemFlags.m64   = true; break;
+        case "m80"     : mFlags.mem = true; mMemFlags.m80   = true; break;
+        case "m128"    : mFlags.mem = true; mMemFlags.m128  = true; break;
+        case "m256"    : mFlags.mem = true; mMemFlags.m256  = true; break;
+        case "m512"    : mFlags.mem = true; mMemFlags.m512  = true; break;
+        case "m1024"   : mFlags.mem = true; mMemFlags.m1024 = true; break;
+        case "mib"     : mFlags.mem = true; mMemFlags.mib   = true; break;
+        case "mem"     : mFlags.mem = true; mMemFlags.mAny  = true; break;
 
-        case "vm32x"   : mFlags.vm    = true; mMemFlags.vm32x = true; break;
-        case "vm32y"   : mFlags.vm    = true; mMemFlags.vm32y = true; break;
-        case "vm32z"   : mFlags.vm    = true; mMemFlags.vm32z = true; break;
-        case "vm64x"   : mFlags.vm    = true; mMemFlags.vm64x = true; break;
-        case "vm64y"   : mFlags.vm    = true; mMemFlags.vm64y = true; break;
-        case "vm64z"   : mFlags.vm    = true; mMemFlags.vm64z = true; break;
+        case "vm32x"   : mFlags.vm = true; mMemFlags.vm32x = true; break;
+        case "vm32y"   : mFlags.vm = true; mMemFlags.vm32y = true; break;
+        case "vm32z"   : mFlags.vm = true; mMemFlags.vm32z = true; break;
+        case "vm64x"   : mFlags.vm = true; mMemFlags.vm64x = true; break;
+        case "vm64y"   : mFlags.vm = true; mMemFlags.vm64y = true; break;
+        case "vm64z"   : mFlags.vm = true; mMemFlags.vm64z = true; break;
 
         case "i4"      :
         case "i8"      :
         case "i16"     :
         case "i32"     :
-        case "i64"     :
+        case "i64"     : mFlags[k] = true; break;
+
         case "rel8"    :
-        case "rel32"   : mFlags[k]    = true; break;
+        case "rel32"   :
+          mFlags.i32 = true;
+          mFlags.i64 = true;
+          mFlags[k] = true;
+          break;
 
         default: {
-          const oldRegIndex = sRegIndex;
           switch (k) {
-            case "al"    : mFlags.r8lo = true; sRegIndex = "0"; break;
-            case "ah"    : mFlags.r8hi = true; sRegIndex = "0"; break;
-            case "ax"    : mFlags.r16  = true; sRegIndex = "0"; break;
-            case "eax"   : mFlags.r32  = true; sRegIndex = "0"; break;
-            case "rax"   : mFlags.r64  = true; sRegIndex = "0"; break;
-            case "bl"    : mFlags.r8lo = true; sRegIndex = "3"; break;
-            case "bh"    : mFlags.r8hi = true; sRegIndex = "3"; break;
-            case "bx"    : mFlags.r16  = true; sRegIndex = "3"; break;
-            case "ebx"   : mFlags.r32  = true; sRegIndex = "3"; break;
-            case "rbx"   : mFlags.r64  = true; sRegIndex = "3"; break;
-            case "cl"    : mFlags.r8lo = true; sRegIndex = "1"; break;
-            case "ch"    : mFlags.r8hi = true; sRegIndex = "1"; break;
-            case "cx"    : mFlags.r16  = true; sRegIndex = "1"; break;
-            case "ecx"   : mFlags.r32  = true; sRegIndex = "1"; break;
-            case "rcx"   : mFlags.r64  = true; sRegIndex = "1"; break;
-            case "dl"    : mFlags.r8lo = true; sRegIndex = "2"; break;
-            case "dh"    : mFlags.r8hi = true; sRegIndex = "2"; break;
-            case "dx"    : mFlags.r16  = true; sRegIndex = "2"; break;
-            case "edx"   : mFlags.r32  = true; sRegIndex = "2"; break;
-            case "rdx"   : mFlags.r64  = true; sRegIndex = "2"; break;
-            case "si"    : mFlags.r16  = true; sRegIndex = "6"; break;
-            case "esi"   : mFlags.r32  = true; sRegIndex = "6"; break;
-            case "rsi"   : mFlags.r64  = true; sRegIndex = "6"; break;
-            case "di"    : mFlags.r16  = true; sRegIndex = "7"; break;
-            case "edi"   : mFlags.r32  = true; sRegIndex = "7"; break;
-            case "rdi"   : mFlags.r64  = true; sRegIndex = "7"; break;
-            case "fp0"   : mFlags.fp   = true; sRegIndex = "0"; break;
-            case "xmm0"  : mFlags.xmm  = true; sRegIndex = "0"; break;
-            case "ymm0"  : mFlags.ymm  = true; sRegIndex = "0"; break;
+            case "es"    : mFlags.sreg = true; sRegMask |= 1 << 1; break;
+            case "cs"    : mFlags.sreg = true; sRegMask |= 1 << 2; break;
+            case "ss"    : mFlags.sreg = true; sRegMask |= 1 << 3; break;
+            case "ds"    : mFlags.sreg = true; sRegMask |= 1 << 4; break;
+            case "fs"    : mFlags.sreg = true; sRegMask |= 1 << 5; break;
+            case "gs"    : mFlags.sreg = true; sRegMask |= 1 << 6; break;
+            case "al"    : mFlags.r8lo = true; sRegMask |= 1 << 0; break;
+            case "ah"    : mFlags.r8hi = true; sRegMask |= 1 << 0; break;
+            case "ax"    : mFlags.r16  = true; sRegMask |= 1 << 0; break;
+            case "eax"   : mFlags.r32  = true; sRegMask |= 1 << 0; break;
+            case "rax"   : mFlags.r64  = true; sRegMask |= 1 << 0; break;
+            case "bl"    : mFlags.r8lo = true; sRegMask |= 1 << 3; break;
+            case "bh"    : mFlags.r8hi = true; sRegMask |= 1 << 3; break;
+            case "bx"    : mFlags.r16  = true; sRegMask |= 1 << 3; break;
+            case "ebx"   : mFlags.r32  = true; sRegMask |= 1 << 3; break;
+            case "rbx"   : mFlags.r64  = true; sRegMask |= 1 << 3; break;
+            case "cl"    : mFlags.r8lo = true; sRegMask |= 1 << 1; break;
+            case "ch"    : mFlags.r8hi = true; sRegMask |= 1 << 1; break;
+            case "cx"    : mFlags.r16  = true; sRegMask |= 1 << 1; break;
+            case "ecx"   : mFlags.r32  = true; sRegMask |= 1 << 1; break;
+            case "rcx"   : mFlags.r64  = true; sRegMask |= 1 << 1; break;
+            case "dl"    : mFlags.r8lo = true; sRegMask |= 1 << 2; break;
+            case "dh"    : mFlags.r8hi = true; sRegMask |= 1 << 2; break;
+            case "dx"    : mFlags.r16  = true; sRegMask |= 1 << 2; break;
+            case "edx"   : mFlags.r32  = true; sRegMask |= 1 << 2; break;
+            case "rdx"   : mFlags.r64  = true; sRegMask |= 1 << 2; break;
+            case "si"    : mFlags.r16  = true; sRegMask |= 1 << 6; break;
+            case "esi"   : mFlags.r32  = true; sRegMask |= 1 << 6; break;
+            case "rsi"   : mFlags.r64  = true; sRegMask |= 1 << 6; break;
+            case "di"    : mFlags.r16  = true; sRegMask |= 1 << 7; break;
+            case "edi"   : mFlags.r32  = true; sRegMask |= 1 << 7; break;
+            case "rdi"   : mFlags.r64  = true; sRegMask |= 1 << 7; break;
+            case "fp0"   : mFlags.fp   = true; sRegMask |= 1 << 0; break;
+            case "xmm0"  : mFlags.xmm  = true; sRegMask |= 1 << 0; break;
+            case "ymm0"  : mFlags.ymm  = true; sRegMask |= 1 << 0; break;
             default:
               console.log(`UNKNOWN OPERAND '${k}'`);
           }
-          if (oldRegIndex !== "0xFF" && oldRegIndex !== sRegIndex)
-            throw new Error(`Register index collision ${oldRegIndex} vs ${sRegIndex}`);
         }
       }
     }
@@ -743,7 +731,7 @@ class OSignature {
     const sMemFlags = StringifyArray(SortOpArray(Object.getOwnPropertyNames(mMemFlags)), OpToAsmJitOp);
     const sExtFlags = StringifyArray(SortOpArray(Object.getOwnPropertyNames(mExtFlags)), OpToAsmJitOp);
 
-    return `OSIGNATURE(${sFlags || 0}, ${sMemFlags || 0}, ${sExtFlags || 0}, ${sRegIndex})`;
+    return `OSIGNATURE(${sFlags || 0}, ${sMemFlags || 0}, ${sExtFlags || 0}, ${Utils.decToHex(sRegMask, 2)})`;
   }
 }
 

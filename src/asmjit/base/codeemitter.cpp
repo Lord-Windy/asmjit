@@ -122,7 +122,7 @@ Error CodeEmitter::setLastError(Error error, const char* message) {
 
   // Logging is skipped if the error is handled by `ErrorHandler`.
   ErrorHandler* handler = _code->_errorHandler;
-  ASMJIT_TLOG("[ERROR] 0x%0.8u: %s%s\n",
+  ASMJIT_TLOG("[ERROR] 0x%08u: %s%s\n",
     static_cast<unsigned int>(error), message, handler ? "" : " (ErrorHandler not attached)");
 
   if (handler && handler->handleError(error, message, this))

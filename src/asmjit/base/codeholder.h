@@ -127,9 +127,9 @@ public:
       _stdCallConv(CallConv::kIdNone),
       _fastCallConv(CallConv::kIdNone),
       _baseAddress(kNoBaseAddress) {}
-  ASMJIT_INLINE CodeInfo(const CodeInfo& other) noexcept { *this = other; }
+  ASMJIT_INLINE CodeInfo(const CodeInfo& other) noexcept { init(other); }
 
-  explicit ASMJIT_INLINE CodeInfo(uint32_t archType, uint32_t archMode = 0, uint64_t baseAddress = 0) noexcept
+  explicit ASMJIT_INLINE CodeInfo(uint32_t archType, uint32_t archMode = 0, uint64_t baseAddress = kNoBaseAddress) noexcept
     : _archInfo(archType, archMode),
       _packedMiscInfo(0),
       _baseAddress(baseAddress) {}
@@ -148,10 +148,10 @@ public:
     _baseAddress = other._baseAddress;
   }
 
-  ASMJIT_INLINE void init(uint32_t archType, uint32_t archMode = 0) noexcept {
+  ASMJIT_INLINE void init(uint32_t archType, uint32_t archMode = 0, uint64_t baseAddress = kNoBaseAddress) noexcept {
     _archInfo.init(archType, archMode);
     _packedMiscInfo = 0;
-    _baseAddress = 0;
+    _baseAddress = baseAddress;
   }
 
   ASMJIT_INLINE void reset() noexcept {

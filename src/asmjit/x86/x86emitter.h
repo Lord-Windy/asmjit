@@ -489,11 +489,16 @@ struct X86EmitterBaseT {
   INST_0x(int3, Int3)                                                     // ANY
   INST_0x(into, Into)                                                     // ANY
   INST_1c(j, J, X86Inst::condToJcc, Label)                                // ANY
+  INST_1c(j, J, X86Inst::condToJcc, Imm)                                  // ANY
+  INST_1c(j, J, X86Inst::condToJcc, uint64_t)                             // ANY
   INST_2x(jecxz, Jecxz, X86Gp, Label)                                     // ANY       [EXPLICIT] Short jump if CX/ECX/RCX is zero.
+  INST_2x(jecxz, Jecxz, X86Gp, Imm)                                       // ANY       [EXPLICIT] Short jump if CX/ECX/RCX is zero.
+  INST_2x(jecxz, Jecxz, X86Gp, uint64_t)                                  // ANY       [EXPLICIT] Short jump if CX/ECX/RCX is zero.
   INST_1x(jmp, Jmp, X86Gp)                                                // ANY
   INST_1x(jmp, Jmp, X86Mem)                                               // ANY
   INST_1x(jmp, Jmp, Label)                                                // ANY
-  INST_1i(jmp, Jmp, Imm)                                                  // ANY
+  INST_1x(jmp, Jmp, Imm)                                                  // ANY
+  INST_1x(jmp, Jmp, uint64_t)                                             // ANY
   INST_1x(lahf, Lahf, AH)                                                 // LAHF_SAHF [EXPLICIT] AH <- EFL
   INST_1x(ldmxcsr, Ldmxcsr, X86Mem)                                       // SSE
   INST_2x(lea, Lea, X86Gp, X86Mem)                                        // ANY
@@ -4748,6 +4753,8 @@ struct X86EmitterImplicitT : public X86EmitterBaseT<This> {
   INST_1x(imul, Imul, X86Mem)                                             // ANY       [IMPLICIT] AX      <- AL  * m8
                                                                           // ANY       [IMPLICIT] xAX:xDX <- xAX * m16|m32|m64
   INST_1x(jecxz, Jecxz, Label)                                            // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
+  INST_1x(jecxz, Jecxz, Imm)                                              // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
+  INST_1x(jecxz, Jecxz, uint64_t)                                         // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
   INST_0x(lahf, Lahf)                                                     // LAHF_SAHF [IMPLICIT] AH      <- EFL
   INST_1x(mul, Mul, X86Gp)                                                // ANY       [IMPLICIT] AX      <-  AL * r8
                                                                           // ANY       [IMPLICIT] xDX:xAX <- xAX * r16|r32|r64

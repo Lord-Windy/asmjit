@@ -134,6 +134,9 @@ ASMJIT_ENUM(ErrorCode) {
   //! Parent id specified for a non-local (global) label.
   kErrorNonLocalLabelCantHaveParent,
 
+  //! Invalid relocation entry.
+  kErrorInvalidRelocEntry,
+
   //! Invalid instruction.
   kErrorInvalidInstruction,
   //! Invalid register type.
@@ -152,18 +155,22 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidBroadcast,
   //! Invalid 'suppress-all-exceptions' {sae} or 'rounding-control' {rc} (AVX-512).
   kErrorInvalidSAEOrER,
-  //! Illegal address used (not encodable).
+  //! Invalid address used (not encodable).
   kErrorInvalidAddress,
-  //! Illegal displacement used (not encodable).
+  //! Invalid use of 64-bit address in 32-bit mode.
+  kErrorInvalidUseOf64BitAddressIn32BitMode,
+  //! Invalid displacement (not encodable).
   kErrorInvalidDisplacement,
+  //! Invalid REX prefix.
+  kErrorInvalidRexPrefix,
 
   //! Invalid TypeId.
   kErrorInvalidTypeId,
-  //! Illegal use of a low 8-bit GPB register.
+  //! Invalid use of a low 8-bit GPB register.
   kErrorInvalidUseOfGpbHi,
-  //! Illegal use of a 64-bit GPQ register in 32-bit mode.
+  //! Invalid use of a 64-bit GPQ register in 32-bit mode.
   kErrorInvalidUseOfGpq,
-  //! Illegal use of an 80-bit float (TypeId::kF80).
+  //! Invalid use of an 80-bit float (TypeId::kF80).
   kErrorInvalidUseOfF80,
   //! AsmJit requires a physical register, but no one is available.
   kErrorNoMorePhysRegs,

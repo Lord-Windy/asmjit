@@ -2380,7 +2380,7 @@ struct X86Inst {
     uint32_t flags;                      //!< Operand flags.
     uint16_t memFlags;                   //!< Memory flags.
     uint8_t extFlags;                    //!< Extra flags.
-    uint8_t regId;                       //!< Register index or 0xFF (if not used).
+    uint8_t regMask;                     //!< Mask of possible register IDs.
   };
 
   // --------------------------------------------------------------------------

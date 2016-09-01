@@ -484,7 +484,7 @@ int main(int argc, char* argv[]) {
   // Print the machine-code generated or do something more interesting with it?
   //   8B4424048B4C24048B5424040F28010F58010F2900C3
   for (size_t i = 0; i < buf.length; i++)
-    printf("%0.2X", buf.data[i]);
+    printf("%02X", buf.data[i]);
 
   return 0;
 }
@@ -1288,7 +1288,7 @@ public:
   // Return `true` to set last error to `err`, return `false` to do nothing.
   // The `origin` points to the `X86Assembler` instance (&a in our case).
   virtual bool handleError(Error err, const char* message, void* origin) {
-    printf("ASMJIT ERROR: 0x%0.8X [%s]\n", err, message);
+    printf("ASMJIT ERROR: 0x%08X [%s]\n", err, message);
     return false;
   }
 };
@@ -1355,7 +1355,7 @@ int main(int argc, char* argv[]) {
     a.emit(X86Inst::kIdMov, x86::eax, x86::xmm4, x86::xmm1);
   }
   catch (const AsmJitException& ex) {
-    printf("ASMJIT ERROR: 0x%0.8X [%s]\n", ex.error, ex.message.c_str());
+    printf("ASMJIT ERROR: 0x%08X [%s]\n", ex.error, ex.message.c_str());
   }
 }
 ```
@@ -1395,7 +1395,7 @@ int main(int argc, char* argv[]) {
   }
   else {
     Error err = a.getLastError();
-    printf("ASMJIT ERROR: 0x%0.8X [%s]\n", err, DebugUtils::errorAsString(err));
+    printf("ASMJIT ERROR: 0x%08X [%s]\n", err, DebugUtils::errorAsString(err));
   }
 }
 ```

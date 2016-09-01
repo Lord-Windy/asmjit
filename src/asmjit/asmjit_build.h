@@ -966,7 +966,7 @@ public:
 
 // Internal macros that are only used when building AsmJit itself.
 #if defined(ASMJIT_EXPORTS)
-# if ASMJIT_CC_HAS_ATTRIBUTE_OPTIMIZE
+# if !defined(ASMJIT_DEBUG) && ASMJIT_CC_HAS_ATTRIBUTE_OPTIMIZE
 #  define ASMJIT_FAVOR_SIZE __attribute__((__optimize__("Os")))
 # else
 #  define ASMJIT_FAVOR_SIZE

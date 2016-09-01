@@ -517,14 +517,14 @@ uint32_t CodeHolder::getLabelIdByName(const char* name, size_t nameLength, uint3
 // ============================================================================
 
 //! Encode MOD byte.
-static ASMJIT_INLINE uint32_t X86_MOD(uint32_t m, uint32_t o, uint32_t rm) noexcept {
+static ASMJIT_INLINE uint32_t x86EncodeMod(uint32_t m, uint32_t o, uint32_t rm) noexcept {
   return (m << 6) | (o << 3) | rm;
 }
 
+// TODO: Support multiple sections, this only relocates the first.
+// TODO: This should go to Runtime as it's responsible for relocating the
+//       code, CodeHolder should just hold it.
 size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
-  // TODO: Support multiple sections, this only relocates the first.
-  // TODO: This should go to Runtime as it's responsible for relocating the
-  // code, CodeHolder should just hold it.
   SectionEntry* section = _sections[0];
   ASMJIT_ASSERT(section != nullptr);
 
@@ -545,8 +545,8 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
   // is generated on-the-fly by the relocator (this code doesn't exist at the moment).
   ::memcpy(dst, section->buffer.data, minCodeSize);
 
-  // Trampoline pointer.
-  uint8_t* tramp = dst + minCodeSize;
+  // Trampoline offset from the beginning of dst/baseAddress.
+  size_t trampOffset = minCodeSize;
 
   // Relocate all recorded locations.
   size_t numRelocs = _relocations.getLength();
@@ -555,80 +555,100 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
   for (size_t i = 0; i < numRelocs; i++) {
     const CodeHolder::RelocEntry& re = relocs[i];
 
-    // Make sure that the `RelocEntry` is correct.
     uint64_t ptr = re.data;
-    size_t offset = static_cast<size_t>(re.from);
-    ASMJIT_ASSERT(offset + re.size <= static_cast<uint64_t>(maxCodeSize));
+    size_t codeOffset = static_cast<size_t>(re.from);
 
-    // Whether to use trampoline, can be only used if relocation type is
-    // kRelocAbsToRel on 64-bit.
+    // Make sure that the `RelocEntry` is correct, we don't want to write
+    // out of bounds in `dst`.
+    if (ASMJIT_UNLIKELY(codeOffset + re.size > maxCodeSize))
+      return DebugUtils::errored(kErrorInvalidRelocEntry);
+
+    // Whether to use trampoline, can be only used if relocation type is `kRelocTrampoline`.
     bool useTrampoline = false;
 
     switch (re.type) {
-      case kRelocAbsToAbs:
+      case kRelocAbsToAbs: {
         break;
+      }
 
-      case kRelocRelToAbs:
+      case kRelocRelToAbs: {
         ptr += baseAddress;
         break;
+      }
 
-      case kRelocAbsToRel:
-        ptr -= baseAddress + re.from + 4;
+      case kRelocAbsToRel: {
+        ptr -= baseAddress + re.from + re.size;
         break;
+      }
 
-      case kRelocTrampoline:
-        ptr -= baseAddress + re.from + 4;
+      case kRelocTrampoline: {
+        if (re.size != 4)
+          return DebugUtils::errored(kErrorInvalidRelocEntry);
+
+        ptr -= baseAddress + re.from + re.size;
         if (!Utils::isInt32(static_cast<int64_t>(ptr))) {
-          ptr = (uint64_t)tramp - (baseAddress + re.from + 4);
+          ptr = (uint64_t)trampOffset - re.from - re.size;
           useTrampoline = true;
         }
         break;
+      }
 
       default:
-        ASMJIT_NOT_REACHED();
+        return DebugUtils::errored(kErrorInvalidRelocEntry);
     }
 
     switch (re.size) {
-      case 4: Utils::writeU32u(dst + offset, static_cast<uint32_t>(ptr & 0xFFFFFFFFU)); break;
-      case 8: Utils::writeU64u(dst + offset, ptr); break;
-      default: ASMJIT_NOT_REACHED();
+      case 1:
+        Utils::writeU8(dst + codeOffset, static_cast<uint32_t>(ptr & 0xFFU));
+        break;
+
+      case 4:
+        Utils::writeU32u(dst + codeOffset, static_cast<uint32_t>(ptr & 0xFFFFFFFFU));
+        break;
+
+      case 8:
+        Utils::writeU64u(dst + codeOffset, ptr);
+        break;
+
+      default:
+        return DebugUtils::errored(kErrorInvalidRelocEntry);
     }
 
     // Handle the trampoline case.
     if (useTrampoline) {
       // Bytes that replace [REX, OPCODE] bytes.
       uint32_t byte0 = 0xFF;
-      uint32_t byte1 = dst[offset - 1];
+      uint32_t byte1 = dst[codeOffset - 1];
 
       if (byte1 == 0xE8) {
         // Patch CALL/MOD byte to FF/2 (-> 0x15).
-        byte1 = X86_MOD(0, 2, 5);
+        byte1 = x86EncodeMod(0, 2, 5);
       }
       else if (byte1 == 0xE9) {
         // Patch JMP/MOD byte to FF/4 (-> 0x25).
-        byte1 = X86_MOD(0, 4, 5);
+        byte1 = x86EncodeMod(0, 4, 5);
+      }
+      else {
+        return DebugUtils::errored(kErrorInvalidRelocEntry);
       }
 
       // Patch `jmp/call` instruction.
-      ASMJIT_ASSERT(offset >= 2);
-      dst[offset - 2] = static_cast<uint8_t>(byte0);
-      dst[offset - 1] = static_cast<uint8_t>(byte1);
+      ASMJIT_ASSERT(codeOffset >= 2);
+      dst[codeOffset - 2] = static_cast<uint8_t>(byte0);
+      dst[codeOffset - 1] = static_cast<uint8_t>(byte1);
 
-      // Absolute address.
-      Utils::writeU64u(tramp, static_cast<uint64_t>(re.data));
-
-      // Advance trampoline pointer.
-      tramp += 8;
+      // Store absolute address and advance the trampoline pointer.
+      Utils::writeU64u(dst + trampOffset, re.data);
+      trampOffset += 8;
 
 #if !defined(ASMJIT_DISABLE_LOGGING)
       if (logger)
-        logger->logf("[reloc] dq 0x%0.16llX ; Trampoline\n", re.data);
+        logger->logf("[reloc] dq 0x%016llX ; Trampoline\n", re.data);
 #endif // !ASMJIT_DISABLE_LOGGING
     }
   }
 
-  size_t result = archType == ArchInfo::kTypeX64 ? (size_t)(tramp - dst) : (size_t)(minCodeSize);
-  return result;
+  return minCodeSize + trampOffset;
 }
 
 } // asmjit namespace
