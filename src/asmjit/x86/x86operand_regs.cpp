@@ -79,11 +79,6 @@ namespace asmjit {
   ASMJIT_X86_REG_04(TYPE, ID + 0 ), \
   ASMJIT_X86_REG_04(TYPE, ID + 4 )
 
-#define ASMJIT_X86_REG_09(TYPE, ID) \
-  ASMJIT_X86_REG_04(TYPE, ID + 0 ), \
-  ASMJIT_X86_REG_04(TYPE, ID + 4 ), \
-  ASMJIT_X86_REG_01(TYPE, ID + 8 )
-
 #define ASMJIT_X86_REG_16(TYPE, ID) \
   ASMJIT_X86_REG_08(TYPE, ID + 0 ), \
   ASMJIT_X86_REG_08(TYPE, ID + 8 )
@@ -164,8 +159,8 @@ const X86OpData x86OpData = {
   { ASMJIT_X86_REG_32(X86Reg::kRegYmm  , 0) },
   { ASMJIT_X86_REG_32(X86Reg::kRegZmm  , 0) },
   { ASMJIT_X86_REG_04(X86Reg::kRegBnd  , 0) },
-  { ASMJIT_X86_REG_09(X86Reg::kRegCr   , 0) },
-  { ASMJIT_X86_REG_08(X86Reg::kRegDr   , 0) }
+  { ASMJIT_X86_REG_16(X86Reg::kRegCr   , 0) },
+  { ASMJIT_X86_REG_16(X86Reg::kRegDr   , 0) }
 };
 
 #undef ASMJIT_X86_REG_32

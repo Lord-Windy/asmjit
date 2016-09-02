@@ -167,7 +167,7 @@ public:
   ASMJIT_INLINE void resetShift() noexcept { setShift(0); }
 
   //! Get if the memory operand has a segment override.
-  ASMJIT_INLINE bool hasSegment() const noexcept { return (_mem.flags & (kMemSegmentMask)) != 0; }
+  ASMJIT_INLINE bool hasSegment() const noexcept { return (_mem.flags & kMemSegmentMask) != 0; }
   //! Get associated segment override as `X86Seg` operand.
   ASMJIT_INLINE X86Seg getSegment() const noexcept;
   //! Get segment override as id, see \ref X86Seg::Id.
@@ -555,8 +555,8 @@ struct X86OpData {
   ASMJIT_DEFINE_REG_DATA(X86Ymm ) ymm[32];
   ASMJIT_DEFINE_REG_DATA(X86Zmm ) zmm[32];
   ASMJIT_DEFINE_REG_DATA(X86Bnd ) bnd[4];
-  ASMJIT_DEFINE_REG_DATA(X86CReg) cr[9];
-  ASMJIT_DEFINE_REG_DATA(X86DReg) dr[8];
+  ASMJIT_DEFINE_REG_DATA(X86CReg) cr[16];
+  ASMJIT_DEFINE_REG_DATA(X86DReg) dr[16];
 #undef ASMJIT_DEFINE_REG_DATA
 };
 ASMJIT_VARAPI const X86OpData x86OpData;
@@ -808,6 +808,13 @@ ASMJIT_PHYS_REG(X86CReg, cr5  , cr[5]);     //!< 32-bit or 64-bit control regist
 ASMJIT_PHYS_REG(X86CReg, cr6  , cr[6]);     //!< 32-bit or 64-bit control register.
 ASMJIT_PHYS_REG(X86CReg, cr7  , cr[7]);     //!< 32-bit or 64-bit control register.
 ASMJIT_PHYS_REG(X86CReg, cr8  , cr[8]);     //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr9  , cr[9]);     //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr10 , cr[10]);    //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr11 , cr[11]);    //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr12 , cr[12]);    //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr13 , cr[13]);    //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr14 , cr[14]);    //!< 32-bit or 64-bit control register.
+ASMJIT_PHYS_REG(X86CReg, cr15 , cr[15]);    //!< 32-bit or 64-bit control register.
 
 ASMJIT_PHYS_REG(X86DReg, dr0  , dr[0]);     //!< 32-bit or 64-bit debug register.
 ASMJIT_PHYS_REG(X86DReg, dr1  , dr[1]);     //!< 32-bit or 64-bit debug register.
@@ -817,6 +824,14 @@ ASMJIT_PHYS_REG(X86DReg, dr4  , dr[4]);     //!< 32-bit or 64-bit debug register
 ASMJIT_PHYS_REG(X86DReg, dr5  , dr[5]);     //!< 32-bit or 64-bit debug register.
 ASMJIT_PHYS_REG(X86DReg, dr6  , dr[6]);     //!< 32-bit or 64-bit debug register.
 ASMJIT_PHYS_REG(X86DReg, dr7  , dr[7]);     //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr8  , dr[8]);     //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr9  , dr[9]);     //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr10 , dr[10]);    //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr11 , dr[11]);    //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr12 , dr[12]);    //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr13 , dr[13]);    //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr14 , dr[14]);    //!< 32-bit or 64-bit debug register.
+ASMJIT_PHYS_REG(X86DReg, dr15 , dr[15]);    //!< 32-bit or 64-bit debug register.
 
 #undef ASMJIT_PHYS_REG
 } // anonymous namespace
@@ -970,35 +985,35 @@ static ASMJIT_INLINE X86Mem ptr(uint64_t base, const X86Vec& index, uint32_t shi
   }                                                                                 \
   /*! Create a `[base + (index << shift) + disp]` memory operand. */                \
   static ASMJIT_INLINE X86Mem FUNC(const X86Gp& base, const X86Gp& index, uint32_t shift = 0, int32_t disp = 0) noexcept { \
-    return ptr(base, index, shift, disp, SIZE);                                     \
+    return X86Mem(base, index, shift, disp, SIZE);                                  \
   }                                                                                 \
   /*! Create a `[base + (vec_index << shift) + disp]` memory operand. */            \
   static ASMJIT_INLINE X86Mem FUNC(const X86Gp& base, const X86Vec& index, uint32_t shift = 0, int32_t disp = 0) noexcept { \
-    return ptr(base, index, shift, disp, SIZE);                                     \
+    return X86Mem(base, index, shift, disp, SIZE);                                  \
   }                                                                                 \
   /*! Create a `[base + disp]` memory operand. */                                   \
   static ASMJIT_INLINE X86Mem FUNC(const Label& base, int32_t disp = 0) noexcept {  \
-    return ptr(base, disp, SIZE);                                                   \
+    return X86Mem(base, disp, SIZE);                                                \
   }                                                                                 \
   /*! Create a `[base + (index << shift) + disp]` memory operand. */                \
   static ASMJIT_INLINE X86Mem FUNC(const Label& base, const X86Gp& index, uint32_t shift, int32_t disp = 0) noexcept { \
-    return ptr(base, index, shift, disp, SIZE);                                     \
+    return X86Mem(base, index, shift, disp, SIZE);                                  \
   }                                                                                 \
   /*! Create a `[rip + disp]` memory operand. */                                    \
   static ASMJIT_INLINE X86Mem FUNC(const X86Rip& rip_, int32_t disp = 0) noexcept { \
-    return ptr(rip_, disp, SIZE);                                                   \
+    return X86Mem(rip_, disp, SIZE);                                                \
   }                                                                                 \
   /*! Create a `[base + disp]` memory operand. */                                   \
   static ASMJIT_INLINE X86Mem FUNC(uint64_t base) noexcept {                        \
-    return ptr(base, SIZE);                                                         \
+    return X86Mem(base, SIZE);                                                      \
   }                                                                                 \
   /*! Create a `[base + (index << shift) + disp]` memory operand. */                \
   static ASMJIT_INLINE X86Mem FUNC(uint64_t base, const X86Gp& index, uint32_t shift = 0) noexcept { \
-    return ptr(base, index, shift, SIZE);                                           \
+    return X86Mem(base, index, shift, SIZE);                                        \
   }                                                                                 \
   /*! Create a `[base + (vec_index << shift) + disp]` memory operand. */            \
   static ASMJIT_INLINE X86Mem FUNC(uint64_t base, const X86Vec& index, uint32_t shift = 0) noexcept { \
-    return ptr(base, index, shift, SIZE);                                           \
+    return X86Mem(base, index, shift, SIZE);                                        \
   }
 
 // Define memory operand constructors that use platform independent naming.
@@ -1018,6 +1033,7 @@ ASMJIT_DEFINE_PTR_FUNC(dword_ptr, 4)
 ASMJIT_DEFINE_PTR_FUNC(qword_ptr, 8)
 ASMJIT_DEFINE_PTR_FUNC(tword_ptr, 10)
 ASMJIT_DEFINE_PTR_FUNC(oword_ptr, 16)
+ASMJIT_DEFINE_PTR_FUNC(dqword_ptr, 16)
 ASMJIT_DEFINE_PTR_FUNC(yword_ptr, 32)
 ASMJIT_DEFINE_PTR_FUNC(zword_ptr, 64)
 

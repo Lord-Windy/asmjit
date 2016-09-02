@@ -145,6 +145,8 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidPhysId,
   //! Invalid register's virtual id.
   kErrorInvalidVirtId,
+  //! Invalid REX prefix.
+  kErrorInvalidRexPrefix,
   //! Invalid mask register (not 'k').
   kErrorInvalidKMaskReg,
   //! Invalid {k} use (not supported by the instruction).
@@ -161,8 +163,8 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidUseOf64BitAddressIn32BitMode,
   //! Invalid displacement (not encodable).
   kErrorInvalidDisplacement,
-  //! Invalid REX prefix.
-  kErrorInvalidRexPrefix,
+  //! Invalid segment.
+  kErrorInvalidSegment,
 
   //! Invalid TypeId.
   kErrorInvalidTypeId,

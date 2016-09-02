@@ -3476,7 +3476,7 @@ static const X86ValidationData _x64ValidationData = {
     0x00000000U,       // #00 None.
     0x00000000U,       // #01 Reserved.
     0x00000001U,       // #02 RIP.
-    0x00000060U,       // #03 SEG (FS|GS).
+    0x0000007EU,       // #03 SEG (FS|GS) (ES|CS|SS|DS defined, but ignored).
     0x0000FFFFU,       // #04 GPB-LO.
     0x0000000FU,       // #05 GPB-HI.
     0x0000FFFFU,       // #06 GPW.
@@ -3490,8 +3490,8 @@ static const X86ValidationData _x64ValidationData = {
     0xFFFFFFFFU,       // #14 ZMM (16 base regs, 32 regs only with EVEX encoding).
     0x00000000U,       // #15 FUTURE.
     0x0000000FU,       // #16 BND.
-    0x000001FFU,       // #17 CR.
-    0x000000FFU        // #18 DR.
+    0x0000FFFFU,       // #17 CR.
+    0x0000FFFFU        // #18 DR.
   },
 
   // AllowedMemBaseRegs:
@@ -3579,6 +3579,9 @@ ASMJIT_FAVOR_SIZE Error X86Inst::validate(
         uint32_t indexType = m.getIndexType();
 
         memOp = &m;
+
+        if (m.getSegmentId() > 6)
+          return DebugUtils::errored(kErrorInvalidSegment);
 
         // TODO: Validate base and index and combine with `combinedRegMask`.
         if (baseType) {
@@ -3965,7 +3968,7 @@ UNIT(x86_inst_validation) {
   INFO("Validating instructions that use segment registers.");
   EXPECT(x86_validate(X86Inst::kIdMov   , x86::ax  , x86::fs  ) == kErrorOk);
   EXPECT(x64_validate(X86Inst::kIdMov   , x86::ax  , x86::fs  ) == kErrorOk);
-  EXPECT(x64_validate(X86Inst::kIdMov   , x86::ax  , x86::cs  ) != kErrorOk);
+  EXPECT(x64_validate(X86Inst::kIdPush  , x86::cs             ) != kErrorOk);
 
   INFO("Validating instructions that use memory operands.");
   EXPECT(x86_validate(X86Inst::kIdMov   , x86::eax , x86::ptr(x86::ebx)) == kErrorOk);

@@ -9,7 +9,6 @@ Complete x86/x64 JIT and Remote Assembler for C++.
   * [Permissive ZLIB license](./LICENSE.md)
 
 'NEXT' TODO:
-
   * This README contains outdated code and is not complete.
   * Only the first section works atm.
   * AVX512 {sae} and {er} not supported yet.
