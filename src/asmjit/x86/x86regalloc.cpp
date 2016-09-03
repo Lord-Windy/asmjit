@@ -46,7 +46,7 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
 #define R(ri) { uint8_t(ri)         , uint8_t(kInvalidReg), uint16_t(TiedReg::kRReg) }
 #define W(ri) { uint8_t(kInvalidReg), uint8_t(ri)         , uint16_t(TiedReg::kWReg) }
 #define X(ri) { uint8_t(ri)         , uint8_t(ri)         , uint16_t(TiedReg::kXReg) }
-#define NONE() { 0, 0, 0 }
+#define NONE() { uint8_t(kInvalidReg), uint8_t(kInvalidReg), 0 }
   static const X86SpecialInst instCpuid[]        = { X(X86Gp::kIdAx), W(X86Gp::kIdBx), X(X86Gp::kIdCx), W(X86Gp::kIdDx) };
   static const X86SpecialInst instCbwCdqeCwde[]  = { X(X86Gp::kIdAx) };
   static const X86SpecialInst instCdqCwdCqo[]    = { W(X86Gp::kIdDx), R(X86Gp::kIdAx) };
@@ -56,19 +56,15 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
   static const X86SpecialInst instDiv2[]         = { X(X86Gp::kIdAx), R(kInvalidReg) };
   static const X86SpecialInst instDiv3[]         = { X(X86Gp::kIdDx), X(X86Gp::kIdAx), R(kInvalidReg) };
   static const X86SpecialInst instJecxz[]        = { R(X86Gp::kIdCx) };
-  static const X86SpecialInst instLods[]         = { W(X86Gp::kIdAx), X(X86Gp::kIdSi), X(X86Gp::kIdCx) };
   static const X86SpecialInst instMul2[]         = { X(X86Gp::kIdAx), R(kInvalidReg) };
   static const X86SpecialInst instMul3[]         = { W(X86Gp::kIdDx), X(X86Gp::kIdAx), R(kInvalidReg) };
   static const X86SpecialInst instMulx[]         = { W(kInvalidReg), W(kInvalidReg), R(kInvalidReg), R(X86Gp::kIdDx) };
-  static const X86SpecialInst instMovsCmps[]     = { X(X86Gp::kIdDi), X(X86Gp::kIdSi), X(X86Gp::kIdCx) };
   static const X86SpecialInst instLahf[]         = { W(X86Gp::kIdAx) };
   static const X86SpecialInst instSahf[]         = { R(X86Gp::kIdAx) };
   static const X86SpecialInst instMaskmovq[]     = { R(kInvalidReg), R(kInvalidReg), R(X86Gp::kIdDi) };
   static const X86SpecialInst instRdtscRdtscp[]  = { W(X86Gp::kIdDx), W(X86Gp::kIdAx), W(X86Gp::kIdCx) };
   static const X86SpecialInst instRot[]          = { X(kInvalidReg), R(X86Gp::kIdCx) };
-  static const X86SpecialInst instScas[]         = { X(X86Gp::kIdDi), R(X86Gp::kIdAx), X(X86Gp::kIdCx) };
   static const X86SpecialInst instShldShrd[]     = { X(kInvalidReg), R(kInvalidReg), R(X86Gp::kIdCx) };
-  static const X86SpecialInst instStos[]         = { R(X86Gp::kIdDi), R(X86Gp::kIdAx), X(X86Gp::kIdCx) };
   static const X86SpecialInst instThirdXMM0[]    = { W(kInvalidReg), R(kInvalidReg), R(0) };
   static const X86SpecialInst instPcmpestri[]    = { R(kInvalidReg), R(kInvalidReg), NONE(), W(X86Gp::kIdCx) };
   static const X86SpecialInst instPcmpestrm[]    = { R(kInvalidReg), R(kInvalidReg), NONE(), W(0) };
@@ -77,6 +73,12 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
   static const X86SpecialInst instXsaveXrstor[]  = { W(kInvalidReg), R(X86Gp::kIdDx), R(X86Gp::kIdAx) };
   static const X86SpecialInst instXgetbv[]       = { W(X86Gp::kIdDx), W(X86Gp::kIdAx), R(X86Gp::kIdCx) };
   static const X86SpecialInst instXsetbv[]       = { R(X86Gp::kIdDx), R(X86Gp::kIdAx), R(X86Gp::kIdCx) };
+
+  static const X86SpecialInst instCmps[]         = { X(X86Gp::kIdSi), X(X86Gp::kIdDi) };
+  static const X86SpecialInst instLods[]         = { W(X86Gp::kIdAx), X(X86Gp::kIdSi) };
+  static const X86SpecialInst instMovs[]         = { X(X86Gp::kIdDi), X(X86Gp::kIdSi) };
+  static const X86SpecialInst instScas[]         = { X(X86Gp::kIdDi), R(X86Gp::kIdAx) };
+  static const X86SpecialInst instStos[]         = { X(X86Gp::kIdDi), R(X86Gp::kIdAx) };
 #undef NONE
 #undef X
 #undef W
@@ -90,18 +92,7 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
     case X86Inst::kIdCdq        :
     case X86Inst::kIdCwd        :
     case X86Inst::kIdCqo        : return instCdqCwdCqo;
-    case X86Inst::kIdCmpsB      :
-    case X86Inst::kIdCmpsD      :
-    case X86Inst::kIdCmpsQ      :
-    case X86Inst::kIdCmpsW      :
-    case X86Inst::kIdRepeCmpsB  :
-    case X86Inst::kIdRepeCmpsD  :
-    case X86Inst::kIdRepeCmpsQ  :
-    case X86Inst::kIdRepeCmpsW  :
-    case X86Inst::kIdRepneCmpsB :
-    case X86Inst::kIdRepneCmpsD :
-    case X86Inst::kIdRepneCmpsQ :
-    case X86Inst::kIdRepneCmpsW : return instMovsCmps;
+    case X86Inst::kIdCmps       : return instCmps;
     case X86Inst::kIdCmpxchg    : return instCmpxchg;
     case X86Inst::kIdCmpxchg8b  :
     case X86Inst::kIdCmpxchg16b : return instCmpxchg8b16b;
@@ -115,22 +106,8 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
     case X86Inst::kIdMul        : return (opCount == 2) ? instMul2 : instMul3;
     case X86Inst::kIdMulx       : return instMulx;
     case X86Inst::kIdJecxz      : return instJecxz;
-    case X86Inst::kIdLodsB      :
-    case X86Inst::kIdLodsD      :
-    case X86Inst::kIdLodsQ      :
-    case X86Inst::kIdLodsW      :
-    case X86Inst::kIdRepLodsB   :
-    case X86Inst::kIdRepLodsD   :
-    case X86Inst::kIdRepLodsQ   :
-    case X86Inst::kIdRepLodsW   : return instLods;
-    case X86Inst::kIdMovsB      :
-    case X86Inst::kIdMovsD      :
-    case X86Inst::kIdMovsQ      :
-    case X86Inst::kIdMovsW      :
-    case X86Inst::kIdRepMovsB   :
-    case X86Inst::kIdRepMovsD   :
-    case X86Inst::kIdRepMovsQ   :
-    case X86Inst::kIdRepMovsW   : return instMovsCmps;
+    case X86Inst::kIdLods       : return instLods;
+    case X86Inst::kIdMovs       : return instMovs;
     case X86Inst::kIdLahf       : return instLahf;
     case X86Inst::kIdSahf       : return instSahf;
     case X86Inst::kIdMaskmovq   :
@@ -161,26 +138,8 @@ static ASMJIT_INLINE const X86SpecialInst* X86SpecialInst_get(uint32_t instId, c
                                   return instShldShrd;
     case X86Inst::kIdRdtsc      :
     case X86Inst::kIdRdtscp     : return instRdtscRdtscp;
-    case X86Inst::kIdScasB      :
-    case X86Inst::kIdScasD      :
-    case X86Inst::kIdScasQ      :
-    case X86Inst::kIdScasW      :
-    case X86Inst::kIdRepeScasB  :
-    case X86Inst::kIdRepeScasD  :
-    case X86Inst::kIdRepeScasQ  :
-    case X86Inst::kIdRepeScasW  :
-    case X86Inst::kIdRepneScasB :
-    case X86Inst::kIdRepneScasD :
-    case X86Inst::kIdRepneScasQ :
-    case X86Inst::kIdRepneScasW : return instScas;
-    case X86Inst::kIdStosB      :
-    case X86Inst::kIdStosD      :
-    case X86Inst::kIdStosQ      :
-    case X86Inst::kIdStosW      :
-    case X86Inst::kIdRepStosB   :
-    case X86Inst::kIdRepStosD   :
-    case X86Inst::kIdRepStosQ   :
-    case X86Inst::kIdRepStosW   : return instStos;
+    case X86Inst::kIdScas       : return instScas;
+    case X86Inst::kIdStos       : return instStos;
     case X86Inst::kIdBlendvpd   :
     case X86Inst::kIdBlendvps   :
     case X86Inst::kIdPblendvb   :
@@ -1656,6 +1615,8 @@ _NextGroup:
 
         uint32_t instId = node->getInstId();
         uint32_t flags = node->getFlags();
+        uint32_t options = node->getOptions();
+        uint32_t gpAllowedMask = 0xFFFFFFFF;
 
         Operand* opArray = node->getOpArray();
         uint32_t opCount = node->getOpCount();
@@ -1672,7 +1633,6 @@ _NextGroup:
           if (commonData.isSpecial() && (special = X86SpecialInst_get(instId, opArray, opCount)) != nullptr)
             flags |= CBNode::kFlagIsSpecial;
 
-          uint32_t gpAllowedMask = 0xFFFFFFFF;
           for (uint32_t i = 0; i < opCount; i++) {
             Operand* op = &opArray[i];
             VirtReg* vreg;
@@ -1805,6 +1765,8 @@ _NextGroup:
               X86Mem* m = static_cast<X86Mem*>(op);
               node->setMemOpIndex(i);
 
+              uint32_t specBase = special ? uint32_t(special[i].inReg) : uint32_t(kInvalidReg);
+
               if (m->hasBaseReg()) {
                 uint32_t id = m->getBaseId();
                 if (cc()->isVirtRegValid(id)) {
@@ -1847,7 +1809,17 @@ _NextGroup:
                       tied->flags |= combinedFlags;
                     }
                     else {
-                      tied->flags |= TiedReg::kRReg;
+                      if (specBase != kInvalidReg) {
+                        uint32_t mask = Utils::mask(specBase);
+                        inRegs.or_(vreg->getRegKind(), mask);
+                        outRegs.or_(vreg->getRegKind(), mask);
+                        tied->inRegs |= mask;
+                        tied->setOutPhysId(specBase);
+                        tied->flags |= special[i].flags;
+                      }
+                      else {
+                        tied->flags |= TiedReg::kRReg;
+                      }
                     }
                   }
                 }
@@ -1856,10 +1828,10 @@ _NextGroup:
               if (m->hasIndexReg()) {
                 uint32_t id = m->getIndexId();
                 if (cc()->isVirtRegValid(id)) {
-                  // TODO: AVX vector operands support.
-                  // Restrict allocation to all registers except ESP/RSP/R12.
+                  // Restrict allocation to all registers except ESP|RSP.
                   vreg = cc()->getVirtRegById(m->getIndexId());
                   if (!vreg->isFixed()) {
+                    // TODO: AVX vector operands support.
                     RA_MERGE(vreg, tied, 0, gaRegs[X86Reg::kKindGp] & gpAllowedMask);
                     tied->allocableRegs &= indexMask;
                     tied->flags |= TiedReg::kRReg;
@@ -1877,6 +1849,25 @@ _NextGroup:
               X86RAPass_prepareSingleVarInst(instId, &agTmp[0]);
           }
         }
+
+        const Operand_& opExtra = node->getOpExtra();
+        if ((options & CodeEmitter::kOptionOpExtra) != 0 && opExtra.isReg()) {
+          uint32_t id = opExtra.as<Reg>().getId();
+          if (cc()->isVirtRegValid(id)) {
+            VirtReg* vreg = cc()->getVirtRegById(id);
+            TiedReg* tied;
+            RA_MERGE(vreg, tied, 0, gaRegs[vreg->getRegKind()] & gpAllowedMask);
+
+            if (options & (X86Inst::kOptionRep | X86Inst::kOptionRepnz)) {
+              tied->allocableRegs = Utils::mask(X86Gp::kIdCx);
+              tied->flags |= TiedReg::kXReg;
+            }
+            else {
+              tied->flags |= TiedReg::kRReg;
+            }
+          }
+        }
+
         RA_FINALIZE(node_);
 
         // Handle conditional/unconditional jump.

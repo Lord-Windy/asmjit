@@ -318,6 +318,67 @@ public:
            size <= 32 ? signatureOf<kRegYmm>() : signatureOf<kRegZmm>() ;
   }
 
+  static ASMJIT_INLINE bool isGp(const Operand_& op) noexcept {
+    // Check operand type and register kind. Not interested in register type and size.
+    const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF           , 0x00);
+    const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 0x00);
+    return (op.getSignature() & kMsk) == kSgn;
+  }
+
+  //! Get if the `op` operand is either a low or high 8-bit GPB register.
+  static ASMJIT_INLINE bool isGpb(const Operand_& op) noexcept {
+    // Check operand type, register kind, and size. Not interested in register type.
+    const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF           , 0xFF);
+    const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 1   );
+    return (op.getSignature() & kMsk) == kSgn;
+  }
+
+  //! Get if the `op` operand is either a low or high 8-bit GPB register.
+  static ASMJIT_INLINE bool isVec(const Operand_& op) noexcept {
+    // Check operand type and register kind. Not interested in register type and size.
+    const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF            , 0x00);
+    const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindVec, 0   );
+    return (op.getSignature() & kMsk) == kSgn;
+  }
+
+  static ASMJIT_INLINE bool isRip(const Operand_& op) noexcept { return op.as<X86Reg>().isRip(); }
+  static ASMJIT_INLINE bool isSeg(const Operand_& op) noexcept { return op.as<X86Reg>().isSeg(); }
+  static ASMJIT_INLINE bool isGpbLo(const Operand_& op) noexcept { return op.as<X86Reg>().isGpbLo(); }
+  static ASMJIT_INLINE bool isGpbHi(const Operand_& op) noexcept { return op.as<X86Reg>().isGpbHi(); }
+  static ASMJIT_INLINE bool isGpw(const Operand_& op) noexcept { return op.as<X86Reg>().isGpw(); }
+  static ASMJIT_INLINE bool isGpd(const Operand_& op) noexcept { return op.as<X86Reg>().isGpd(); }
+  static ASMJIT_INLINE bool isGpq(const Operand_& op) noexcept { return op.as<X86Reg>().isGpq(); }
+  static ASMJIT_INLINE bool isFp(const Operand_& op) noexcept { return op.as<X86Reg>().isFp(); }
+  static ASMJIT_INLINE bool isMm(const Operand_& op) noexcept { return op.as<X86Reg>().isMm(); }
+  static ASMJIT_INLINE bool isK(const Operand_& op) noexcept { return op.as<X86Reg>().isK(); }
+  static ASMJIT_INLINE bool isXmm(const Operand_& op) noexcept { return op.as<X86Reg>().isXmm(); }
+  static ASMJIT_INLINE bool isYmm(const Operand_& op) noexcept { return op.as<X86Reg>().isYmm(); }
+  static ASMJIT_INLINE bool isZmm(const Operand_& op) noexcept { return op.as<X86Reg>().isZmm(); }
+  static ASMJIT_INLINE bool isBnd(const Operand_& op) noexcept { return op.as<X86Reg>().isBnd(); }
+  static ASMJIT_INLINE bool isCr(const Operand_& op) noexcept { return op.as<X86Reg>().isCr(); }
+  static ASMJIT_INLINE bool isDr(const Operand_& op) noexcept { return op.as<X86Reg>().isDr(); }
+
+  static ASMJIT_INLINE bool isGp(const Operand_& op, uint32_t id) noexcept { return isGp(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpb(const Operand_& op, uint32_t id) noexcept { return isGpb(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isVec(const Operand_& op, uint32_t id) noexcept { return isVec(op) & (op.getId() == id); }
+
+  static ASMJIT_INLINE bool isRip(const Operand_& op, uint32_t id) noexcept { return isRip(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isSeg(const Operand_& op, uint32_t id) noexcept { return isSeg(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpbLo(const Operand_& op, uint32_t id) noexcept { return isGpbLo(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpbHi(const Operand_& op, uint32_t id) noexcept { return isGpbHi(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpw(const Operand_& op, uint32_t id) noexcept { return isGpw(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpd(const Operand_& op, uint32_t id) noexcept { return isGpd(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isGpq(const Operand_& op, uint32_t id) noexcept { return isGpq(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isFp(const Operand_& op, uint32_t id) noexcept { return isFp(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isMm(const Operand_& op, uint32_t id) noexcept { return isMm(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isK(const Operand_& op, uint32_t id) noexcept { return isK(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isXmm(const Operand_& op, uint32_t id) noexcept { return isXmm(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isYmm(const Operand_& op, uint32_t id) noexcept { return isYmm(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isZmm(const Operand_& op, uint32_t id) noexcept { return isZmm(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isBnd(const Operand_& op, uint32_t id) noexcept { return isBnd(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isCr(const Operand_& op, uint32_t id) noexcept { return isCr(op) & (op.getId() == id); }
+  static ASMJIT_INLINE bool isDr(const Operand_& op, uint32_t id) noexcept { return isDr(op) & (op.getId() == id); }
+
   // --------------------------------------------------------------------------
   // [Memory Cast]
   // --------------------------------------------------------------------------
@@ -867,67 +928,6 @@ static ASMJIT_INLINE X86Bnd bnd(uint32_t id) noexcept { return X86Bnd(id); }
 static ASMJIT_INLINE X86CReg cr(uint32_t id) noexcept { return X86CReg(id); }
 //! Create a 32-bit or 64-bit debug register operand.
 static ASMJIT_INLINE X86DReg dr(uint32_t id) noexcept { return X86DReg(id); }
-
-static ASMJIT_INLINE bool isGp(const Operand_& op) noexcept {
-  // Check operand type and register kind. Not interested in register type and size.
-  const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF           , 0x00);
-  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 0x00);
-  return (op.getSignature() & kMsk) == kSgn;
-}
-
-//! Get if the `op` operand is either a low or high 8-bit GPB register.
-static ASMJIT_INLINE bool isGpb(const Operand_& op) noexcept {
-  // Check operand type, register kind, and size. Not interested in register type.
-  const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF           , 0xFF);
-  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindGp, 1   );
-  return (op.getSignature() & kMsk) == kSgn;
-}
-
-//! Get if the `op` operand is either a low or high 8-bit GPB register.
-static ASMJIT_INLINE bool isVec(const Operand_& op) noexcept {
-  // Check operand type and register kind. Not interested in register type and size.
-  const uint32_t kMsk = Utils::pack32_4x8(0xFF           , 0x00, 0xFF            , 0x00);
-  const uint32_t kSgn = Utils::pack32_4x8(Operand::kOpReg, 0x00, X86Reg::kKindVec, 0   );
-  return (op.getSignature() & kMsk) == kSgn;
-}
-
-static ASMJIT_INLINE bool isRip(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isRip(); }
-static ASMJIT_INLINE bool isSeg(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isSeg(); }
-static ASMJIT_INLINE bool isGpbLo(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isGpbLo(); }
-static ASMJIT_INLINE bool isGpbHi(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isGpbHi(); }
-static ASMJIT_INLINE bool isGpw(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isGpw(); }
-static ASMJIT_INLINE bool isGpd(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isGpd(); }
-static ASMJIT_INLINE bool isGpq(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isGpq(); }
-static ASMJIT_INLINE bool isFp(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isFp(); }
-static ASMJIT_INLINE bool isMm(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isMm(); }
-static ASMJIT_INLINE bool isK(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isK(); }
-static ASMJIT_INLINE bool isXmm(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isXmm(); }
-static ASMJIT_INLINE bool isYmm(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isYmm(); }
-static ASMJIT_INLINE bool isZmm(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isZmm(); }
-static ASMJIT_INLINE bool isBnd(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isBnd(); }
-static ASMJIT_INLINE bool isCr(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isCr(); }
-static ASMJIT_INLINE bool isDr(const Operand_& op) noexcept { return static_cast<const X86Reg&>(op).isDr(); }
-
-static ASMJIT_INLINE bool isGp(const Operand_& op, uint32_t id) noexcept { return isGp(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpb(const Operand_& op, uint32_t id) noexcept { return isGpb(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isVec(const Operand_& op, uint32_t id) noexcept { return isVec(op) & (op.getId() == id); }
-
-static ASMJIT_INLINE bool isRip(const Operand_& op, uint32_t id) noexcept { return isRip(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isSeg(const Operand_& op, uint32_t id) noexcept { return isSeg(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpbLo(const Operand_& op, uint32_t id) noexcept { return isGpbLo(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpbHi(const Operand_& op, uint32_t id) noexcept { return isGpbHi(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpw(const Operand_& op, uint32_t id) noexcept { return isGpw(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpd(const Operand_& op, uint32_t id) noexcept { return isGpd(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isGpq(const Operand_& op, uint32_t id) noexcept { return isGpq(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isFp(const Operand_& op, uint32_t id) noexcept { return isFp(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isMm(const Operand_& op, uint32_t id) noexcept { return isMm(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isK(const Operand_& op, uint32_t id) noexcept { return isK(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isXmm(const Operand_& op, uint32_t id) noexcept { return isXmm(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isYmm(const Operand_& op, uint32_t id) noexcept { return isYmm(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isZmm(const Operand_& op, uint32_t id) noexcept { return isZmm(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isBnd(const Operand_& op, uint32_t id) noexcept { return isBnd(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isCr(const Operand_& op, uint32_t id) noexcept { return isCr(op) & (op.getId() == id); }
-static ASMJIT_INLINE bool isDr(const Operand_& op, uint32_t id) noexcept { return isDr(op) & (op.getId() == id); }
 
 // ============================================================================
 // [asmjit::x86 - Ptr (Reg)]

@@ -159,8 +159,10 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidSAEOrER,
   //! Invalid address used (not encodable).
   kErrorInvalidAddress,
+  //! Invalid index register used in memory address (not encodable).
+  kErrorInvalidAddressIndex,
   //! Invalid use of 64-bit address in 32-bit mode.
-  kErrorInvalidUseOf64BitAddressIn32BitMode,
+  kErrorInvalidAddress64Bit,
   //! Invalid displacement (not encodable).
   kErrorInvalidDisplacement,
   //! Invalid segment.

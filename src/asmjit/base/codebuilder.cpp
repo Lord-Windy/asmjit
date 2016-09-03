@@ -556,8 +556,8 @@ Error CodeBuilder::serialize(CodeEmitter* dst) {
         const Operand_* o3 = &dst->_none;
 
         switch (opCount) {
-          case 6: dst->_op5 = opArray[5]; options |= CodeEmitter::kOptionHasOp5; ASMJIT_FALLTHROUGH;
-          case 5: dst->_op4 = opArray[4]; options |= CodeEmitter::kOptionHasOp4; ASMJIT_FALLTHROUGH;
+          case 6: dst->_op5 = opArray[5]; options |= CodeEmitter::kOptionOp5; ASMJIT_FALLTHROUGH;
+          case 5: dst->_op4 = opArray[4]; options |= CodeEmitter::kOptionOp4; ASMJIT_FALLTHROUGH;
           case 4: o3 = &opArray[3]; ASMJIT_FALLTHROUGH;
           case 3: o2 = &opArray[2]; ASMJIT_FALLTHROUGH;
           case 2: o1 = &opArray[1]; ASMJIT_FALLTHROUGH;

@@ -57,14 +57,14 @@ static const char x86FormatterSegmentNames[] =
 
 static const char* x86GetAddressSizeString(uint32_t size) noexcept {
   switch (size) {
-    case 1 : return "byte ptr ";
-    case 2 : return "word ptr ";
-    case 4 : return "dword ptr ";
-    case 8 : return "qword ptr ";
-    case 10: return "tword ptr ";
-    case 16: return "oword ptr ";
-    case 32: return "yword ptr ";
-    case 64: return "zword ptr ";
+    case 1 : return "byte ";
+    case 2 : return "word ";
+    case 4 : return "dword ";
+    case 8 : return "qword ";
+    case 10: return "tword ";
+    case 16: return "oword ";
+    case 32: return "yword ";
+    case 64: return "zword ";
     default: return "";
   }
 }
@@ -221,35 +221,63 @@ ASMJIT_FAVOR_SIZE Error X86Formatter::formatInstruction(
   const Operand_& opExtra,
   const Operand_* opArray, uint32_t opCount) const noexcept {
 
-  // Rex, lock and short prefix.
-  if (options & X86Inst::kOptionShortForm) out.appendString("short ");
-  if (options & X86Inst::kOptionLongForm) out.appendString("long ");
-  if (options & X86Inst::kOptionLock) out.appendString("lock ");
+  bool opExtraDone = false;
 
-  if (options & X86Inst::kOptionRex) {
-    const uint32_t kRXBWMask = X86Inst::kOptionOpCodeR |
-                               X86Inst::kOptionOpCodeX |
-                               X86Inst::kOptionOpCodeB |
-                               X86Inst::kOptionOpCodeW ;
-    if (options & kRXBWMask) {
-      out.appendString("rex.");
-      if (options & X86Inst::kOptionOpCodeR) out.appendChar('r');
-      if (options & X86Inst::kOptionOpCodeX) out.appendChar('x');
-      if (options & X86Inst::kOptionOpCodeB) out.appendChar('b');
-      if (options & X86Inst::kOptionOpCodeW) out.appendChar('w');
-      out.appendChar(' ');
+  // Format instruction options and instruction mnemonic.
+  if (instId < X86Inst::_kIdCount) {
+    const X86Inst& instInfo = X86Inst::getInst(instId);
+
+    // SHORT/LONG forms.
+    if (options & X86Inst::kOptionShortForm) out.appendString("short ");
+    if (options & X86Inst::kOptionLongForm) out.appendString("long ");
+
+    // LOCK option.
+    if (options & X86Inst::kOptionLock) out.appendString("lock ");
+
+    // REP options.
+    if (options & (X86Inst::kOptionRep | X86Inst::kOptionRepnz)) {
+      const char* rep = "repnz ";
+      if ((options & (X86Inst::kOptionRep | X86Inst::kOptionRepnz)) == X86Inst::kOptionRep)
+        rep = instInfo.hasFlag(X86Inst::kInstFlagRepnz) ? "repz " : "rep ";
+
+      out.appendString(rep);
+      if (!opExtra.isNone()) {
+        out.appendChar('{');
+        formatOperand(out, logOptions, opExtra);
+        out.appendString("} ");
+        opExtraDone = true;
+      }
     }
-    else {
-      out.appendString("rex ");
+
+    // REX options.
+    if (options & X86Inst::kOptionRex) {
+      const uint32_t kRXBWMask = X86Inst::kOptionOpCodeR |
+                                 X86Inst::kOptionOpCodeX |
+                                 X86Inst::kOptionOpCodeB |
+                                 X86Inst::kOptionOpCodeW ;
+      if (options & kRXBWMask) {
+        out.appendString("rex.");
+        if (options & X86Inst::kOptionOpCodeR) out.appendChar('r');
+        if (options & X86Inst::kOptionOpCodeX) out.appendChar('x');
+        if (options & X86Inst::kOptionOpCodeB) out.appendChar('b');
+        if (options & X86Inst::kOptionOpCodeW) out.appendChar('w');
+        out.appendChar(' ');
+      }
+      else {
+        out.appendString("rex ");
+      }
     }
-  }
 
-  if (options & X86Inst::kOptionVex3) {
-    out.appendString("vex3 ");
-  }
+    // VEX options.
+    if (options & X86Inst::kOptionVex3) {
+      out.appendString("vex3 ");
+    }
 
-  // Dump instruction name.
-  out.appendString(X86Inst::getNameById(instId));
+    out.appendString(instInfo.getName());
+  }
+  else {
+    out.appendFormat("<unknown id=#%u>", static_cast<unsigned int>(instId));
+  }
 
   for (uint32_t i = 0; i < opCount; i++) {
     const Operand_& op = opArray[i];
@@ -260,7 +288,12 @@ ASMJIT_FAVOR_SIZE Error X86Formatter::formatInstruction(
 
     // Support AVX-512 {k}{z}.
     if (i == 0) {
-      if (options & X86Inst::kOptionK) {
+      const uint32_t kExtMsk =
+        X86Inst::kOptionOpExtra |
+        X86Inst::kOptionRep     |
+        X86Inst::kOptionRepnz   ;
+
+      if ((options & kExtMsk) == X86Inst::kOptionOpExtra) {
         out.appendString(" {");
         formatOperand(out, logOptions, opExtra);
         out.appendChar('}');

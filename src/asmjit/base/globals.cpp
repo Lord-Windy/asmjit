@@ -52,6 +52,7 @@ static const char errorMessages[] =
   "Invalid broadcast {1tox}\0"
   "Invalid {sae} or {rc} option\0"
   "Invalid address\0"
+  "Invalid address index\0"
   "Invalid use of 64-bit address in 32-bit mode\0"
   "Invalid displacement\0"
   "Invalid segment\0"

@@ -242,10 +242,7 @@ struct X86Inst {
     kIdCmp,                              // ANY
     kIdCmppd,                            // SSE2
     kIdCmpps,                            // SSE
-    kIdCmpsB,                            // CMPS
-    kIdCmpsD,                            // CMPS
-    kIdCmpsQ,                            // CMPS & X64
-    kIdCmpsW,                            // CMPS
+    kIdCmps,                             // ANY
     kIdCmpsd,                            // SSE2
     kIdCmpss,                            // SSE
     kIdCmpxchg,                          // I486+
@@ -493,10 +490,7 @@ struct X86Inst {
     kIdLea,                              // ANY
     kIdLeave,                            // ANY
     kIdLfence,                           // SSE2
-    kIdLodsB,                            // LODS
-    kIdLodsD,                            // LODS
-    kIdLodsQ,                            // LODS & X64
-    kIdLodsW,                            // LODS
+    kIdLods,                             // ANY
     kIdLzcnt,                            // LZCNT
     kIdMaskmovdqu,                       // SSE2
     kIdMaskmovq,                         // MMX2
@@ -537,10 +531,7 @@ struct X86Inst {
     kIdMovntss,                          // SSE4A
     kIdMovq,                             // MMX|SSE|SSE2
     kIdMovq2dq,                          // SSE2
-    kIdMovsB,                            // MOVS
-    kIdMovsD,                            // MOVS
-    kIdMovsQ,                            // MOVS & X64
-    kIdMovsW,                            // MOVS
+    kIdMovs,                             // ANY
     kIdMovsd,                            // SSE2
     kIdMovshdup,                         // SSE3
     kIdMovsldup,                         // SSE3
@@ -737,34 +728,6 @@ struct X86Inst {
     kIdRdseed,                           // RDSEED
     kIdRdtsc,                            // ANY
     kIdRdtscp,                           // ANY
-    kIdRepLodsB,                         // ANY (REP)
-    kIdRepLodsD,                         // ANY (REP)
-    kIdRepLodsQ,                         // X64 (REP)
-    kIdRepLodsW,                         // ANY (REP)
-    kIdRepMovsB,                         // ANY (REP)
-    kIdRepMovsD,                         // ANY (REP)
-    kIdRepMovsQ,                         // X64 (REP)
-    kIdRepMovsW,                         // ANY (REP)
-    kIdRepStosB,                         // ANY (REP)
-    kIdRepStosD,                         // ANY (REP)
-    kIdRepStosQ,                         // X64 (REP)
-    kIdRepStosW,                         // ANY (REP)
-    kIdRepeCmpsB,                        // ANY (REP)
-    kIdRepeCmpsD,                        // ANY (REP)
-    kIdRepeCmpsQ,                        // X64 (REP)
-    kIdRepeCmpsW,                        // ANY (REP)
-    kIdRepeScasB,                        // ANY (REP)
-    kIdRepeScasD,                        // ANY (REP)
-    kIdRepeScasQ,                        // X64 (REP)
-    kIdRepeScasW,                        // ANY (REP)
-    kIdRepneCmpsB,                       // ANY (REP)
-    kIdRepneCmpsD,                       // ANY (REP)
-    kIdRepneCmpsQ,                       // X64 (REP)
-    kIdRepneCmpsW,                       // ANY (REP)
-    kIdRepneScasB,                       // ANY (REP)
-    kIdRepneScasD,                       // ANY (REP)
-    kIdRepneScasQ,                       // X64 (REP)
-    kIdRepneScasW,                       // ANY (REP)
     kIdRet,                              // ANY
     kIdRol,                              // ANY
     kIdRor,                              // ANY
@@ -780,10 +743,7 @@ struct X86Inst {
     kIdSar,                              // ANY
     kIdSarx,                             // BMI2
     kIdSbb,                              // ANY
-    kIdScasB,                            // SCAS
-    kIdScasD,                            // SCAS
-    kIdScasQ,                            // SCAS & X64
-    kIdScasW,                            // SCAS
+    kIdScas,                             // ANY
     kIdSeta,                             // ANY (setcc)
     kIdSetae,                            // ANY (setcc)
     kIdSetb,                             // ANY (setcc)
@@ -839,10 +799,7 @@ struct X86Inst {
     kIdStd,                              // ANY
     kIdSti,                              // ANY
     kIdStmxcsr,                          // SSE
-    kIdStosB,                            // STOS
-    kIdStosD,                            // STOS
-    kIdStosQ,                            // STOS & X64
-    kIdStosW,                            // STOS
+    kIdStos,                             // ANY
     kIdSub,                              // ANY
     kIdSubpd,                            // SSE2
     kIdSubps,                            // SSE
@@ -1590,11 +1547,13 @@ struct X86Inst {
     kEncodingX86MovsxMovzx,              //!< X86 movsx, movzx.
     kEncodingX86Push,                    //!< X86 push.
     kEncodingX86Pop,                     //!< X86 pop.
-    kEncodingX86Rep,                     //!< X86 rep|repe|repne lods?, movs?, stos?, cmps?, scas?.
     kEncodingX86Ret,                     //!< X86 ret.
     kEncodingX86Rot,                     //!< X86 rcl, rcr, rol, ror, sal, sar, shl, shr.
     kEncodingX86Set,                     //!< X86 setcc.
     kEncodingX86ShldShrd,                //!< X86 shld, shrd.
+    kEncodingX86StrRM,                   //!< X86 lods.
+    kEncodingX86StrMR,                   //!< X86 scas, stos.
+    kEncodingX86StrMM,                   //!< X86 cmps, movs.
     kEncodingX86Test,                    //!< X86 test.
     kEncodingX86Xadd,                    //!< X86 xadd.
     kEncodingX86Xchg,                    //!< X86 xchg.
@@ -1704,24 +1663,26 @@ struct X86Inst {
     kInstFlagXchg         = 0x00000004U, //!< Instruction is an exchange like instruction (xchg, xadd).
     kInstFlagFlow         = 0x00000008U, //!< Control-flow instruction (jmp, jcc, call, ret).
 
-    kInstFlagFp           = 0x00000010U, //!< Instruction accesses FPU register(s).
+    kInstFlagVolatile     = 0x00000010U, //!< Volatile instruction, never reorder.
     kInstFlagLock         = 0x00000020U, //!< Instruction can be prefixed by using the LOCK prefix.
-    kInstFlagSpecial      = 0x00000040U, //!< Instruction requires special handling (implicit operands), used by \ref Compiler.
+    kInstFlagRep          = 0x00000040U, //!< Instruction can be prefixed by using the REP/REPZ/REPNZ prefix.
+    kInstFlagRepnz        = 0x00000080U, //!< Instruction can be prefixed by using the REPNZ prefix.
+
+    kInstFlagFp           = 0x00000100U, //!< Instruction accesses FPU register(s).
+    kInstFlagSpecial      = 0x00000200U, //!< Instruction requires special handling (implicit operands), used by \ref Compiler.
 
     //! Instruction always performs memory access.
     //!
     //! This flag is always combined with `kInstFlagSpecial` and describes
     //! that there is an implicit address which is accessed (usually EDI/RDI
     //! and/or ESI/RSI).
-    kInstFlagSpecialMem   = 0x00000080U,
+    kInstFlagSpecialMem   = 0x00000400U,
+    kInstFlagZeroIfMem    = 0x00000800U, //!< Cleans the rest of destination if source is memory (movss, movsd).
 
-    kInstFlagFPU_M10      = 0x00000100U, //!< FPU instruction can address tword_ptr (shared with M2).
-    kInstFlagFPU_M2       = 0x00000100U, //!< FPU instruction can address word_ptr (shared with M10).
-    kInstFlagFPU_M4       = 0x00000200U, //!< FPU instruction can address dword_ptr.
-    kInstFlagFPU_M8       = 0x00000400U, //!< FPU instruction can address qword_ptr.
-
-    kInstFlagZeroIfMem    = 0x00001000U, //!< Cleans the rest of destination if source is memory (movss, movsd).
-    kInstFlagVolatile     = 0x00002000U, //!< Hint for instruction scheduler to not reorder this instruction.
+    kInstFlagFPU_M10      = 0x00001000U, //!< FPU instruction can address tword_ptr (shared with M2).
+    kInstFlagFPU_M2       = 0x00001000U, //!< FPU instruction can address word_ptr (shared with M10).
+    kInstFlagFPU_M4       = 0x00002000U, //!< FPU instruction can address dword_ptr.
+    kInstFlagFPU_M8       = 0x00004000U, //!< FPU instruction can address qword_ptr.
 
     // ------------------------------------------------------------------------
     // [VEX/EVEX VSIB]
@@ -1733,32 +1694,32 @@ struct X86Inst {
     // options and also instruction options to decide whether to emit EVEX prefix
     // or not.
 
-    kInstFlagVM           = 0x00004000U, //!< Instruction uses a vector memory index (VSIB).
-    kInstFlagVex          = 0x00008000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
-    kInstFlagVex_VM       = 0x0000C000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
+    kInstFlagVM           = 0x00010000U, //!< Instruction uses a vector memory index (VSIB).
+    kInstFlagVex          = 0x00020000U, //!< Instruction can be encoded by VEX (AVX|AVX2|BMI|...).
+    kInstFlagVex_VM       = 0x00030000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
 
-    kInstFlagEvex         = 0x00010000U, //!< Instruction can be encoded by EVEX (AVX-512).
+    kInstFlagEvex         = 0x00040000U, //!< Instruction can be encoded by EVEX (AVX-512).
     kInstFlagEvex0        = 0U,          //!< Used inside macros.
 
-    kInstFlagEvexK_       = 0x00020000U, //!< Supports masking {k0..k7}.
-    kInstFlagEvexKZ       = 0x00040000U, //!< Supports zeroing of elements {k0..k7}{z}.
+    kInstFlagEvexK_       = 0x00100000U, //!< Supports masking {k0..k7}.
+    kInstFlagEvexKZ       = 0x00200000U, //!< Supports zeroing of elements {k0..k7}{z}.
     kInstFlagEvexB0       = 0x00000000U, //!< No broadcast (used by instruction tables).
-    kInstFlagEvexB4       = 0x00080000U, //!< Supports broadcast 'b32'.
-    kInstFlagEvexB8       = 0x00100000U, //!< Supports broadcast 'b64'.
-    kInstFlagEvexSAE      = 0x00200000U, //!< Supports 'suppress-all-exceptions' {sae}.
-    kInstFlagEvexER       = 0x00400000U, //!< Supports 'embedded-rounding-control' {rc} with implicit {sae},
-    kInstFlagEvexVL       = 0x00800000U, //!< Supports access to XMM|YMM registers (AVX512-VL).
+    kInstFlagEvexB4       = 0x00400000U, //!< Supports broadcast 'b32'.
+    kInstFlagEvexB8       = 0x00800000U, //!< Supports broadcast 'b64'.
+    kInstFlagEvexSAE      = 0x01000000U, //!< Supports 'suppress-all-exceptions' {sae}.
+    kInstFlagEvexER       = 0x02000000U, //!< Supports 'embedded-rounding-control' {rc} with implicit {sae},
+    kInstFlagEvexVL       = 0x04000000U, //!< Supports access to XMM|YMM registers (AVX512-VL).
 
-    kInstFlagEvexSet_Shift= 24,
-    kInstFlagEvexSet_Mask = 0x0F000000U, //!< AVX-512 feature set required to execute the instruction.
+    kInstFlagEvexSet_Shift= 28,
+    kInstFlagEvexSet_Mask = 0xF0000000U, //!< AVX-512 feature set required to execute the instruction.
     kInstFlagEvexSet_F_   = 0x00000000U, //!< Supported by AVX512-F (no extra requirements).
-    kInstFlagEvexSet_CDI  = 0x01000000U, //!< Supported by AVX512-CDI.
-    kInstFlagEvexSet_PFI  = 0x02000000U, //!< Supported by AVX512-PFI.
-    kInstFlagEvexSet_ERI  = 0x03000000U, //!< Supported by AVX512-ERI.
-    kInstFlagEvexSet_DQ   = 0x04000000U, //!< Supported by AVX512-DQ.
-    kInstFlagEvexSet_BW   = 0x05000000U, //!< Supported by AVX512-BW.
-    kInstFlagEvexSet_IFMA = 0x06000000U, //!< Supported by AVX512-IFMA.
-    kInstFlagEvexSet_VBMI = 0x07000000U  //!< Supported by AVX512-VBMI.
+    kInstFlagEvexSet_CDI  = 0x10000000U, //!< Supported by AVX512-CDI.
+    kInstFlagEvexSet_PFI  = 0x20000000U, //!< Supported by AVX512-PFI.
+    kInstFlagEvexSet_ERI  = 0x30000000U, //!< Supported by AVX512-ERI.
+    kInstFlagEvexSet_DQ   = 0x40000000U, //!< Supported by AVX512-DQ.
+    kInstFlagEvexSet_BW   = 0x50000000U, //!< Supported by AVX512-BW.
+    kInstFlagEvexSet_IFMA = 0x60000000U, //!< Supported by AVX512-IFMA.
+    kInstFlagEvexSet_VBMI = 0x70000000U  //!< Supported by AVX512-VBMI.
   };
 
   //! Specifies meaning of all bits in an opcode (AsmJit specific).
@@ -2012,25 +1973,28 @@ struct X86Inst {
 
   //! Instruction options.
   ASMJIT_ENUM(Options) {
-    // NOTE: Don't collide with bits used by CodeEmitter::Options.
+    // NOTE: Don't collide with reserved bits used by CodeEmitter (0x000000FF).
 
-    // CodeEmitter opts.  = 0x000003F3U
+    kOptionOp4            = CodeEmitter::kOptionOp4,
+    kOptionOp5            = CodeEmitter::kOptionOp5,
+    kOptionOpExtra        = CodeEmitter::kOptionOpExtra,
 
-    kOptionVex3           = 0x00000004U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x04).
-    kOptionEvex           = 0x00000008U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x08).
+    kOptionShortForm      = 0x00000100U, //!< Emit short-form of the instruction.
+    kOptionLongForm       = 0x00000200U, //!< Emit long-form of the instruction.
 
-    kOptionK              = CodeEmitter::kOptionHasOpExtra,
+    kOptionVex3           = 0x00000400U, //!< Use 3-byte VEX prefix if possible (AVX) (must be 0x00000400).
+    kOptionModMR          = 0x00000800U, //!< Use ModMR instead of ModRM when it's available.
+    kOptionEvex           = 0x00001000U, //!< Use 4-byte EVEX prefix if possible (AVX-512) (must be 0x00001000).
 
-    kOptionShortForm      = 0x00000400U, //!< Emit short-form of the instruction.
-    kOptionLongForm       = 0x00000800U, //!< Emit long-form of the instruction.
+    kOptionLock           = 0x00002000U, //!< LOCK prefix (lock-enabled instructions only).
+    kOptionRep            = 0x00004000U, //!< REP/REPZ prefix (string instructions only).
+    kOptionRepnz          = 0x00008000U, //!< REPNZ prefix (string instructions only).
 
-    kOptionTaken          = 0x00001000U, //!< JCC likely to be taken (historic, only takes effect on P4).
-    kOptionNotTaken       = 0x00002000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
-    kOptionLock           = 0x00004000U, //!< LOCK prefix (lock-enabled instructions only).
-    kOptionModMR          = 0x00008000U, //!< Use ModMR instead of ModRM when it's available.
+    kOptionTaken          = 0x00010000U, //!< JCC likely to be taken (historic, only takes effect on P4).
+    kOptionNotTaken       = 0x00020000U, //!< JCC unlikely to be taken (historic, only takes effect on P4).
 
-    kOptionSAE            = 0x00020000U, //!< AVX-512: 'suppress-all-exceptions' {sae}.
-    kOptionER             = 0x00040000U, //!< AVX-512: 'rounding-control' {rc} and {sae}.
+    kOptionSAE            = 0x00040000U, //!< AVX-512: 'suppress-all-exceptions' {sae}.
+    kOptionER             = 0x00080000U, //!< AVX-512: 'rounding-control' {rc} and {sae}.
 
     kOption1ToX           = 0x00100000U, //!< AVX-512: broadcast the first element to all {1tox}.
     kOptionRN_SAE         = 0x00000000U, //!< AVX-512: round-to-nearest (even)      {rn-sae} (bits 00).
@@ -2184,8 +2148,8 @@ struct X86Inst {
 
   //! Supported architectures.
   ASMJIT_ENUM(ArchMask) {
-    kArchMaskX86          = 0x01,        //!< X86 encoding supported.
-    kArchMaskX64          = 0x02         //!< X64 encoding supported.
+    kArchMaskX86          = 0x01,        //!< X86 mode supported.
+    kArchMaskX64          = 0x02         //!< X64 mode supported.
   };
 
   //! Instruction's operand flags.
@@ -2244,6 +2208,10 @@ struct X86Inst {
     kMemOpVm64x           = 0x0010U,     //!< Operand can be a vm64x (vector) pointer.
     kMemOpVm64y           = 0x0020U,     //!< Operand can be a vm64y (vector) pointer.
     kMemOpVm64z           = 0x0040U,     //!< Operand can be a vm64z (vector) pointer.
+
+    kMemOpBaseOnly        = 0x0200U,     //!< Only memory base is allowed (no index, no offset).
+    kMemOpDs              = 0x0400U,     //!< Implicit memory operand's DS segment.
+    kMemOpEs              = 0x0800U,     //!< Implicit memory operand's ES segment.
 
     kMemOpMib             = 0x4000U,     //!< Operand must be MIB (base+index) pointer.
     kMemOpAny             = 0x8000U      //!< Operand can be any scalar memory pointer.
@@ -2358,6 +2326,7 @@ struct X86Inst {
 
   //! Data specific to AVX+ and FMA+ family instructions.
   struct AvxData {
+
   };
 
   //! Instruction signature.
@@ -2469,10 +2438,10 @@ struct X86Inst {
 #if !defined(ASMJIT_DISABLE_TEXT)
   //! Get an instruction ID from a given instruction `name`.
   //!
-  //! If there is an exact match the instruction id is returned, otherwise
-  //! `kInvalidInst` (zero) is returned.
-  //!
-  //! The given `name` doesn't have to be null-terminated if `len` is provided.
+  //! NOTE: Instruction name MUST BE in lowercase, otherwise there will be no
+  //! match. If there is an exact match the instruction id is returned, otherwise
+  //! `kInvalidInst` (zero) is returned instead. The given `name` doesn't have to
+  //! be null-terminated if `len` is provided.
   ASMJIT_API static uint32_t getIdByName(const char* name, size_t len = kInvalidIndex) noexcept;
 
   //! Get an instruction name from a given instruction id `instId`.

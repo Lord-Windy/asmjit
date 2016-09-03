@@ -712,7 +712,10 @@ public:
   //! Helper constants to pack BASE and INDEX register types into `MemData::baseIndexType`.
   ASMJIT_ENUM(BaseIndexType) {
     kMemBaseTypeShift  = 0,
-    kMemIndexTypeShift = 4
+    kMemIndexTypeShift = 4,
+
+    kMemBaseTypeMask   = 0xF << kMemBaseTypeShift,
+    kMemIndexTypeMask  = 0xF << kMemIndexTypeShift
   };
 
   static ASMJIT_INLINE uint32_t encodeBaseIndex(uint32_t baseType, uint32_t indexType) noexcept {

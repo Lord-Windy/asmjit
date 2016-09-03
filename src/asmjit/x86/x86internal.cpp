@@ -894,7 +894,7 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitArgMove(X86Emitter* emitter,
 
       if (TypeId::isInt(srcTypeId) || TypeId::isMask(srcTypeId) || src.isMem()) {
         instId = X86Inst::kmovIdFromSize(srcSize);
-        if (x86::isGp(src) && srcSize <= 4) src.setSignature(X86Reg::signatureOf<X86Reg::kRegGpd>());
+        if (X86Reg::isGp(src) && srcSize <= 4) src.setSignature(X86Reg::signatureOf<X86Reg::kRegGpd>());
         break;
       }
     }
@@ -904,7 +904,7 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitArgMove(X86Emitter* emitter,
       dst.setSignature(X86Reg::signatureOf<X86Reg::kRegXmm>());
 
       // NOTE: This will hurt if `avxEnabled`.
-      if (x86::isMm(src)) {
+      if (X86Reg::isMm(src)) {
         // 64-bit move.
         instId = X86Inst::kIdMovq2dq;
         break;
@@ -946,7 +946,7 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitArgMove(X86Emitter* emitter,
       }
 
       srcSize = Utils::iMin(srcSize, dstSize);
-      if (x86::isGp(src) || src.isMem()) {
+      if (X86Reg::isGp(src) || src.isMem()) {
         // 32-bit move.
         if (srcSize <= 4) {
           instId = avxEnabled ? X86Inst::kIdVmovd : X86Inst::kIdMovd;
@@ -961,7 +961,7 @@ ASMJIT_FAVOR_SIZE Error X86Internal::emitArgMove(X86Emitter* emitter,
         }
       }
 
-      if (x86::isVec(src) || src.isMem()) {
+      if (X86Reg::isVec(src) || src.isMem()) {
         instId = avxEnabled ? X86Inst::kIdVmovaps : X86Inst::kIdMovaps;
         uint32_t sign = X86Reg::signatureOfVecBySize(srcSize);
 

@@ -57,9 +57,7 @@ public:
     //! opcode that is often shown by disassemblers as nop. However there are
     //! more optimized align sequences for 2-11 bytes that may execute faster.
     //! If this feature is enabled AsmJit will generate specialized sequences
-    //! for alignment between 1 to 11 bytes. Also when `X86Compiler` is used,
-    //! it can add REX prefixes into the code to make some instructions greater
-    //! so no alignment sequence is needed.
+    //! for alignment between 2 to 11 bytes.
     kHintOptimizedAlign = 0x00000001U,
 
     //! Emit jump-prediction hints.
@@ -84,37 +82,34 @@ public:
 
   //! CodeEmitter options that are merged with instruction options.
   ASMJIT_ENUM(Options) {
-    //! Reserved, used to check for errors in `Assembler::_emit()`.
-    //!
-    //! The `kOptionMaybeFailureCase` is always set when CodeEmitter is in
-    //! error state.
+    //! Reserved, used to check for errors in `Assembler::_emit()`. In addition,
+    //! if an emitter is in error state it will have `kOptionMaybeFailureCase`
+    //! set
     kOptionMaybeFailureCase = 0x00000001U,
 
     //! Perform a strict validation before the instruction is emitted.
-    //!
-    //! NOTE: This option is used by both Assembler and CodeCompiler.
     kOptionStrictValidation = 0x00000002U,
 
     //! Logging is enabled and `CodeHolder::getLogger()` should return a valid
     //! \ref Logger pointer.
-    kOptionLoggingEnabled   = 0x00000010U,
+    kOptionLoggingEnabled   = 0x00000004U,
 
     //! Mask of all internal options that are not used to represent instruction
     //! options, but are used to instrument Assembler and CodeBuilder. These
     //! options are internal and should not be used outside of AsmJit itself.
-    kOptionReservedMask = 0x00000013U,
+    //!
+    //! NOTE: Reserved options should never appear in `CBInst` options.
+    kOptionReservedMask = 0x00000007U,
 
     //! Instruction has `_op4` (5th operand, indexed from zero).
-    kOptionHasOp4 = 0x0000020U,
+    kOptionOp4 = 0x0000008U,
     //! Instruction has `_op5` (6th operand, indexed from zero).
-    kOptionHasOp5 = 0x0000040U,
+    kOptionOp5 = 0x0000010U,
     //! Instruction has `_opExtra` operand (mask-op {k} operand when using AVX-512).
-    kOptionHasOpExtra = 0x00000080U,
+    kOptionOpExtra = 0x00000020U,
 
-    //! Don't follow the jump (CodeCompiler).
-    //!
-    //! Prevents following the jump during compilation (CodeCompiler).
-    kOptionUnfollow = 0x00000100U,
+    //! Prevents following a jump during compilation (CodeCompiler).
+    kOptionUnfollow = 0x00000040U,
 
     //! Overwrite the destination operand (CodeCompiler).
     //!
@@ -154,7 +149,7 @@ public:
     //!
     //!     - `sqrtss x, y` - only LO element of `x` is changed, if you don't use
     //!       HI elements, use `X86Compiler.overwrite().sqrtss(x, y)`.
-    kOptionOverwrite = 0x00000200U
+    kOptionOverwrite = 0x00000080U
   };
 
   // --------------------------------------------------------------------------
@@ -314,19 +309,19 @@ public:
   ASMJIT_INLINE void resetOptions() noexcept { _options = 0; }
 
   //! Get if the 5th operand (indexed from zero) of the next instruction is used.
-  ASMJIT_INLINE bool hasOp4() const noexcept { return (_options & kOptionHasOp4) != 0; }
+  ASMJIT_INLINE bool hasOp4() const noexcept { return (_options & kOptionOp4) != 0; }
   //! Get if the 6th operand (indexed from zero) of the next instruction is used.
-  ASMJIT_INLINE bool hasOp5() const noexcept { return (_options & kOptionHasOp5) != 0; }
+  ASMJIT_INLINE bool hasOp5() const noexcept { return (_options & kOptionOp5) != 0; }
   //! Get if the op-mask operand of the next instruction is used.
-  ASMJIT_INLINE bool hasOpExtra() const noexcept { return (_options & kOptionHasOpExtra) != 0; }
+  ASMJIT_INLINE bool hasOpExtra() const noexcept { return (_options & kOptionOpExtra) != 0; }
 
   ASMJIT_INLINE const Operand& getOp4() const noexcept { return static_cast<const Operand&>(_op4); }
   ASMJIT_INLINE const Operand& getOp5() const noexcept { return static_cast<const Operand&>(_op5); }
   ASMJIT_INLINE const Operand& getOpExtra() const noexcept { return static_cast<const Operand&>(_opExtra); }
 
-  ASMJIT_INLINE void setOp4(const Operand_& op4) noexcept { _options |= kOptionHasOp4; _op4 = op4; }
-  ASMJIT_INLINE void setOp5(const Operand_& op5) noexcept { _options |= kOptionHasOp5; _op5 = op5; }
-  ASMJIT_INLINE void setOpExtra(const Operand_& opExtra) noexcept { _options |= kOptionHasOpExtra; _opExtra = opExtra; }
+  ASMJIT_INLINE void setOp4(const Operand_& op4) noexcept { _options |= kOptionOp4; _op4 = op4; }
+  ASMJIT_INLINE void setOp5(const Operand_& op5) noexcept { _options |= kOptionOp5; _op5 = op5; }
+  ASMJIT_INLINE void setOpExtra(const Operand_& opExtra) noexcept { _options |= kOptionOpExtra; _opExtra = opExtra; }
 
   //! Get annotation of the next instruction.
   ASMJIT_INLINE const char* getInlineComment() const noexcept { return _inlineComment; }
@@ -415,7 +410,7 @@ public:
 
   CodeInfo _codeInfo;                    //!< Basic information about the code (matches CodeHolder::_codeInfo).
   CodeHolder* _code;                     //!< CodeHolder the CodeEmitter is attached to.
-  CodeEmitter* _nextEmitter;             //!< Linked list of `CodeEmitter`s attached to a single \ref CodeHolder.
+  CodeEmitter* _nextEmitter;             //!< Linked list of `CodeEmitter`s attached to the same \ref CodeHolder.
 
   uint8_t _type;                         //!< See CodeEmitter::Type.
   uint8_t _destroyed;                    //!< Set by ~CodeEmitter() before calling `_code->detach()`.

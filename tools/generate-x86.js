@@ -253,6 +253,44 @@ class IndexedString {
 // ----------------------------------------------------------------------------
 
 class X86Utils {
+  // Get group of instructions having the same name as understood by AsmJit.
+  static getGroup(name) {
+    var rep = null;
+    var names = null;
+
+    switch (name) {
+      // Remap / filter these instructions.
+      case "cmpsd": names = ["cmpsd"]; rep = false; break;
+      case "movsd": names = ["movsd"]; rep = false; break;
+
+      case "cmps": names = ["cmpsb", "cmpsw", "cmpsd", "cmpsq"]; rep = true; break;
+      case "movs": names = ["movsb", "movsw", "movsd", "movsq"]; rep = true; break;
+      case "lods": names = ["lodsb", "lodsw", "lodsd", "lodsq"]; break;
+      case "scas": names = ["scasb", "scasw", "scasd", "scasq"]; break;
+      case "stos": names = ["stosb", "stosw", "stosd", "stosq"]; break;
+
+      default:
+        return x86db.getGroup(name);
+    }
+
+    const insts = [];
+    for (var i = 0; i < names.length; i++) {
+      insts.push.apply(insts, x86db.getGroup(names[i]));
+    }
+
+    if (rep === null)
+      return insts;
+
+    // Filter, if needed.
+    const output = [];
+    for (var i = 0; i < insts.length; i++) {
+      const inst = insts[i];
+      if (rep === !!(inst.rep || inst.repe || inst.repne))
+        output.push(inst);
+    }
+    return output;
+  }
+
   // Get if a group of instructions is either MMX or SSE.
   static isMmxOrSseInsts(insts) {
     var n = 0;
@@ -437,32 +475,35 @@ const OpSortPriority = {
   "dreg"    : 15,
 
   "mem"     : 30,
-  "m8"      : 31,
-  "m16"     : 32,
-  "m32"     : 33,
-  "m64"     : 34,
-  "m80"     : 35,
-  "m128"    : 36,
-  "m256"    : 37,
-  "m512"    : 38,
-  "m1024"   : 39,
-  "mib"     : 40,
+  "vm"      : 31,
+  "m8"      : 32,
+  "m16"     : 33,
+  "m32"     : 34,
+  "m64"     : 35,
+  "m80"     : 36,
+  "m128"    : 37,
+  "m256"    : 38,
+  "m512"    : 39,
+  "m1024"   : 40,
+  "mib"     : 41,
+  "vm32x"   : 42,
+  "vm32y"   : 43,
+  "vm32z"   : 44,
+  "vm64x"   : 45,
+  "vm64y"   : 46,
+  "vm64z"   : 47,
+  "memBase" : 48,
+  "memES"   : 49,
+  "memDS"   : 50,
 
-  "vm32x"   : 41,
-  "vm32y"   : 42,
-  "vm32z"   : 43,
-  "vm64x"   : 44,
-  "vm64y"   : 45,
-  "vm64z"   : 46,
+  "i4"      : 60,
+  "i8"      : 61,
+  "i16"     : 62,
+  "i32"     : 63,
+  "i64"     : 64,
 
-  "i4"      : 50,
-  "i8"      : 51,
-  "i16"     : 52,
-  "i32"     : 53,
-  "i64"     : 54,
-
-  "rel8"    : 60,
-  "rel32"   : 61
+  "rel8"    : 70,
+  "rel32"   : 71
 };
 
 const OpToAsmJitOp = {
@@ -489,6 +530,7 @@ const OpToAsmJitOp = {
 
   "mem"     : "FLAG(Mem)",
   "vm"      : "FLAG(Vm)",
+
   "m8"      : "MEM(M8)",
   "m16"     : "MEM(M16)",
   "m32"     : "MEM(M32)",
@@ -500,13 +542,16 @@ const OpToAsmJitOp = {
   "m1024"   : "MEM(M1024)",
   "mib"     : "MEM(Mib)",
   "mAny"    : "MEM(Any)",
-
   "vm32x"   : "MEM(Vm32x)",
   "vm32y"   : "MEM(Vm32y)",
   "vm32z"   : "MEM(Vm32z)",
   "vm64x"   : "MEM(Vm64x)",
   "vm64y"   : "MEM(Vm64y)",
   "vm64z"   : "MEM(Vm64z)",
+
+  "memBase" : "MEM(BaseOnly)",
+  "memDS"   : "MEM(Ds)",
+  "memES"   : "MEM(Es)",
 
   "i4"      : "FLAG(I4)",
   "i8"      : "FLAG(I8)",
@@ -602,10 +647,18 @@ class OSignature {
     var prefix = (flags.read && flags.write) ? "X:" : (flags.write) ? "W:" : "R:";
 
     for (var k in flags) {
-      if (k === "read" || k === "write" || k === "implicit")
+      if (k === "read" || k === "write" || k === "implicit" || k === "memDS" || k === "memES")
         continue;
-      s += (s ? "|" : "") + k;
+
+      var x = k;
+      if (x === "memZAX") x = "zax";
+      if (x === "memZDI") x = "zdi";
+      if (x === "memZSI") x = "zsi";
+      s += (s ? "|" : "") + x;
     }
+
+    if (flags.memDS) s = "ds:[" + s + "]";
+    if (flags.memES) s = "es:[" + s + "]";
 
     if (flags.implicit)
       s = "<" + s + ">";
@@ -615,21 +668,21 @@ class OSignature {
 
   toAsmJitOpData() {
     var s = "";
-    var flags = this.flags;
+    var oFlags = this.flags;
 
     var mFlags = Object.create(null);
     var mMemFlags = Object.create(null);
     var mExtFlags = Object.create(null);
     var sRegMask = 0;
 
-    if (flags.read && flags.write)
+    if (oFlags.read && oFlags.write)
       mFlags.rw = true;
-    else if (flags.write)
+    else if (oFlags.write)
       mFlags.write = true;
     else
       mFlags.read = true;
 
-    for (var k in flags) {
+    for (var k in oFlags) {
       switch (k) {
         case "read"    : break;
         case "write"   : break;
@@ -662,6 +715,12 @@ class OSignature {
         case "m1024"   : mFlags.mem = true; mMemFlags.m1024 = true; break;
         case "mib"     : mFlags.mem = true; mMemFlags.mib   = true; break;
         case "mem"     : mFlags.mem = true; mMemFlags.mAny  = true; break;
+
+        case "memDS"   : mFlags.mem = true; mMemFlags.memDS = true; break;
+        case "memES"   : mFlags.mem = true; mMemFlags.memES = true; break;
+        case "memZAX"  : mFlags.mem = true; sRegMask |= 1 << 0; mMemFlags.memBase = true; break;
+        case "memZSI"  : mFlags.mem = true; sRegMask |= 1 << 6; mMemFlags.memBase = true; break;
+        case "memZDI"  : mFlags.mem = true; sRegMask |= 1 << 7; mMemFlags.memBase = true; break;
 
         case "vm32x"   : mFlags.vm = true; mMemFlags.vm32x = true; break;
         case "vm32y"   : mFlags.vm = true; mMemFlags.vm32y = true; break;
@@ -891,8 +950,17 @@ class X86Generator {
           op.flags.implicit = true;
         }
 
-        if (reg) op.flags[reg] = true;
-        if (reg === "r8lo") op.flags.r8hi = true;
+        if (iop.memSeg) {
+          if (iop.memSeg === "ds") op.flags.memDS = true;
+          if (iop.memSeg === "es") op.flags.memES = true;
+          if (reg === "zax") op.flags.memZAX = true;
+          if (reg === "zsi") op.flags.memZSI = true;
+          if (reg === "zdi") op.flags.memZDI = true;
+        }
+        else if (reg) {
+          op.flags[reg] = true;
+          if (reg === "r8lo") op.flags.r8hi = true;
+        }
 
         if (mem) op.flags[mem] = true;
         if (imm) op.flags["i" + imm] = true;
@@ -952,7 +1020,7 @@ class X86Generator {
       // if (iflags.indexOf("|A512") !== -1)
       //   iflags = iflags.substr(0, iflags.indexOf("|A512")).trim();
 
-      const insts = x86db.getGroup(name);
+      const insts = X86Utils.getGroup(name);
       if (!insts) {
         console.log(`INSTRUCTION '${name}' not found in asmdb`);
       }
@@ -1177,7 +1245,7 @@ class X86Generator {
 
       const sseName = sseInsts[0].name;
       const avxName = "v" + sseName;
-      const avxInsts = x86db.getGroup(avxName);
+      const avxInsts = X86Utils.getGroup(avxName);
 
       if (!avxInsts) {
         console.log(`SseToAvx: Instruction '${sseName}' has no AVX counterpart`);
@@ -1227,7 +1295,7 @@ class X86Generator {
 
     for (var i = 0; i < instArray.length; i++) {
       const inst = instArray[i];
-      const insts = x86db.getGroup(inst.name);
+      const insts = X86Utils.getGroup(inst.name);
       if (!insts) continue;
 
       if (X86Utils.isMmxOrSseInsts(insts)) {

@@ -105,16 +105,16 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
   const uint32_t kErrorsAndSpecialCases =
     kOptionMaybeFailureCase | // CodeEmitter in error state.
     kOptionStrictValidation | // Strict validation.
-    kOptionHasOp4           | // Has 5th operand (o4, indexed from zero).
-    kOptionHasOp5           ; // Has 6th operand (o5, indexed from zero).
+    kOptionOp4              | // Has 5th operand (o4, indexed from zero).
+    kOptionOp5              ; // Has 6th operand (o5, indexed from zero).
 
   if (ASMJIT_UNLIKELY(options & kErrorsAndSpecialCases)) {
     // Don't do anything if we are in error state.
     if (_lastError) return _lastError;
 
     // Count 5th and 6th operands.
-    if (options & kOptionHasOp4) opCount = 5;
-    if (options & kOptionHasOp5) opCount = 6;
+    if (options & kOptionOp4) opCount = 5;
+    if (options & kOptionOp5) opCount = 6;
 
 #if !defined(ASMJIT_DISABLE_VALIDATION)
     // Strict validation.
@@ -155,6 +155,9 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (opCount > 4) opArray[4].copyFrom(_op4);
     if (opCount > 5) opArray[5].copyFrom(_op5);
     new(node) CBJump(this, instId, options, opArray, opCount);
+
+    if (options & CodeEmitter::kOptionOpExtra)
+      node->_opExtra = _opExtra;
 
     CBLabel* jTarget = nullptr;
     if (!(options & kOptionUnfollow)) {
@@ -206,6 +209,9 @@ Error X86Compiler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1
     if (opCount > 4) opArray[4].copyFrom(_op4);
     if (opCount > 5) opArray[5].copyFrom(_op5);
     node = new(node) CBInst(this, instId, options, opArray, opCount);
+
+    if (options & CodeEmitter::kOptionOpExtra)
+      node->_opExtra = _opExtra;
 
     if (inlineComment) {
       inlineComment = static_cast<char*>(_cbDataZone.dup(inlineComment, ::strlen(inlineComment), true));

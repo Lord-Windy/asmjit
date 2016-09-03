@@ -745,7 +745,7 @@ public:
 
 class X86Test_AllocImul1 : public X86Test {
 public:
-  X86Test_AllocImul1() : X86Test("[Alloc] Imul #1") {}
+  X86Test_AllocImul1() : X86Test("[Alloc] IMUL #1") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocImul1());
@@ -801,7 +801,7 @@ public:
 
 class X86Test_AllocImul2 : public X86Test {
 public:
-  X86Test_AllocImul2() : X86Test("[Alloc] Imul #2") {}
+  X86Test_AllocImul2() : X86Test("[Alloc] IMUL #2") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocImul2());
@@ -855,7 +855,7 @@ public:
 
 class X86Test_AllocIdiv1 : public X86Test {
 public:
-  X86Test_AllocIdiv1() : X86Test("[Alloc] Idiv #1") {}
+  X86Test_AllocIdiv1() : X86Test("[Alloc] IDIV #1") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocIdiv1());
@@ -901,7 +901,7 @@ public:
 
 class X86Test_AllocSetz : public X86Test {
 public:
-  X86Test_AllocSetz() : X86Test("[Alloc] Setz") {}
+  X86Test_AllocSetz() : X86Test("[Alloc] SETZ") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocSetz());
@@ -952,7 +952,7 @@ public:
 
 class X86Test_AllocShlRor : public X86Test {
 public:
-  X86Test_AllocShlRor() : X86Test("[Alloc] Shl/Ror") {}
+  X86Test_AllocShlRor() : X86Test("[Alloc] SHL/ROR") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocShlRor());
@@ -1002,7 +1002,7 @@ public:
 
 class X86Test_AllocGpLo : public X86Test {
 public:
-  X86Test_AllocGpLo() : X86Test("[Alloc] GP.LO") {}
+  X86Test_AllocGpLo() : X86Test("[Alloc] GPB-LO") {}
 
   enum { kCount = 32 };
 
@@ -1093,7 +1093,7 @@ public:
 
 class X86Test_AllocRepMovsb : public X86Test {
 public:
-  X86Test_AllocRepMovsb() : X86Test("[Alloc] Rep MovsB") {}
+  X86Test_AllocRepMovsb() : X86Test("[Alloc] REP MOVS") {}
 
   static void add(ZoneVector<X86Test*>& tests) {
     tests.append(new X86Test_AllocRepMovsb());
@@ -1110,7 +1110,7 @@ public:
     cc.setArg(1, src);
     cc.setArg(2, cnt);
 
-    cc.rep_movsb(dst, src, cnt);
+    cc.rep(cnt).movs(x86::byte_ptr(dst), x86::byte_ptr(src));
     cc.endFunc();
   }
 

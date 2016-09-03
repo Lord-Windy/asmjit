@@ -193,15 +193,17 @@ Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3) { return _e
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, OP o4) {
   _op4 = o4;
-  if (!o4.isNone()) _options |= kOptionHasOp4;
+
+  if (!o4.isNone()) _options |= kOptionOp4;
   return _emit(instId, o0, o1, o2, o3);
 }
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, OP o4, OP o5) {
   _op4 = o4;
   _op5 = o5;
-  if (!o4.isNone()) _options |= kOptionHasOp4;
-  if (!o5.isNone()) _options |= kOptionHasOp5;
+
+  if (!o4.isNone()) _options |= kOptionOp4;
+  if (!o5.isNone()) _options |= kOptionOp5;
   return _emit(instId, o0, o1, o2, o3);
 }
 
@@ -211,15 +213,16 @@ Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, int o2) { return _emit(in
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, int o3) { return _emit(instId, o0, o1, o2, Imm(o3)); }
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, int o4) {
-  _options |= kOptionHasOp4;
+  _options |= kOptionOp4;
   _op4 = Imm(o4);
   return _emit(instId, o0, o1, o2, o3);
 }
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, OP o4, int o5) {
-  _options |= kOptionHasOp4 | kOptionHasOp5;
   _op4 = o4;
   _op5 = Imm(o5);
+
+  _options |= kOptionOp4 | kOptionOp5;
   return _emit(instId, o0, o1, o2, o3);
 }
 
@@ -229,15 +232,16 @@ Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, int64_t o2) { return _emi
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, int64_t o3) { return _emit(instId, o0, o1, o2, Imm(o3)); }
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, int64_t o4) {
-  _options |= kOptionHasOp4;
+  _options |= kOptionOp4;
   _op4 = Imm(o4);
   return _emit(instId, o0, o1, o2, o3);
 }
 
 Error CodeEmitter::emit(uint32_t instId, OP o0, OP o1, OP o2, OP o3, OP o4, int64_t o5) {
-  _options |= kOptionHasOp4 | kOptionHasOp5;
   _op4 = o4;
   _op5 = Imm(o5);
+
+  _options |= kOptionOp4 | kOptionOp5;
   return _emit(instId, o0, o1, o2, o3);
 }
 

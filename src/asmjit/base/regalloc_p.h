@@ -113,7 +113,7 @@ struct TiedReg {
 
   //! Pointer to the associated \ref VirtReg.
   VirtReg* vreg;
-  //! Linked register flags.
+  //! Tied flags.
   uint32_t flags;
 
   union {

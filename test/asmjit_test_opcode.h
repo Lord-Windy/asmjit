@@ -164,18 +164,18 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.bts(intptr_gpA, gzB);
   a.call(gzA);
   a.call(intptr_gpA);
-  a.cbw();                               // Implicit AX      <- Sign Extend AL.
-  a.cbw(ax);                             // Explicit AX      <- Sign Extend AL.
-  a.cdq();                               // Implicit EDX:EAX <- Sign Extend EAX.
-  a.cdq(edx, eax);                       // Explicit EDX:EAX <- Sign Extend EAX.
-  if (isX64) a.cdqe();                   // Implicit RAX     <- Sign Extend EAX.
-  if (isX64) a.cdqe(eax);                // Explicit RAX     <- Sign Extend EAX.
-  a.cwd();                               // Implicit DX:AX   <- Sign Extend AX.
-  a.cwd(dx, ax);                         // Explicit DX:AX   <- Sign Extend AX.
-  a.cwde();                              // Implicit EAX     <- Sign Extend AX.
-  a.cwde(eax);                           // Explicit EAX     <- Sign Extend AX.
-  if (isX64) a.cqo();                    // Implicit RDX:RAX <- Sign Extend RAX.
-  if (isX64) a.cqo(rdx, rax);            // Explicit RDX:RAX <- Sign Extend RAX.
+  a.cbw();                                 // Implicit AX      <- Sign Extend AL.
+  a.cbw(ax);                               // Explicit AX      <- Sign Extend AL.
+  a.cdq();                                 // Implicit EDX:EAX <- Sign Extend EAX.
+  a.cdq(edx, eax);                         // Explicit EDX:EAX <- Sign Extend EAX.
+  if (isX64) a.cdqe();                     // Implicit RAX     <- Sign Extend EAX.
+  if (isX64) a.cdqe(eax);                  // Explicit RAX     <- Sign Extend EAX.
+  a.cwd();                                 // Implicit DX:AX   <- Sign Extend AX.
+  a.cwd(dx, ax);                           // Explicit DX:AX   <- Sign Extend AX.
+  a.cwde();                                // Implicit EAX     <- Sign Extend AX.
+  a.cwde(eax);                             // Explicit EAX     <- Sign Extend AX.
+  if (isX64) a.cqo();                      // Implicit RDX:RAX <- Sign Extend RAX.
+  if (isX64) a.cqo(rdx, rax);              // Explicit RDX:RAX <- Sign Extend RAX.
   a.clc();
   a.cld();
   a.cmc();
@@ -198,17 +198,18 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.cmp(intptr_gpA, 1);
   a.cmp(anyptr_gpA, gdB);
   a.cmp(intptr_gpA, gzB);
-  a.cmpxchg(gdA, gdB);                   // Implicit regA, regB, <EAX>
-  a.cmpxchg(gzA, gzB);                   // Implicit regA, regB, <ZAX>
-  a.cmpxchg(gdA, gdB, eax);              // Explicit regA, regB, <EAX>
-  a.cmpxchg(gzA, gzB, a.zax());          // Explicit regA, regB, <ZAX>
-  a.cmpxchg(anyptr_gpA, gdB);            // Implicit mem , regB, <EAX>
-  a.cmpxchg(anyptr_gpA, gzB);            // Implicit mem , regB, <ZAX>
-  a.cmpxchg(anyptr_gpA, gdB, eax);       // Explicit mem , regB, <EAX>
-  a.cmpxchg(anyptr_gpA, gzB, a.zax());   // Explicit mem , regB, <ZAX>
-  a.cmpxchg8b(anyptr_gpA);
-  a.cpuid();                             // Implicit <EAX>, <EBX>, <ECX>, <EDX>
-  a.cpuid(eax, ebx, ecx, edx);           // Explicit <EAX>, <EBX>, <ECX>, <EDX>
+  a.cmpxchg(gdA, gdB);                     // Implicit regA, regB, <EAX>
+  a.cmpxchg(gzA, gzB);                     // Implicit regA, regB, <ZAX>
+  a.cmpxchg(gdA, gdB, eax);                // Explicit regA, regB, <EAX>
+  a.cmpxchg(gzA, gzB, a.zax());            // Explicit regA, regB, <ZAX>
+  a.cmpxchg(anyptr_gpA, gdB);              // Implicit mem , regB, <EAX>
+  a.cmpxchg(anyptr_gpA, gzB);              // Implicit mem , regB, <ZAX>
+  a.cmpxchg(anyptr_gpA, gdB, eax);         // Explicit mem , regB, <EAX>
+  a.cmpxchg(anyptr_gpA, gzB, a.zax());     // Explicit mem , regB, <ZAX>
+  a.cmpxchg8b(anyptr_gpA);                 // Implicit mem , <EDX>, <EAX>, <ECX>, <EBX>
+  if (isX64) a.cmpxchg16b(anyptr_gpA);     // Implicit mem , <RDX>, <RAX>, <RCX>, <RBX>
+  a.cpuid();                               // Implicit <EAX>, <EBX>, <ECX>, <EDX>
+  a.cpuid(eax, ebx, ecx, edx);             // Explicit <EAX>, <EBX>, <ECX>, <EDX>
   a.crc32(gdA, byte_ptr(gzB));
   a.crc32(gdA, word_ptr(gzB));
   a.crc32(gdA, dword_ptr(gzB));
@@ -295,10 +296,10 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.rcr(intptr_gpA, 0);
   a.rcr(intptr_gpA, 1);
   a.rcr(intptr_gpA, cl);
-  a.rdtsc();                             // Implicit <EDX:EAX>
-  a.rdtsc(edx, eax);                     // Explicit <EDX:EAX>
-  a.rdtscp();                            // Implicit <EDX:EAX>, <ECX>
-  a.rdtscp(edx, eax, ecx);               // Implicit <EDX:EAX>, <ECX>
+  a.rdtsc();                               // Implicit <EDX:EAX>
+  a.rdtsc(edx, eax);                       // Explicit <EDX:EAX>
+  a.rdtscp();                              // Implicit <EDX:EAX>, <ECX>
+  a.rdtscp(edx, eax, ecx);                 // Implicit <EDX:EAX>, <ECX>
   a.ret();
   a.ret(0);
   a.rol(gdA, 0);
@@ -425,65 +426,65 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.xor_(intptr_gpA, gzB);
 
   // Special case - div|mul.
-  a.div(cl);                             // Implicit AH:AL <- AX * r8
-  a.div(byte_ptr(gzA));                  // Implicit AH:AL <- AX * m8
-  a.div(ax, cl);                         // Explicit AH:AL <- AX * r8
-  a.div(ax, anyptr_gpA);                 // Explicit AH:AL <- AX * m8
+  a.div(cl);                               // Implicit AH:AL <- AX * r8
+  a.div(byte_ptr(gzA));                    // Implicit AH:AL <- AX * m8
+  a.div(ax, cl);                           // Explicit AH:AL <- AX * r8
+  a.div(ax, anyptr_gpA);                   // Explicit AH:AL <- AX * m8
 
-  a.div(cx);                             // Implicit DX:AX <- DX:AX * r16
-  a.div(word_ptr(gzA));                  // Implicit DX:AX <- DX:AX * m16
-  a.div(dx, ax, cx);                     // Explicit DX:AX <- DX:AX * r16
-  a.div(dx, ax, anyptr_gpA);             // Explicit DX:AX <- DX:AX * m16
+  a.div(cx);                               // Implicit DX:AX <- DX:AX * r16
+  a.div(word_ptr(gzA));                    // Implicit DX:AX <- DX:AX * m16
+  a.div(dx, ax, cx);                       // Explicit DX:AX <- DX:AX * r16
+  a.div(dx, ax, anyptr_gpA);               // Explicit DX:AX <- DX:AX * m16
 
-  a.div(ecx);                            // Implicit EDX:EAX <- EDX:EAX * r32
-  a.div(dword_ptr(gzA));                 // Implicit EDX:EAX <- EDX:EAX * m32
-  a.div(edx, eax, ecx);                  // Explicit EDX:EAX <- EDX:EAX * r32
-  a.div(edx, eax, anyptr_gpA);           // Explicit EDX:EAX <- EDX:EAX * m32
+  a.div(ecx);                              // Implicit EDX:EAX <- EDX:EAX * r32
+  a.div(dword_ptr(gzA));                   // Implicit EDX:EAX <- EDX:EAX * m32
+  a.div(edx, eax, ecx);                    // Explicit EDX:EAX <- EDX:EAX * r32
+  a.div(edx, eax, anyptr_gpA);             // Explicit EDX:EAX <- EDX:EAX * m32
 
-  if (isX64) a.div(rcx);                 // Implicit RDX|RAX <- RDX:RAX * r64
-  if (isX64) a.div(qword_ptr(gzA));      // Implicit RDX|RAX <- RDX:RAX * m64
-  if (isX64) a.div(rdx, rax, rcx);       // Explicit RDX|RAX <- RDX:RAX * r64
-  if (isX64) a.div(rdx, rax, anyptr_gpA);// Explicit RDX|RAX <- RDX:RAX * m64
+  if (isX64) a.div(rcx);                   // Implicit RDX|RAX <- RDX:RAX * r64
+  if (isX64) a.div(qword_ptr(gzA));        // Implicit RDX|RAX <- RDX:RAX * m64
+  if (isX64) a.div(rdx, rax, rcx);         // Explicit RDX|RAX <- RDX:RAX * r64
+  if (isX64) a.div(rdx, rax, anyptr_gpA);  // Explicit RDX|RAX <- RDX:RAX * m64
 
-  a.idiv(cl);                            // Implicit AH:AL <- AX * r8
-  a.idiv(byte_ptr(gzA));                 // Implicit AH:AL <- AX * m8
-  a.idiv(ax, cl);                        // Explicit AH:AL <- AX * r8
-  a.idiv(ax, anyptr_gpA);                // Explicit AH:AL <- AX * m8
+  a.idiv(cl);                              // Implicit AH:AL <- AX * r8
+  a.idiv(byte_ptr(gzA));                   // Implicit AH:AL <- AX * m8
+  a.idiv(ax, cl);                          // Explicit AH:AL <- AX * r8
+  a.idiv(ax, anyptr_gpA);                  // Explicit AH:AL <- AX * m8
 
-  a.idiv(cx);                            // Implicit DX:AX <- DX:AX * r16
-  a.idiv(word_ptr(gzA));                 // Implicit DX:AX <- DX:AX * m16
-  a.idiv(dx, ax, cx);                    // Explicit DX:AX <- DX:AX * r16
-  a.idiv(dx, ax, anyptr_gpA);            // Explicit DX:AX <- DX:AX * m16
+  a.idiv(cx);                              // Implicit DX:AX <- DX:AX * r16
+  a.idiv(word_ptr(gzA));                   // Implicit DX:AX <- DX:AX * m16
+  a.idiv(dx, ax, cx);                      // Explicit DX:AX <- DX:AX * r16
+  a.idiv(dx, ax, anyptr_gpA);              // Explicit DX:AX <- DX:AX * m16
 
-  a.idiv(ecx);                           // Implicit EDX:EAX <- EDX:EAX * r32
-  a.idiv(dword_ptr(gzA));                // Implicit EDX:EAX <- EDX:EAX * m32
-  a.idiv(edx, eax, ecx);                 // Explicit EDX:EAX <- EDX:EAX * r32
-  a.idiv(edx, eax, anyptr_gpA);          // Explicit EDX:EAX <- EDX:EAX * m32
+  a.idiv(ecx);                             // Implicit EDX:EAX <- EDX:EAX * r32
+  a.idiv(dword_ptr(gzA));                  // Implicit EDX:EAX <- EDX:EAX * m32
+  a.idiv(edx, eax, ecx);                   // Explicit EDX:EAX <- EDX:EAX * r32
+  a.idiv(edx, eax, anyptr_gpA);            // Explicit EDX:EAX <- EDX:EAX * m32
 
-  if (isX64) a.idiv(rcx);                // Implicit RDX|RAX <- RDX:RAX * r64
-  if (isX64) a.idiv(qword_ptr(gzA));     // Implicit RDX|RAX <- RDX:RAX * m64
-  if (isX64) a.idiv(rdx, rax, rcx);      // Explicit RDX|RAX <- RDX:RAX * r64
-  if (isX64) a.idiv(rdx, rax, anyptr_gpA);// Explicit RDX|RAX <- RDX:RAX * m64
+  if (isX64) a.idiv(rcx);                  // Implicit RDX|RAX <- RDX:RAX * r64
+  if (isX64) a.idiv(qword_ptr(gzA));       // Implicit RDX|RAX <- RDX:RAX * m64
+  if (isX64) a.idiv(rdx, rax, rcx);        // Explicit RDX|RAX <- RDX:RAX * r64
+  if (isX64) a.idiv(rdx, rax, anyptr_gpA); // Explicit RDX|RAX <- RDX:RAX * m64
 
-  a.mul(cl);                             // Implicit AX <- AL * r8
-  a.mul(byte_ptr(gzA));                  // Implicit AX <- AL * m8
-  a.mul(ax, cl);                         // Explicit AX <- AL * r8
-  a.mul(ax, anyptr_gpA);                 // Explicit AX <- AL * m8
+  a.mul(cl);                               // Implicit AX <- AL * r8
+  a.mul(byte_ptr(gzA));                    // Implicit AX <- AL * m8
+  a.mul(ax, cl);                           // Explicit AX <- AL * r8
+  a.mul(ax, anyptr_gpA);                   // Explicit AX <- AL * m8
 
-  a.mul(cx);                             // Implicit DX:AX <- AX * r16
-  a.mul(word_ptr(gzA));                  // Implicit DX:AX <- AX * m16
-  a.mul(dx, ax, cx);                     // Explicit DX:AX <- AX * r16
-  a.mul(dx, ax, anyptr_gpA);             // Explicit DX:AX <- AX * m16
+  a.mul(cx);                               // Implicit DX:AX <- AX * r16
+  a.mul(word_ptr(gzA));                    // Implicit DX:AX <- AX * m16
+  a.mul(dx, ax, cx);                       // Explicit DX:AX <- AX * r16
+  a.mul(dx, ax, anyptr_gpA);               // Explicit DX:AX <- AX * m16
 
-  a.mul(ecx);                            // Implicit EDX:EAX <- EAX * r32
-  a.mul(dword_ptr(gzA));                 // Implicit EDX:EAX <- EAX * m32
-  a.mul(edx, eax, ecx);                  // Explicit EDX:EAX <- EAX * r32
-  a.mul(edx, eax, anyptr_gpA);           // Explicit EDX:EAX <- EAX * m32
+  a.mul(ecx);                              // Implicit EDX:EAX <- EAX * r32
+  a.mul(dword_ptr(gzA));                   // Implicit EDX:EAX <- EAX * m32
+  a.mul(edx, eax, ecx);                    // Explicit EDX:EAX <- EAX * r32
+  a.mul(edx, eax, anyptr_gpA);             // Explicit EDX:EAX <- EAX * m32
 
-  if (isX64) a.mul(rcx);                 // Implicit RDX|RAX <- RAX * r64
-  if (isX64) a.mul(qword_ptr(gzA));      // Implicit RDX|RAX <- RAX * m64
-  if (isX64) a.mul(rdx, rax, rcx);       // Explicit RDX|RAX <- RAX * r64
-  if (isX64) a.mul(rdx, rax, anyptr_gpA);// Explicit RDX|RAX <- RAX * m64
+  if (isX64) a.mul(rcx);                   // Implicit RDX|RAX <- RAX * r64
+  if (isX64) a.mul(qword_ptr(gzA));        // Implicit RDX|RAX <- RAX * m64
+  if (isX64) a.mul(rdx, rax, rcx);         // Explicit RDX|RAX <- RAX * r64
+  if (isX64) a.mul(rdx, rax, anyptr_gpA);  // Explicit RDX|RAX <- RAX * m64
 
   a.imul(gdA);
   a.imul(gzA);
@@ -574,43 +575,50 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.lodsb();
   a.lodsd();
   a.lodsw();
-  a.rep_lodsb();
-  a.rep_lodsd();
-  a.rep_lodsw();
+  a.rep().lodsb();
+  a.rep().lodsd();
+  a.rep().lodsw();
+  if (isX64) a.rep().lodsq();
 
   a.movsb();
   a.movsd();
   a.movsw();
-  a.rep_movsb();
-  a.rep_movsd();
-  a.rep_movsw();
+  a.rep().movsb();
+  a.rep().movsd();
+  a.rep().movsw();
+  if (isX64) a.rep().movsq();
 
   a.stosb();
   a.stosd();
   a.stosw();
-  a.rep_stosb();
-  a.rep_stosd();
-  a.rep_stosw();
+  a.rep().stosb();
+  a.rep().stosd();
+  a.rep().stosw();
+  if (isX64) a.rep().stosq();
 
   a.cmpsb();
   a.cmpsd();
   a.cmpsw();
-  a.repe_cmpsb();
-  a.repe_cmpsd();
-  a.repe_cmpsw();
-  a.repne_cmpsb();
-  a.repne_cmpsd();
-  a.repne_cmpsw();
+  a.repz().cmpsb();
+  a.repz().cmpsd();
+  a.repz().cmpsw();
+  if (isX64) a.repz().cmpsq();
+  a.repnz().cmpsb();
+  a.repnz().cmpsd();
+  a.repnz().cmpsw();
+  if (isX64) a.repnz().cmpsq();
 
   a.scasb();
   a.scasd();
   a.scasw();
-  a.repe_scasb();
-  a.repe_scasd();
-  a.repe_scasw();
-  a.repne_scasb();
-  a.repne_scasd();
-  a.repne_scasw();
+  a.repz().scasb();
+  a.repz().scasd();
+  a.repz().scasw();
+  if (isX64) a.repz().scasq();
+  a.repnz().scasb();
+  a.repnz().scasd();
+  a.repnz().scasw();
+  if (isX64) a.repnz().scasq();
 
   // Label...Jcc/Jecxz/Jmp.
   a.nop();
@@ -819,10 +827,10 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.fyl2xp1();
 
   // LAHF/SAHF
-  a.lahf();                              // Implicit <AH>
-  a.lahf(ah);                            // Explicit <AH>
-  a.sahf();                              // Implicit <AH>
-  a.sahf(ah);                            // Explicit <AH>
+  a.lahf();                                // Implicit <AH>
+  a.lahf(ah);                              // Explicit <AH>
+  a.sahf();                                // Implicit <AH>
+  a.sahf(ah);                              // Explicit <AH>
 
   // FXSR.
   a.fxrstor(anyptr_gpA);
@@ -831,25 +839,25 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   // XSAVE.
   a.nop();
 
-  a.xgetbv();                            // Implicit <EDX:EAX>, <ECX>
-  a.xgetbv(edx, eax, ecx);               // Explicit <EDX:EAX>, <ECX>
+  a.xgetbv();                              // Implicit <EDX:EAX>, <ECX>
+  a.xgetbv(edx, eax, ecx);                 // Explicit <EDX:EAX>, <ECX>
 
-  a.xsetbv();                            // Implicit <EDX:EAX>, <ECX>
-  a.xsetbv(edx, eax, ecx);               // Explicit <EDX:EAX>, <ECX>
+  a.xsetbv();                              // Implicit <EDX:EAX>, <ECX>
+  a.xsetbv(edx, eax, ecx);                 // Explicit <EDX:EAX>, <ECX>
 
-  a.xrstor(anyptr_gpA);                  // Implicit <EDX:EAX>
-  a.xrstors(anyptr_gpA);                 // Implicit <EDX:EAX>
-  a.xsave(anyptr_gpA);                   // Implicit <EDX:EAX>
-  a.xsavec(anyptr_gpA);                  // Implicit <EDX:EAX>
-  a.xsaveopt(anyptr_gpA);                // Implicit <EDX:EAX>
-  a.xsaves(anyptr_gpA);                  // Implicit <EDX:EAX>
+  a.xrstor(anyptr_gpA);                    // Implicit <EDX:EAX>
+  a.xrstors(anyptr_gpA);                   // Implicit <EDX:EAX>
+  a.xsave(anyptr_gpA);                     // Implicit <EDX:EAX>
+  a.xsavec(anyptr_gpA);                    // Implicit <EDX:EAX>
+  a.xsaveopt(anyptr_gpA);                  // Implicit <EDX:EAX>
+  a.xsaves(anyptr_gpA);                    // Implicit <EDX:EAX>
 
-  if (isX64) a.xrstor64(anyptr_gpA);     // Implicit <EDX:EAX>
-  if (isX64) a.xrstors64(anyptr_gpA);    // Implicit <EDX:EAX>
-  if (isX64) a.xsave64(anyptr_gpA);      // Implicit <EDX:EAX>
-  if (isX64) a.xsavec64(anyptr_gpA);     // Implicit <EDX:EAX>
-  if (isX64) a.xsaveopt64(anyptr_gpA);   // Implicit <EDX:EAX>
-  if (isX64) a.xsaves64(anyptr_gpA);     // Implicit <EDX:EAX>
+  if (isX64) a.xrstor64(anyptr_gpA);       // Implicit <EDX:EAX>
+  if (isX64) a.xrstors64(anyptr_gpA);      // Implicit <EDX:EAX>
+  if (isX64) a.xsave64(anyptr_gpA);        // Implicit <EDX:EAX>
+  if (isX64) a.xsavec64(anyptr_gpA);       // Implicit <EDX:EAX>
+  if (isX64) a.xsaveopt64(anyptr_gpA);     // Implicit <EDX:EAX>
+  if (isX64) a.xsaves64(anyptr_gpA);       // Implicit <EDX:EAX>
 
   // POPCNT.
   a.nop();
@@ -902,14 +910,14 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.bzhi(gzA, gzB, gzC);
   a.bzhi(gdA, anyptr_gpB, gdC);
   a.bzhi(gzA, anyptr_gpB, gzC);
-  a.mulx(gdA, gdB, gdC);                 // Implicit gpA, gpB, gpC, <EDX>
-  a.mulx(gdA, gdB, gdC, edx);            // Explicit gpA, gpB, gpC, <EDX>
-  a.mulx(gzA, gzB, gzC);                 // Implicit gpA, gpB, gpC, <EDX|RDX>
-  a.mulx(gzA, gzB, gzC, a.zdx());        // Explicit gpA, gpB, gpC, <EDX|RDX>
-  a.mulx(gdA, gdB, anyptr_gpC);          // Implicit gpA, gpB, mem, <EDX>
-  a.mulx(gdA, gdB, anyptr_gpC, edx);     // Explicit gpA, gpB, mem, <EDX>
-  a.mulx(gzA, gzB, anyptr_gpC);          // Implicit gpA, gpB, mem, <EDX|RDX>
-  a.mulx(gzA, gzB, anyptr_gpC, a.zdx()); // Explicit gpA, gpB, mem, <EDX|RDX>
+  a.mulx(gdA, gdB, gdC);                   // Implicit gpA, gpB, gpC, <EDX>
+  a.mulx(gdA, gdB, gdC, edx);              // Explicit gpA, gpB, gpC, <EDX>
+  a.mulx(gzA, gzB, gzC);                   // Implicit gpA, gpB, gpC, <EDX|RDX>
+  a.mulx(gzA, gzB, gzC, a.zdx());          // Explicit gpA, gpB, gpC, <EDX|RDX>
+  a.mulx(gdA, gdB, anyptr_gpC);            // Implicit gpA, gpB, mem, <EDX>
+  a.mulx(gdA, gdB, anyptr_gpC, edx);       // Explicit gpA, gpB, mem, <EDX>
+  a.mulx(gzA, gzB, anyptr_gpC);            // Implicit gpA, gpB, mem, <EDX|RDX>
+  a.mulx(gzA, gzB, anyptr_gpC, a.zdx());   // Explicit gpA, gpB, mem, <EDX|RDX>
   a.pdep(gdA, gdB, gdC);
   a.pdep(gzA, gzB, gzC);
   a.pdep(gdA, gdB, anyptr_gpC);
@@ -1006,7 +1014,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
 
   // CLZERO.
   a.nop();
-  a.clzero();                            // Implicit <EAX|RAX>
+  a.clzero();                              // Implicit <EAX|RAX>
 
   // PCOMMIT.
   a.nop();
@@ -1226,8 +1234,8 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.divss(xmmA, xmmB);
   a.divss(xmmA, anyptr_gpB);
   a.ldmxcsr(anyptr_gpA);
-  a.maskmovq(mmA, mmB);                  // Implicit mmA, mmB, <EDI|RDI>
-  a.maskmovq(mmA, mmB, a.zdi());         // Explicit mmA, mmB, <EDI|RDI>
+  a.maskmovq(mmA, mmB);                    // Implicit mmA, mmB, <ds:[EDI|RDI]>
+  a.maskmovq(mmA, mmB, ptr(a.zdi()));      // Explicit mmA, mmB, <ds:[EDI|RDI]>
   a.maxps(xmmA, xmmB);
   a.maxps(xmmA, anyptr_gpB);
   a.maxss(xmmA, xmmB);
@@ -1388,8 +1396,8 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.divsd(xmmA, xmmB);
   a.divsd(xmmA, anyptr_gpB);
   a.lfence();
-  a.maskmovdqu(xmmA, xmmB);              // Implicit xmmA, xmmB, <EDI|RDI>
-  a.maskmovdqu(xmmA, xmmB, a.zdi());     // Explicit xmmA, xmmB, <EDI|RDI>
+  a.maskmovdqu(xmmA, xmmB);                // Implicit xmmA, xmmB, <ds:[EDI|RDI]>
+  a.maskmovdqu(xmmA, xmmB, ptr(a.zdi()));  // Explicit xmmA, xmmB, <ds:[EDI|RDI]>
   a.maxpd(xmmA, xmmB);
   a.maxpd(xmmA, anyptr_gpB);
   a.maxsd(xmmA, xmmB);
@@ -1687,14 +1695,14 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.blendpd(xmmA, anyptr_gpB, 0);
   a.blendps(xmmA, xmmB, 0);
   a.blendps(xmmA, anyptr_gpB, 0);
-  a.blendvpd(xmmA, xmmB);                // Implicit xmmA, xmmB, <XMM0>
-  a.blendvpd(xmmA, xmmB, xmm0);          // Explicit xmmA, xmmB, <XMM0>
-  a.blendvpd(xmmA, anyptr_gpB);          // Implicit xmmA, mem, <XMM0>
-  a.blendvpd(xmmA, anyptr_gpB, xmm0);    // Explicit xmmA, mem, <XMM0>
-  a.blendvps(xmmA, xmmB);                // Implicit xmmA, xmmB, <XMM0>
-  a.blendvps(xmmA, xmmB, xmm0);          // Explicit xmmA, xmmB, <XMM0>
-  a.blendvps(xmmA, anyptr_gpB);          // Implicit xmmA, mem, <XMM0>
-  a.blendvps(xmmA, anyptr_gpB, xmm0);    // Explicit xmmA, mem, XMM0>
+  a.blendvpd(xmmA, xmmB);                  // Implicit xmmA, xmmB, <XMM0>
+  a.blendvpd(xmmA, xmmB, xmm0);            // Explicit xmmA, xmmB, <XMM0>
+  a.blendvpd(xmmA, anyptr_gpB);            // Implicit xmmA, mem , <XMM0>
+  a.blendvpd(xmmA, anyptr_gpB, xmm0);      // Explicit xmmA, mem , <XMM0>
+  a.blendvps(xmmA, xmmB);                  // Implicit xmmA, xmmB, <XMM0>
+  a.blendvps(xmmA, xmmB, xmm0);            // Explicit xmmA, xmmB, <XMM0>
+  a.blendvps(xmmA, anyptr_gpB);            // Implicit xmmA, mem , <XMM0>
+  a.blendvps(xmmA, anyptr_gpB, xmm0);      // Explicit xmmA, mem , <XMM0>
 
   a.dppd(xmmA, xmmB, 0);
   a.dppd(xmmA, anyptr_gpB, 0);
@@ -1710,10 +1718,10 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.mpsadbw(xmmA, anyptr_gpB, 0);
   a.packusdw(xmmA, xmmB);
   a.packusdw(xmmA, anyptr_gpB);
-  a.pblendvb(xmmA, xmmB);                // Implicit xmmA, xmmB, <XMM0>
-  a.pblendvb(xmmA, xmmB, xmm0);          // Explicit xmmA, xmmB, <XMM0>
-  a.pblendvb(xmmA, anyptr_gpB);          // Implicit xmmA, mem, <XMM0>
-  a.pblendvb(xmmA, anyptr_gpB, xmm0);    // Implicit xmmA, mem, <XMM0>
+  a.pblendvb(xmmA, xmmB);                  // Implicit xmmA, xmmB, <XMM0>
+  a.pblendvb(xmmA, xmmB, xmm0);            // Explicit xmmA, xmmB, <XMM0>
+  a.pblendvb(xmmA, anyptr_gpB);            // Implicit xmmA, mem, <XMM0>
+  a.pblendvb(xmmA, anyptr_gpB, xmm0);      // Implicit xmmA, mem, <XMM0>
   a.pblendw(xmmA, xmmB, 0);
   a.pblendw(xmmA, anyptr_gpB, 0);
   a.pcmpeqq(xmmA, xmmB);
@@ -1860,10 +1868,10 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.sha256msg1(xmmA, anyptr_gpB);
   a.sha256msg2(xmmA, xmmB);
   a.sha256msg2(xmmA, anyptr_gpB);
-  a.sha256rnds2(xmmA, xmmB);             // Implicit xmmA, xmmB, <XMM0>
-  a.sha256rnds2(xmmA, xmmB, xmm0);       // Explicit xmmA, xmmB, <XMM0>
-  a.sha256rnds2(xmmA, anyptr_gpB);       // Implicit xmmA, mem, <XMM0>
-  a.sha256rnds2(xmmA, anyptr_gpB, xmm0); // Explicit xmmA, mem, <XMM0>
+  a.sha256rnds2(xmmA, xmmB);               // Implicit xmmA, xmmB, <XMM0>
+  a.sha256rnds2(xmmA, xmmB, xmm0);         // Explicit xmmA, xmmB, <XMM0>
+  a.sha256rnds2(xmmA, anyptr_gpB);         // Implicit xmmA, mem, <XMM0>
+  a.sha256rnds2(xmmA, anyptr_gpB, xmm0);   // Explicit xmmA, mem, <XMM0>
 
   // PCLMULQDQ.
   a.nop();
@@ -2032,8 +2040,8 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.vlddqu(xmmA, anyptr_gpB);
   a.vlddqu(ymmA, anyptr_gpB);
   a.vldmxcsr(anyptr_gpA);
-  a.vmaskmovdqu(xmmA, xmmB);             // Implicit xmmA, xmmB, <EDI|RDI>
-  a.vmaskmovdqu(xmmA, xmmB, a.zdi());    // Explicit xmmA, xmmB, <EDI|RDI>
+  a.vmaskmovdqu(xmmA, xmmB);               // Implicit xmmA, xmmB, <ds:[EDI|RDI]>
+  a.vmaskmovdqu(xmmA, xmmB, ptr(a.zdi())); // Explicit xmmA, xmmB, <ds:[EDI|RDI]>
   a.vmaskmovps(xmmA, xmmB, anyptr_gpC);
   a.vmaskmovps(ymmA, ymmB, anyptr_gpC);
   a.vmaskmovps(anyptr_gpA, xmmB, xmmC);
