@@ -2431,7 +2431,7 @@ CaseExtMovd:
       goto CaseExtRm;
 
     case X86Inst::kEncodingExtRmZDI:
-      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && !o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
+      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
         goto InvalidInstruction;
 
       isign3 &= 0x3F;
@@ -2750,7 +2750,7 @@ CaseExtRm:
       break;
 
     case X86Inst::kEncodingVexRmZDI:
-      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && !o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
+      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
         goto InvalidInstruction;
 
       isign3 &= 0x3F;
