@@ -1669,7 +1669,7 @@ struct X86Inst {
     kInstFlagRepnz        = 0x00000080U, //!< Instruction can be prefixed by using the REPNZ prefix.
 
     kInstFlagFp           = 0x00000100U, //!< Instruction accesses FPU register(s).
-    kInstFlagSpecial      = 0x00000200U, //!< Instruction requires special handling (implicit operands), used by \ref Compiler.
+    kInstFlagSpecial      = 0x00000200U, //!< Instruction requires special handling (implicit operands), used by \ref X86Compiler.
 
     //! Instruction always performs memory access.
     //!

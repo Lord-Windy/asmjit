@@ -351,10 +351,63 @@ Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* name) {
   RegInfo regInfo;
   uint32_t typeId;
 
-  if (isVirtRegValid(ref))
-    typeId = getVirtReg(ref)->getTypeId();
-  else
+  if (isVirtRegValid(ref)) {
+    VirtReg* vRef = getVirtReg(ref);
+    typeId = vRef->getTypeId();
+
+    // NOTE: It's possible to cast one register type to another if it's the
+    // same register kind. However, VirtReg always contains the TypeId that
+    // was used to create the register. This means that in some cases we may
+    // end up having different size of `ref` and `vRef`. In such case we
+    // adjust the TypeId to match the `ref` register type instead of the
+    // original register type, which should be the expected behavior.
+    uint32_t typeSize = TypeId::sizeOf(typeId);
+    uint32_t refSize = ref.getSize();
+
+    if (typeSize != refSize) {
+      if (TypeId::isInt(typeId)) {
+        // GP register - change TypeId to match `ref`, but keep sign of `vRef`.
+        switch (refSize) {
+          case  1: typeId = TypeId::kI8  | (typeId & 1); break;
+          case  2: typeId = TypeId::kI16 | (typeId & 1); break;
+          case  4: typeId = TypeId::kI32 | (typeId & 1); break;
+          case  8: typeId = TypeId::kI64 | (typeId & 1); break;
+          default: typeId = TypeId::kVoid; break;
+        }
+      }
+      else if (TypeId::isMmx(typeId)) {
+        // MMX register - always use 64-bit.
+        typeId = TypeId::kMmx64;
+      }
+      else if (TypeId::isMask(typeId)) {
+        // Mask register - change type based on `ref` size.
+        switch (refSize) {
+          case  1: typeId = TypeId::kMask8; break;
+          case  2: typeId = TypeId::kMask16; break;
+          case  4: typeId = TypeId::kMask32; break;
+          case  8: typeId = TypeId::kMask64; break;
+          default: typeId = TypeId::kVoid; break;
+        }
+      }
+      else {
+        // VEC register - change TypeId to match `ref` size, keep elements type.
+        uint32_t elementTypeId = TypeId::elementOf(typeId);
+
+        switch (refSize) {
+          case 16: typeId = TypeId::_kVec128Start + (elementTypeId - TypeId::kI8); break;
+          case 32: typeId = TypeId::_kVec256Start + (elementTypeId - TypeId::kI8); break;
+          case 64: typeId = TypeId::_kVec512Start + (elementTypeId - TypeId::kI8); break;
+          default: typeId = TypeId::kVoid; break;
+        }
+      }
+
+      if (typeId == TypeId::kVoid)
+        return setLastError(DebugUtils::errored(kErrorInvalidState));
+    }
+  }
+  else {
     typeId = ref.getRegType();
+  }
 
   Error err = ArchUtils::typeIdToRegInfo(getArchType(), typeId, regInfo);
   if (ASMJIT_UNLIKELY(err)) return setLastError(err);

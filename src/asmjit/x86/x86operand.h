@@ -232,7 +232,7 @@ public:
     kKindMm             = 1,             //!< MMX register kind.
     kKindK              = 2,             //!< K register kind.
     kKindVec            = 3,             //!< XMM|YMM|ZMM register kind.
-    _kKindRACount       = 4,             //!< Count of register kinds used by \ref Compiler.
+    _kKindRACount       = 4,             //!< Count of register kinds used by \ref X86Compiler.
 
     kKindFp             = 4,             //!< FPU (x87) register kind.
     kKindCr             = 5,             //!< Control register kind.
