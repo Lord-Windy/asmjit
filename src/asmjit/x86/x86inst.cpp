@@ -3444,7 +3444,7 @@ static const X86ValidationData _x64ValidationData = {
 static ASMJIT_INLINE bool X86Inst_checkOSig(const X86Inst::OSignature& op, const X86Inst::OSignature& ref) noexcept {
   // Fail if operand types are incompatible.
   uint32_t opFlags = op.flags;
-  if ((ref.flags & opFlags) == 0)
+  if ((opFlags & ref.flags) == 0)
     return false;
 
   // Fail if memory specific flags and sizes are incompatibles.
@@ -3459,9 +3459,11 @@ static ASMJIT_INLINE bool X86Inst_checkOSig(const X86Inst::OSignature& op, const
   }
 
   // Specific register index.
-  uint32_t refRegMask = ref.regMask;
-  if (refRegMask && !(op.regMask & refRegMask))
-    return false;
+  if (opFlags & X86Inst::kOpAllRegs) {
+    uint32_t refRegMask = ref.regMask;
+    if (refRegMask && !(op.regMask & refRegMask))
+      return false;
+  }
 
   return true;
 }

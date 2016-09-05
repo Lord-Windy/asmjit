@@ -1490,7 +1490,7 @@ CaseX86M_Bx_MulDiv:
           }
 
           // Handle a special form 'mov al|ax|eax|rax, [ptr64]' that doesn't use MOD.
-          if (!rmRel->as<X86Mem>().hasBaseOrIndex() && o0.getId() == X86Gp::kIdAx) {
+          if (o0.getId() == X86Gp::kIdAx && !rmRel->as<X86Mem>().hasBaseOrIndex()) {
             opCode += 0xA0;
             imVal = rmRel->as<X86Mem>().getOffset();
             imLen = getGpSize();
@@ -4273,7 +4273,8 @@ EmitImm:
     ASMJIT_ASSERT(i == 4);
 
 #if ASMJIT_ARCH_64BIT
-    EMIT_DWORD(imm >> 8);
+    imm >>= 8;
+    EMIT_DWORD(static_cast<uint32_t>(imm));
 #else
     EMIT_DWORD(static_cast<uint32_t>((static_cast<uint64_t>(imVal) >> 32) & 0xFFFFFFFFU));
 #endif

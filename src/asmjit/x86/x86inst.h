@@ -2171,6 +2171,9 @@ struct X86Inst {
     kOpXmm                = 0x00001000U, //!< Operand can be a 128-bit XMM register.
     kOpYmm                = 0x00002000U, //!< Operand can be a 256-bit YMM register.
     kOpZmm                = 0x00004000U, //!< Operand can be a 512-bit ZMM register.
+
+    kOpAllRegs            = 0x00007FFFU, //!< Combination of all possible registers.
+
     kOpMem                = 0x00010000U, //!< Operand can be a scalar memory pointer.
     kOpVm                 = 0x00020000U, //!< Operand can be a vector memory pointer.
     kOpI4                 = 0x00040000U, //!< Operand can be a 4-bit immediate.
