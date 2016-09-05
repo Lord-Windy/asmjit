@@ -53,7 +53,14 @@ static const X86FormatterRegData x86FormatterRegData[] = {
   { "dr%u" , true , 0 }  // #18 DR.
 };
 static const char x86FormatterSegmentNames[] =
-  "\0\0\0\0es:\0cs:\0ss:\0ds:\0fs:\0gs:\0\0\0\0\0";
+  "\0\0\0\0"
+  "es:\0"
+  "cs:\0"
+  "ss:\0"
+  "ds:\0"
+  "fs:\0"
+  "gs:\0"
+  "??:\0"; // Unknown 7th segment?
 
 static const char* x86GetAddressSizeString(uint32_t size) noexcept {
   switch (size) {
@@ -150,6 +157,9 @@ ASMJIT_FAVOR_SIZE Error X86Formatter::formatOperand(StringBuilder& out, uint32_t
       out.appendString(x86FormatterSegmentNames + seg * 4);
 
     out.appendChar('[');
+    if (m.isAbs())
+      out.appendString("abs ");
+
     if (m.hasBase()) {
       if (m.hasBaseLabel()) {
         out.appendFormat("L%u", Operand::unpackId(m.getBaseId()));

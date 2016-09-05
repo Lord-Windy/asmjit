@@ -380,7 +380,7 @@ Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* name) {
         typeId = TypeId::kMmx64;
       }
       else if (TypeId::isMask(typeId)) {
-        // Mask register - change type based on `ref` size.
+        // Mask register - change TypeId to match `ref` size.
         switch (refSize) {
           case  1: typeId = TypeId::kMask8; break;
           case  2: typeId = TypeId::kMask16; break;
@@ -390,7 +390,7 @@ Error CodeCompiler::_newReg(Reg& out, const Reg& ref, const char* name) {
         }
       }
       else {
-        // VEC register - change TypeId to match `ref` size, keep elements type.
+        // VEC register - change TypeId to match `ref` size, keep vector metadata.
         uint32_t elementTypeId = TypeId::elementOf(typeId);
 
         switch (refSize) {

@@ -1013,7 +1013,19 @@ static ASMJIT_INLINE X86Mem ptr(uint64_t base, const X86Vec& index, uint32_t shi
   }                                                                                 \
   /*! Create a `[base + (vec_index << shift) + disp]` memory operand. */            \
   static ASMJIT_INLINE X86Mem FUNC(uint64_t base, const X86Vec& index, uint32_t shift = 0) noexcept { \
-    return X86Mem(base, index, shift, SIZE);                                        \
+    return X86Mem(base, index, shift, SIZE, Mem::kFlagAbs);                         \
+  }                                                                                 \
+  /*! Create a `[base + disp]` memory operand. */                                   \
+  static ASMJIT_INLINE X86Mem FUNC##_abs(uint64_t base) noexcept {                  \
+    return X86Mem(base, SIZE);                                                      \
+  }                                                                                 \
+  /*! Create a `[base + (index << shift) + disp]` memory operand. */                \
+  static ASMJIT_INLINE X86Mem FUNC##_abs(uint64_t base, const X86Gp& index, uint32_t shift = 0) noexcept { \
+    return X86Mem(base, index, shift, SIZE, Mem::kFlagAbs);                         \
+  }                                                                                 \
+  /*! Create a `[base + (vec_index << shift) + disp]` memory operand. */            \
+  static ASMJIT_INLINE X86Mem FUNC##_abs(uint64_t base, const X86Vec& index, uint32_t shift = 0) noexcept { \
+    return X86Mem(base, index, shift, SIZE, Mem::kFlagAbs);                         \
   }
 
 // Define memory operand constructors that use platform independent naming.

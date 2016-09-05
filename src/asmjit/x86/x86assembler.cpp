@@ -656,6 +656,8 @@ static Error X86Assembler_validateInstruction(
 #define ENC_OPS5(OP0, OP1, OP2, OP3, OP4) ((Operand::kOp##OP0) + ((Operand::kOp##OP1) << 3) + ((Operand::kOp##OP2) << 6) + ((Operand::kOp##OP3) << 9) + ((Operand::kOp##OP4) << 12))
 
 Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3) {
+  Error err;
+
   const Operand_* rmRel;         // Memory operand or operand that holds Label|Imm.
   uint32_t rmInfo;               // Memory operand's info based on x86MemInfo.
   uint32_t rbReg;                // Memory base or modRM register.
@@ -705,9 +707,9 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
 
       // Grow request, happens rarely.
       if ((size_t)(_bufferEnd - cursor) < 16) {
-        Error err = _code->growBuffer(&_section->buffer, 16);
-        if (ASMJIT_UNLIKELY(err))
-          return X86Assembler_failedInstruction(this, err, instId, options, o0, o1, o2, o3);
+        err = _code->growBuffer(&_section->buffer, 16);
+        if (ASMJIT_UNLIKELY(err)) goto Failed;
+
         cursor = _bufferPtr;
       }
     }
@@ -858,7 +860,7 @@ CaseX86M_Bx_MulDiv:
 
       if (isign3 == ENC_OPS1(Mem)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
         rmRel = &o0;
 
         opCode += o0.getSize() != 1;
@@ -893,7 +895,7 @@ CaseX86M_Bx_MulDiv:
     case X86Inst::kEncodingX86Arith:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto InvalidInstruction;
+          goto OperandSizeMismatch;
 
         opReg = o0.getId();
         rbReg = o1.getId();
@@ -1008,7 +1010,7 @@ CaseX86M_Bx_MulDiv:
         uint32_t memSize = o0.getSize();
 
         if (ASMJIT_UNLIKELY(memSize == 0))
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(memSize, 4);
@@ -1069,7 +1071,7 @@ CaseX86M_Bx_MulDiv:
 
       if (isign3 == ENC_OPS2(Mem, Imm)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
 
         rmRel = &o0;
         goto EmitX86M;
@@ -1102,7 +1104,7 @@ CaseX86M_Bx_MulDiv:
 
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto InvalidInstruction;
+          goto OperandSizeMismatch;
 
         rbReg = o0.getId();
         opReg = o1.getId();
@@ -1158,7 +1160,7 @@ CaseX86M_Bx_MulDiv:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
         rmRel = &o1;
         if (o1.getSize() == 0)
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
 
         // This seems to be the only exception of encoding 66F2 PP prefix.
         if (o1.getSize() == 2) EMIT_BYTE(0x66);
@@ -1226,7 +1228,7 @@ CaseX86M_Bx_MulDiv:
           goto CaseX86M_Bx_MulDiv;
 
         if (o0.getSize() != o1.getSize())
-          goto InvalidInstruction;
+          goto OperandSizeMismatch;
 
         opReg = o0.getId();
         rbReg = o1.getId();
@@ -1579,7 +1581,7 @@ CaseX86M_Bx_MulDiv:
         uint32_t memSize = o0.getSize();
 
         if (ASMJIT_UNLIKELY(memSize == 0))
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(memSize, 4);
@@ -1624,7 +1626,7 @@ CaseX86M_Bx_MulDiv:
         if (X86Reg::isSeg(o0)) {
           uint32_t segment = o0.getId();
           if (ASMJIT_UNLIKELY(segment >= X86Seg::kIdCount))
-            goto InvalidInstruction;
+            goto InvalidSegment;
 
           if (segment >= X86Seg::kIdFs)
             EMIT_BYTE(0x0F);
@@ -1654,7 +1656,7 @@ CaseX86M_Bx_MulDiv:
         if (X86Reg::isSeg(o0)) {
           uint32_t segment = o0.getId();
           if (ASMJIT_UNLIKELY(segment == X86Seg::kIdCs || segment >= X86Seg::kIdCount))
-            goto InvalidInstruction;
+            goto InvalidSegment;
 
           if (segment >= X86Seg::kIdFs)
             EMIT_BYTE(0x0F);
@@ -1679,6 +1681,9 @@ CaseX86Pop_Gp:
       }
 
       if (isign3 == ENC_OPS1(Mem)) {
+        if (ASMJIT_UNLIKELY(o0.getSize() == 0))
+          goto AmbiguousOperandSize;
+
         if (ASMJIT_UNLIKELY(o0.getSize() != 2 && o0.getSize() != getGpSize()))
           goto InvalidInstruction;
 
@@ -1756,7 +1761,7 @@ CaseX86Pop_Gp:
 
         if (isign3 == ENC_OPS2(Mem, Imm)) {
           if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-            goto InvalidInstruction;
+            goto AmbiguousOperandSize;
 
           imVal = static_cast<const Imm&>(o1).getInt64() & 0xFF;
           imLen = 0;
@@ -1842,11 +1847,11 @@ CaseX86Pop_Gp:
 
         uint32_t size = o0.getSize();
         if (o1.hasSize() && ASMJIT_UNLIKELY(o1.getSize() != size))
-          goto InvalidInstruction;
-        ADD_PREFIX_BY_SIZE(size);
+          goto OperandSizeMismatch;
 
-        // Segment-override prefix of the second operand.
+        ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
+
         goto EmitX86OpStr;
       }
       break;
@@ -1864,10 +1869,11 @@ CaseX86Pop_Gp:
 
         uint32_t size = o1.getSize();
         if (o0.hasSize() && ASMJIT_UNLIKELY(o0.getSize() != size))
-          goto InvalidInstruction;
-        ADD_PREFIX_BY_SIZE(size);
+          goto OperandSizeMismatch;
 
+        ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
+
         goto EmitX86OpStr;
       }
       break;
@@ -1887,11 +1893,15 @@ CaseX86Pop_Gp:
           goto InvalidInstruction;
 
         uint32_t size = o1.getSize();
-        if (ASMJIT_UNLIKELY(size == 0 || o0.getSize() != size))
-          goto InvalidInstruction;
-        ADD_PREFIX_BY_SIZE(size);
+        if (ASMJIT_UNLIKELY(size == 0))
+          goto AmbiguousOperandSize;
 
+        if (ASMJIT_UNLIKELY(o0.getSize() != size))
+          goto OperandSizeMismatch;
+
+        ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
+
         goto EmitX86OpStr;
       }
       break;
@@ -1899,7 +1909,7 @@ CaseX86Pop_Gp:
     case X86Inst::kEncodingX86Test:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (o0.getSize() != o1.getSize())
-          goto InvalidInstruction;
+          goto OperandSizeMismatch;
 
         rbReg = o0.getId();
         opReg = o1.getId();
@@ -1964,7 +1974,7 @@ CaseX86Pop_Gp:
 
       if (isign3 == ENC_OPS2(Mem, Imm)) {
         if (ASMJIT_UNLIKELY(o0.getSize() == 0))
-          goto InvalidInstruction;
+          goto AmbiguousOperandSize;
 
         imVal = static_cast<const Imm&>(o1).getInt64();
         imLen = Utils::iMin<uint32_t>(o0.getSize(), 4);
@@ -2000,7 +2010,7 @@ CaseX86Pop_Gp:
         opReg = o1.getId();
 
         if (o0.getSize() != o1.getSize())
-          goto InvalidInstruction;
+          goto OperandSizeMismatch;
 
         if (o0.getSize() == 1) {
           FIXUP_GPB(o0, rbReg);
@@ -3605,11 +3615,47 @@ EmitModSib:
         }
       }
     }
-    // ==========|> [DISP32].
+    // ==========|> [ABSOLUTE | DISP32].
     else if (!(rmInfo & (kX86MemInfo_BaseLabel | kX86MemInfo_BaseRip))) {
-      dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
-      EMIT_BYTE(x86EncodeMod(0, opReg, 5));
-      EMIT_DWORD(static_cast<int32_t>(dispOffset));
+      if (is32Bit()) {
+        dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
+        EMIT_BYTE(x86EncodeMod(0, opReg, 5));
+        EMIT_DWORD(static_cast<int32_t>(dispOffset));
+      }
+      else {
+        uint64_t baseAddress = getCodeInfo().getBaseAddress();
+        dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
+
+        // Prefer absolute addressing mode if FS|GS segment override is present.
+        bool absoluteValid = rmRel->as<X86Mem>().getOffsetHi32() == (dispOffset >> 31);
+        bool preferAbsolute = (rmRel->as<X86Mem>().getSegmentId() >= X86Seg::kIdFs) || rmRel->as<X86Mem>().isAbs();
+
+        // If we know the base address and the memory operand points to an
+        // absolute address it's possible to calculate REL32 that can be
+        // be used as [RIP+REL32] in 64-bit mode.
+        if (baseAddress != kNoBaseAddress && !preferAbsolute) {
+          const uint32_t kModRel32Size = 5;
+          uint64_t rip64 = baseAddress +
+            static_cast<uint64_t>((uintptr_t)(cursor - _bufferData)) + imLen + kModRel32Size;
+
+          uint64_t rel64 = static_cast<uint64_t>(rmRel->as<X86Mem>().getOffset()) - rip64;
+          if (Utils::isInt32(static_cast<int64_t>(rel64))) {
+            EMIT_BYTE(x86EncodeMod(0, opReg, 5));
+            EMIT_DWORD(static_cast<uint32_t>(rel64 & 0xFFFFFFFFU));
+            if (imLen != 0)
+              goto EmitImm;
+            else
+              goto EmitDone;
+          }
+        }
+
+        if (ASMJIT_UNLIKELY(!absoluteValid))
+          goto InvalidAddress64Bit;
+
+        EMIT_BYTE(x86EncodeMod(0, opReg, 4));
+        EMIT_BYTE(x86EncodeSib(0, 4, 5));
+        EMIT_DWORD(dispOffset);
+      }
     }
     // ==========|> [LABEL|RIP + DISP32]
     else {
@@ -3618,7 +3664,7 @@ EmitModSib:
       if (is32Bit()) {
 EmitModSib_LabelRip_X86:
         if (ASMJIT_UNLIKELY(_code->_relocations.willGrow(1) != kErrorOk))
-          goto OutOfMemory;
+          goto NoHeapMemory;
 
         dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
         if (rmInfo & kX86MemInfo_BaseLabel) {
@@ -4100,7 +4146,7 @@ EmitJmpCall:
       }
 
       if (ASMJIT_UNLIKELY(_code->_relocations.willGrow(1) != kErrorOk))
-        goto OutOfMemory;
+        goto NoHeapMemory;
 
       CodeHolder::RelocEntry re;
       re.type = kRelocAbsToRel;
@@ -4182,7 +4228,7 @@ EmitDisplacement:
 
     // Chain with label.
     CodeHolder::LabelLink* link = _code->newLabelLink();
-    if (ASMJIT_UNLIKELY(!link)) goto OutOfMemory;
+    if (ASMJIT_UNLIKELY(!link)) goto NoHeapMemory;
 
     link->prev = label->_links;
     link->offset = (intptr_t)(cursor - _bufferData);
@@ -4254,49 +4300,25 @@ EmitDone:
   // [Error Cases]
   // --------------------------------------------------------------------------
 
-InvalidArgument:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidArgument), instId, options, o0, o1, o2, o3);
+#define ERROR_HANDLER(ERROR) ERROR: err = DebugUtils::errored(kError##ERROR); goto Failed;
 
-InvalidInstruction:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidInstruction), instId, options, o0, o1, o2, o3);
+ERROR_HANDLER(NoHeapMemory)
+ERROR_HANDLER(InvalidArgument)
+ERROR_HANDLER(InvalidLabel)
+ERROR_HANDLER(InvalidInstruction)
+ERROR_HANDLER(InvalidRexPrefix)
+ERROR_HANDLER(InvalidBroadcast)
+ERROR_HANDLER(InvalidSAEOrER)
+ERROR_HANDLER(InvalidAddress)
+ERROR_HANDLER(InvalidAddressIndex)
+ERROR_HANDLER(InvalidAddress64Bit)
+ERROR_HANDLER(InvalidDisplacement)
+ERROR_HANDLER(InvalidSegment)
+ERROR_HANDLER(OperandSizeMismatch)
+ERROR_HANDLER(AmbiguousOperandSize)
 
-InvalidBroadcast:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidBroadcast), instId, options, o0, o1, o2, o3);
-
-InvalidSAEOrER:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidSAEOrER), instId, options, o0, o1, o2, o3);
-
-InvalidAddress:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidAddress), instId, options, o0, o1, o2, o3);
-
-InvalidAddressIndex:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidAddressIndex), instId, options, o0, o1, o2, o3);
-
-InvalidAddress4Bit:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidAddress64Bit), instId, options, o0, o1, o2, o3);
-
-InvalidLabel:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidLabel), instId, options, o0, o1, o2, o3);
-
-InvalidDisplacement:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidDisplacement), instId, options, o0, o1, o2, o3);
-
-InvalidRexPrefix:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorInvalidRexPrefix), instId, options, o0, o1, o2, o3);
-
-OutOfMemory:
-  return X86Assembler_failedInstruction(this,
-    DebugUtils::errored(kErrorNoHeapMemory), instId, options, o0, o1, o2, o3);
+Failed:
+  return X86Assembler_failedInstruction(this, err, instId, options, o0, o1, o2, o3);
 }
 
 } // asmjit namespace

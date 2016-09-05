@@ -168,17 +168,22 @@ ASMJIT_ENUM(ErrorCode) {
   //! Invalid segment.
   kErrorInvalidSegment,
 
+  //! Mismatching operand size (size of multiple operands doesn't match the operation size).
+  kErrorOperandSizeMismatch,
+  //! Ambiguous operand size (memory has zero size while it's required to determine the operation type.
+  kErrorAmbiguousOperandSize,
+
   //! Invalid TypeId.
   kErrorInvalidTypeId,
-  //! Invalid use of a low 8-bit GPB register.
+  //! Invalid use of a 8-bit GPB-HIGH register.
   kErrorInvalidUseOfGpbHi,
   //! Invalid use of a 64-bit GPQ register in 32-bit mode.
   kErrorInvalidUseOfGpq,
   //! Invalid use of an 80-bit float (TypeId::kF80).
   kErrorInvalidUseOfF80,
+
   //! AsmJit requires a physical register, but no one is available.
   kErrorNoMorePhysRegs,
-
   //! A variable has been assigned more than once to a function argument (CodeCompiler).
   kErrorOverlappingRegArgs,
   //! Invalid register to hold stack arguments offset.

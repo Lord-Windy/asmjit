@@ -32,8 +32,8 @@ namespace asmjit {
 // ============================================================================
 
 class Assembler;
-class CodeHolder;
 class CodeEmitter;
+class CodeHolder;
 
 // ============================================================================
 // [asmjit::AlignMode]
@@ -308,20 +308,19 @@ public:
   // [LabelEntry]
   // --------------------------------------------------------------------------
 
-  //! Label entry contains the following properties:
+  //! Label entry.
   //!
+  //! Contains the following properties:
   //!   * Label id - This is the only thing that is set to the `Label` operand.
   //!   * Label name - Optional, used mostly to create executables and libraries.
   //!   * Label type - Type of the label, default `Label::kTypeAnonymous`.
   //!   * Label parent id - Derived from many assemblers that allow to define a
   //!       local label that falls under a global label. This allows to define
   //!       many labels of the same name that have different parent (global) label.
-  //!
   //!   * Offset - offset of the label bound by `Assembler`.
   //!   * Links - single-linked list that contains locations of code that has
   //!       to be patched when the label gets bound. Every use of unbound label
   //!       adds one link to `_links` list.
-  //!
   //!   * HVal - Hash value of label's name and optionally parentId.
   //!   * HashNext - Hash-table implementation detail.
   class LabelEntry : public ZoneHashNode {
@@ -374,13 +373,10 @@ public:
     // [Members]
     // ------------------------------------------------------------------------
 
-    enum {
-      // Let's round the size of `LabelEntry` to 64 bytes (as ZoneHeap has 32
-      // bytes granularity anyway). This gives `_name` the remaining space,
-      // which is roughly 24 bytes on 64-bit and 36 bytes on 32-bit.
-      kNameBytes =
-        64 - (sizeof(ZoneHashNode) + 8 + sizeof(intptr_t) + sizeof(LabelLink*))
-    };
+    // Let's round the size of `LabelEntry` to 64 bytes (as ZoneHeap has 32
+    // bytes granularity anyway). This gives `_name` the remaining space, which
+    // is roughly 24 bytes on 64-bit and 36 bytes on 32-bit architectures.
+    enum { kNameBytes = 64 - (sizeof(ZoneHashNode) + 8 + sizeof(intptr_t) + sizeof(LabelLink*)) };
 
     uint8_t _type;                       //!< Label type, see Label::Type.
     uint8_t _flags;                      //!< Must be zero.
@@ -395,7 +391,7 @@ public:
   // [RelocEntry]
   // --------------------------------------------------------------------------
 
-  //! Code relocation data.
+  //! Code relocation entry.
   //!
   //! X86/X64 Specific
   //! ----------------

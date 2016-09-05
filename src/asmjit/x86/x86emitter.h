@@ -264,6 +264,14 @@ struct X86EmitterExplicitT {
   ASMJIT_INLINE X86Mem intptr_ptr(uint64_t base, const X86Gp& index, uint32_t shift = 0) const noexcept {
     return x86::ptr(base, index, shift, THIS_C()->getGpSize());
   }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr_abs(uint64_t base) const noexcept {
+    return x86::ptr(base, THIS_C()->getGpSize(), Mem::kFlagAbs);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr_abs(uint64_t base, const X86Gp& index, uint32_t shift = 0) const noexcept {
+    return x86::ptr(base, index, shift, THIS_C()->getGpSize(), Mem::kFlagAbs);
+  }
 
   // --------------------------------------------------------------------------
   // [Embed]

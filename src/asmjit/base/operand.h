@@ -698,6 +698,9 @@ class Mem : public Operand {
 public:
   //! Memory operand flags.
   ASMJIT_ENUM(Flags) {
+    //! Should be encoded as an absolute memory operand.
+    kFlagAbs = 0x20,
+
     //! This memory operand represents a function argument's stack location.
     //!
     //! This flag is used exclusively by \ref CodeCompiler.
@@ -769,14 +772,24 @@ public:
     _init_packed_d2_d3(0, 0);
   }
 
-  ASMJIT_INLINE bool isArgHome() const noexcept { return (_mem.flags & kFlagArgHome) != 0; }
-  ASMJIT_INLINE bool isRegHome() const noexcept { return (_mem.flags & kFlagRegHome) != 0; }
+  ASMJIT_INLINE uint32_t getFlags() const noexcept { return _mem.flags; }
+  ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (_mem.flags & flag) != 0; }
+  ASMJIT_INLINE void addFlags(uint32_t flags) noexcept { _mem.flags |= static_cast<uint8_t>(flags); }
+  ASMJIT_INLINE void clearFlags(uint32_t flags) noexcept { _mem.flags &= ~static_cast<uint8_t>(flags); }
 
-  ASMJIT_INLINE void markArgHome() noexcept { _mem.flags |= kFlagArgHome; }
-  ASMJIT_INLINE void markRegHome() noexcept { _mem.flags |= kFlagRegHome; }
+  ASMJIT_INLINE bool isAbs() const noexcept { return hasFlag(kFlagAbs); }
+  ASMJIT_INLINE bool isArgHome() const noexcept { return hasFlag(kFlagArgHome); }
+  ASMJIT_INLINE bool isRegHome() const noexcept { return hasFlag(kFlagRegHome); }
 
-  ASMJIT_INLINE void clearArgHome() noexcept { _mem.flags &= ~kFlagArgHome; }
-  ASMJIT_INLINE void clearRegHome() noexcept { _mem.flags &= ~kFlagRegHome; }
+  ASMJIT_INLINE void setAbs(bool value = false) noexcept {
+    _mem.flags = static_cast<uint8_t>((_mem.flags & ~kFlagAbs) | (value ? kFlagAbs : 0));
+  }
+  ASMJIT_INLINE void markArgHome() noexcept { addFlags(kFlagArgHome); }
+  ASMJIT_INLINE void markRegHome() noexcept { addFlags(kFlagRegHome); }
+
+  ASMJIT_INLINE void clearAbs(bool value = false) noexcept { _mem.flags &= ~kFlagAbs; }
+  ASMJIT_INLINE void clearArgHome() noexcept { clearFlags(kFlagArgHome); }
+  ASMJIT_INLINE void clearRegHome() noexcept { clearFlags(kFlagRegHome); }
 
   //! Get if the memory operand has a BASE register or label specified.
   ASMJIT_INLINE bool hasBase() const noexcept { return getBaseType() != 0; }

@@ -56,6 +56,8 @@ static const char errorMessages[] =
   "Invalid use of 64-bit address in 32-bit mode\0"
   "Invalid displacement\0"
   "Invalid segment\0"
+  "Operand size mismatch\0"
+  "Ambiguous operand size\0"
   "Invalid type-info\0"
   "Invalid use of a low 8-bit GPB register\0"
   "Invalid use of a 64-bit GPQ register in 32-bit mode\0"
