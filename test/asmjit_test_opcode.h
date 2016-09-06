@@ -1052,10 +1052,15 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.nop();
   a.pcommit();
 
-  // PREFETCHW / PREFETCHWT1.
+  // PREFETCH / PREFETCHW / PREFETCHWT1.
   a.nop();
-  a.prefetchw(anyptr_gpA);
-  a.prefetchwt1(anyptr_gpA);
+  a.prefetch(anyptr_gpA);                  // 3DNOW.
+  a.prefetchnta(anyptr_gpA);               // MMX+SSE.
+  a.prefetcht0(anyptr_gpA);                // MMX+SSE.
+  a.prefetcht1(anyptr_gpA);                // MMX+SSE.
+  a.prefetcht2(anyptr_gpA);                // MMX+SSE.
+  a.prefetchw(anyptr_gpA);                 // PREFETCHW.
+  a.prefetchwt1(anyptr_gpA);               // PREFETCHWT1.
 
   // RDRAND / RDSEED.
   a.nop();
@@ -1224,7 +1229,6 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.pmulhrw(mmA, anyptr_gpB);
   a.pswapd(mmA, mmB);
   a.pswapd(mmA, anyptr_gpB);
-  a.prefetch3dnow(anyptr_gpA);
   a.femms();
 
   // SSE.
@@ -1337,7 +1341,6 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.rcpps(xmmA, anyptr_gpB);
   a.rcpss(xmmA, xmmB);
   a.rcpss(xmmA, anyptr_gpB);
-  a.prefetch(anyptr_gpA, 0);
   a.psadbw(xmmA, xmmB);
   a.psadbw(xmmA, anyptr_gpB);
   a.rsqrtps(xmmA, xmmB);

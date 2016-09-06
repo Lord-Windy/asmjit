@@ -2178,14 +2178,6 @@ CaseX86Pop_Gp:
       }
       break;
 
-    case X86Inst::kEncodingX86Prefetch:
-      if (isign3 == ENC_OPS2(Mem, Imm)) {
-        opReg = static_cast<const Imm&>(o1).getUInt32() & 0x3;
-        rmRel = &o0;
-        goto EmitX86M;
-      }
-      break;
-
     case X86Inst::kEncodingX86Fence:
       rbReg = 0;
       goto EmitX86R;

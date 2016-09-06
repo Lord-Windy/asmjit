@@ -687,8 +687,11 @@ struct X86Inst {
     kIdPopfd,                            // X86
     kIdPopfq,                            // X64
     kIdPor,                              // MMX|SSE2
-    kIdPrefetch,                         // MMX2|SSE
-    kIdPrefetch3dNow,                    // 3DNOW
+    kIdPrefetch,                         // 3DNOW
+    kIdPrefetchnta,                      // MMX2|SSE
+    kIdPrefetcht0,                       // MMX2|SSE
+    kIdPrefetcht1,                       // MMX2|SSE
+    kIdPrefetcht2,                       // MMX2|SSE
     kIdPrefetchw,                        // PREFETCHW
     kIdPrefetchwt1,                      // PREFETCHWT1
     kIdPsadbw,                           // MMX2
@@ -1581,7 +1584,6 @@ struct X86Inst {
     kEncodingX86Test,                    //!< X86 test.
     kEncodingX86Xadd,                    //!< X86 xadd.
     kEncodingX86Xchg,                    //!< X86 xchg.
-    kEncodingX86Prefetch,                //!< X86 prefetch.
     kEncodingX86Fence,                   //!< X86 lfence, mfence, sfence.
     kEncodingFpuOp,                      //!< FPU [OP].
     kEncodingFpuArith,                   //!< FPU fadd, fdiv, fdivr, fmul, fsub, fsubr.
@@ -2160,14 +2162,6 @@ struct X86Inst {
     kRoundTrunc           = 0x03,        //!< Round toward zero (truncate).
     kRoundCurrent         = 0x04,        //!< Round to the current rounding mode set (ignores other RC bits).
     kRoundInexact         = 0x08         //!< Avoids inexact exception, if set.
-  };
-
-  //! Prefetch hints used by PREFETCH instruction.
-  ASMJIT_ENUM(PrefetchHint) {
-    kPrefetchNTA          = 0,           //!< Prefetch by using NT hint.
-    kPrefetchT0           = 1,           //!< Prefetch to L0 cache.
-    kPrefetchT1           = 2,           //!< Prefetch to L1 cache.
-    kPrefetchT2           = 3            //!< Prefetch to L2 cache.
   };
 
   //! Supported architectures.

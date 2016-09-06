@@ -626,7 +626,11 @@ struct X86EmitterExplicitT {
   INST_0x(popf, Popf)                                                  // ANY
   INST_0x(popfd, Popfd)                                                // X86
   INST_0x(popfq, Popfq)                                                // X64
-  INST_2i(prefetch, Prefetch, X86Mem, Imm)                             // SSE
+  INST_1x(prefetch, Prefetch, X86Mem)                                  // 3DNOW
+  INST_1x(prefetchnta, Prefetchnta, X86Mem)                            // SSE
+  INST_1x(prefetcht0, Prefetcht0, X86Mem)                              // SSE
+  INST_1x(prefetcht1, Prefetcht1, X86Mem)                              // SSE
+  INST_1x(prefetcht2, Prefetcht2, X86Mem)                              // SSE
   INST_1x(prefetchw, Prefetchw, X86Mem)                                // PREFETCHW
   INST_1x(prefetchwt1, Prefetchwt1, X86Mem)                            // PREFETCHW1
   INST_1x(push, Push, X86Gp)                                           // ANY
@@ -1591,7 +1595,6 @@ struct X86EmitterExplicitT {
   INST_2x(pmulhrw, Pmulhrw, X86Mm, X86Mem)                             // 3DNOW
   INST_2x(pswapd, Pswapd, X86Mm, X86Mm)                                // 3DNOW
   INST_2x(pswapd, Pswapd, X86Mm, X86Mem)                               // 3DNOW
-  INST_1x(prefetch3dnow, Prefetch3dNow, X86Mem)                        // 3DNOW
   INST_0x(femms, Femms)                                                // 3DNOW
 
   // --------------------------------------------------------------------------
