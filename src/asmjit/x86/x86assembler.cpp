@@ -141,7 +141,7 @@ static const uint8_t x86OpCodePopSeg[8]  = { 0x00, 0x07, 0x00, 0x17, 0x1F, 0xA1,
 #define TABLE(DEF, I) DEF((I*16) +  0), DEF((I*16) +  1), DEF((I*16) +  2), DEF((I*16) +  3), \
                       DEF((I*16) +  4), DEF((I*16) +  5), DEF((I*16) +  6), DEF((I*16) +  7), \
                       DEF((I*16) +  8), DEF((I*16) +  9), DEF((I*16) + 10), DEF((I*16) + 11), \
-                      DEF((I*16) + 12), DEF((I*16) + 13), DEF((I*16) + 14), DEF((I*16)+ 15)
+                      DEF((I*16) + 12), DEF((I*16) + 13), DEF((I*16) + 14), DEF((I*16) + 15)
 
 //! \internal
 //!
@@ -262,6 +262,36 @@ static const uint32_t x86CDisp8SHL[32] = {
 #undef TT
 #undef LL
 
+// Table that contains MOD byte of a 16-bit [BASE + disp] address.
+//   0xFF == Invalid.
+static const uint8_t x86Mod16BaseTable[8] = {
+  0xFF, // AX -> Not encodable.
+  0xFF, // CX -> Not encodable.
+  0xFF, // DX -> Not encodable.
+  0x07, // BX -> 111.
+  0xFF, // SP -> Not encodable.
+  0x06, // BP -> 110.
+  0x04, // SI -> 100.
+  0x05  // DI -> 101.
+};
+
+// Table that contains MOD byte of a 16-bit [BASE + INDEX + disp] combination.
+//   0xFF == Invalid.
+#define IS_BASE_INDEX(X, BASE, INDEX) (((X) >> 3) == X86Gp::kId##BASE && ((X) & 0x7) == X86Gp::kId##INDEX)
+#define X86Mod16BaseIndexTable(X) \
+  ((IS_BASE_INDEX(X, Bx, Si) || IS_BASE_INDEX(X, Si, Bx)) ? 0x00 : \
+   (IS_BASE_INDEX(X, Bx, Di) || IS_BASE_INDEX(X, Di, Bx)) ? 0x01 : \
+   (IS_BASE_INDEX(X, Bp, Si) || IS_BASE_INDEX(X, Si, Bp)) ? 0x02 : \
+   (IS_BASE_INDEX(X, Bp, Di) || IS_BASE_INDEX(X, Di, Bp)) ? 0x03 : 0xFF)
+static const uint8_t x86Mod16BaseIndexTable[64] = {
+  TABLE(X86Mod16BaseIndexTable, 0),
+  TABLE(X86Mod16BaseIndexTable, 1),
+  TABLE(X86Mod16BaseIndexTable, 2),
+  TABLE(X86Mod16BaseIndexTable, 3)
+};
+#undef X86Mod16BaseIndexTable
+#undef IS_BASE_INDEX
+
 #undef TABLE
 
 // ============================================================================
@@ -338,17 +368,24 @@ static ASMJIT_INLINE uint32_t x86EncodeSib(uint32_t s, uint32_t i, uint32_t b) n
 // [asmjit::X86Assembler - Macros]
 // ============================================================================
 
-#define EMIT_BYTE(VAL)                              \
-  do {                                              \
-    cursor[0] = static_cast<uint8_t>((VAL) & 0xFF); \
-    cursor += 1;                                    \
+#define EMIT_BYTE(VAL)                               \
+  do {                                               \
+    cursor[0] = static_cast<uint8_t>((VAL) & 0xFFU); \
+    cursor += 1;                                     \
   } while (0)
 
-#define EMIT_DWORD(VAL)                             \
-  do {                                              \
-    Utils::writeU32uLE(cursor,                      \
-      static_cast<uint32_t>(VAL & 0xFFFFFFFF));     \
-    cursor += 4;                                    \
+#define EMIT_WORD(VAL)                               \
+  do {                                               \
+    Utils::writeU16uLE(cursor,                       \
+      static_cast<uint32_t>((VAL) & 0xFFFFU));       \
+    cursor += 2;                                     \
+  } while (0)
+
+#define EMIT_DWORD(VAL)                              \
+  do {                                               \
+    Utils::writeU32uLE(cursor,                       \
+      static_cast<uint32_t>((VAL) & 0xFFFFFFFFU));   \
+    cursor += 4;                                     \
   } while (0)
 
 // ============================================================================
@@ -3665,13 +3702,13 @@ EmitX86M:
   // --------------------------------------------------------------------------
 
 EmitModSib:
-  if (!(rmInfo & kX86MemInfo_Index)) {
+  if (!(rmInfo & (kX86MemInfo_Index | kX86MemInfo_67H_X86))) {
     // ==========|> [BASE + DISP8|DISP32].
     if (rmInfo & kX86MemInfo_BaseGp) {
       rbReg &= 0x7;
       dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
-      uint32_t mod = x86EncodeMod(0, opReg, rbReg);
 
+      uint32_t mod = x86EncodeMod(0, opReg, rbReg);
       if (rbReg == X86Gp::kIdSp) {
         // [XSP|R12].
         if (dispOffset == 0) {
@@ -3691,7 +3728,7 @@ EmitModSib:
           else {
             EMIT_BYTE(mod + 0x80); // <- MOD(2, opReg, rbReg).
             EMIT_BYTE(x86EncodeSib(0, 4, 4));
-            EMIT_DWORD(static_cast<int32_t>(dispOffset));
+            EMIT_DWORD(dispOffset);
           }
         }
       }
@@ -3710,7 +3747,7 @@ EmitModSib:
         }
         else {
           EMIT_BYTE(mod + 0x80);
-          EMIT_DWORD(static_cast<int32_t>(dispOffset));
+          EMIT_DWORD(dispOffset);
         }
       }
     }
@@ -3719,7 +3756,7 @@ EmitModSib:
       if (is32Bit()) {
         dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
         EMIT_BYTE(x86EncodeMod(0, opReg, 5));
-        EMIT_DWORD(static_cast<int32_t>(dispOffset));
+        EMIT_DWORD(dispOffset);
       }
       else {
         uint64_t baseAddress = getCodeInfo().getBaseAddress();
@@ -3832,7 +3869,7 @@ EmitModSib_LabelRip_X86:
       }
     }
   }
-  else {
+  else if (!(rmInfo & kX86MemInfo_67H_X86)) {
     // ESP|RSP can't be used as INDEX in pure SIB mode, however, VSIB mode
     // allows XMM4|YMM4|ZMM4 (that's why the check is before the label).
     if (ASMJIT_UNLIKELY(rxReg == X86Gp::kIdSp)) goto InvalidAddressIndex;
@@ -3840,7 +3877,7 @@ EmitModSib_LabelRip_X86:
 EmitModVSib:
     rxReg &= 0x7;
 
-    // ==========|> [BASE + INDEX + DISP8|DISP32].
+    // ==========|> [BASE + INDEX + DISP8|DISP16|DISP32].
     if (rmInfo & kX86MemInfo_BaseGp) {
       rbReg &= 0x7;
       dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
@@ -3861,25 +3898,24 @@ EmitModVSib:
           // [BASE + INDEX << SHIFT + DISP8].
           EMIT_BYTE(mod + 0x40); // <- MOD(1, opReg, 4).
           EMIT_BYTE(sib);
-          EMIT_BYTE(cdOffset & 0xFF);
+          EMIT_BYTE(cdOffset);
         }
         else {
-          // [BASE + INDEX << SHIFT + DISP32].
+          // [BASE + INDEX << SHIFT + DISP16|DISP32].
           EMIT_BYTE(mod + 0x80); // <- MOD(2, opReg, 4).
           EMIT_BYTE(sib);
-          EMIT_DWORD(static_cast<int32_t>(dispOffset));
+          EMIT_DWORD(dispOffset);
         }
       }
     }
-    // ==========|> [INDEX + DISP32].
+    // ==========|> [INDEX + DISP16|DISP32].
     else if (!(rmInfo & (kX86MemInfo_BaseLabel | kX86MemInfo_BaseRip))) {
       // [INDEX << SHIFT + DISP32].
       EMIT_BYTE(x86EncodeMod(0, opReg, 4));
       EMIT_BYTE(x86EncodeSib(rmRel->as<X86Mem>().getShift(), rxReg, 5));
 
-      // [DISP32].
       dispOffset = rmRel->as<X86Mem>().getOffsetLo32();
-      EMIT_DWORD(static_cast<int32_t>(dispOffset));
+      EMIT_DWORD(dispOffset);
     }
     // ==========|> [LABEL|RIP + INDEX + DISP32].
     else {
@@ -3891,6 +3927,61 @@ EmitModVSib:
       else {
         goto InvalidAddress;
       }
+    }
+  }
+  else {
+    // 16-bit address mode (32-bit mode with 67 override prefix).
+    dispOffset = (static_cast<int32_t>(rmRel->as<X86Mem>().getOffsetLo32()) << 16) >> 16;
+
+    // NOTE: 16-bit addresses don't use SIB byte and their encoding differs. We
+    // use a table-based approach to calculate the proper MOD byte as it's easier.
+    // Also, not all BASE [+ INDEX] combinations are supported in 16-bit address,
+    // so this may fail.
+    const uint32_t kBaseGpIdx = (kX86MemInfo_BaseGp | kX86MemInfo_Index);
+
+    if (rmInfo & kBaseGpIdx) {
+      // ==========|> [BASE + INDEX + DISP16].
+      uint32_t mod;
+
+      rbReg &= 0x7;
+      rxReg &= 0x7;
+
+      if ((rmInfo & kBaseGpIdx) == kBaseGpIdx) {
+        uint32_t shf = rmRel->as<X86Mem>().getShift();
+        if (ASMJIT_UNLIKELY(shf != 0))
+          goto InvalidAddress;
+        mod = x86Mod16BaseIndexTable[(rbReg << 3) + rxReg];
+      }
+      else {
+        if (rmInfo & kX86MemInfo_Index)
+          rbReg = rxReg;
+        mod = x86Mod16BaseTable[rbReg];
+      }
+
+      if (ASMJIT_UNLIKELY(mod == 0xFF))
+        goto InvalidAddress;
+
+      mod += opReg << 3;
+      if (dispOffset == 0 && mod != 0x06) {
+        EMIT_BYTE(mod);
+      }
+      else if (Utils::isInt8(dispOffset)) {
+        EMIT_BYTE(mod + 0x40);
+        EMIT_BYTE(dispOffset);
+      }
+      else {
+        EMIT_BYTE(mod + 0x80);
+        EMIT_WORD(dispOffset);
+      }
+    }
+    else {
+      // Not supported in 16-bit addresses.
+      if (rmInfo & (kX86MemInfo_BaseRip | kX86MemInfo_BaseLabel))
+        goto InvalidAddress;
+
+      // ==========|> [DISP16].
+      EMIT_BYTE(opReg | 0x06);
+      EMIT_WORD(dispOffset);
     }
   }
 
