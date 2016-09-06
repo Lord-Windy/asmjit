@@ -152,6 +152,10 @@ struct X86Inst {
   //! name to ID mapping and are not aware on how to handle such case.
   ASMJIT_ENUM(Id) {
     kIdNone = 0,
+    kIdAaa,                              // X86
+    kIdAad,                              // X86
+    kIdAam,                              // X86
+    kIdAas,                              // X86
     kIdAdc,                              // ANY
     kIdAdcx,                             // ADX
     kIdAdd,                              // ANY
@@ -395,7 +399,9 @@ struct X86Inst {
     kIdHsubps,                           // SSE3
     kIdIdiv,                             // ANY
     kIdImul,                             // ANY
+    kIdIn,                               // ANY
     kIdInc,                              // ANY
+    kIdIns,                              // ANY
     kIdInsertps,                         // SSE4.1
     kIdInsertq,                          // SSE4A
     kIdInt,                              // ANY
@@ -491,6 +497,9 @@ struct X86Inst {
     kIdLeave,                            // ANY
     kIdLfence,                           // SSE2
     kIdLods,                             // ANY
+    kIdLoop,                             // ANY
+    kIdLoope,                            // ANY
+    kIdLoopne,                           // ANY
     kIdLzcnt,                            // LZCNT
     kIdMaskmovdqu,                       // SSE2
     kIdMaskmovq,                         // MMX2
@@ -555,6 +564,8 @@ struct X86Inst {
     kIdOr,                               // ANY
     kIdOrpd,                             // SSE2
     kIdOrps,                             // SSE
+    kIdOut,                              // ANY
+    kIdOuts,                             // ANY
     kIdPabsb,                            // SSSE3
     kIdPabsd,                            // SSSE3
     kIdPabsw,                            // SSSE3
@@ -669,9 +680,12 @@ struct X86Inst {
     kIdPmullw,                           // MMX|SSE2
     kIdPmuludq,                          // SSE2
     kIdPop,                              // ANY
-    kIdPopa,                             // X86 only
+    kIdPopa,                             // X86
+    kIdPopad,                            // X86
     kIdPopcnt,                           // SSE4.2
     kIdPopf,                             // ANY
+    kIdPopfd,                            // X86
+    kIdPopfq,                            // X64
     kIdPor,                              // MMX|SSE2
     kIdPrefetch,                         // MMX2|SSE
     kIdPrefetch3dNow,                    // 3DNOW
@@ -716,7 +730,10 @@ struct X86Inst {
     kIdPunpcklwd,                        // MMX|SSE2
     kIdPush,                             // ANY
     kIdPusha,                            // X86
+    kIdPushad,                           // X86
     kIdPushf,                            // ANY
+    kIdPushfd,                           // X86
+    kIdPushfq,                           // X64
     kIdPxor,                             // MMX|SSE2
     kIdRcl,                              // ANY
     kIdRcpps,                            // SSE
@@ -805,6 +822,7 @@ struct X86Inst {
     kIdSubps,                            // SSE
     kIdSubsd,                            // SSE2
     kIdSubss,                            // SSE
+    kIdSwapgs,                           // X64
     kIdT1mskc,                           // TBM
     kIdTest,                             // ANY
     kIdTzcnt,                            // TZCNT
@@ -1522,11 +1540,13 @@ struct X86Inst {
     kEncodingNone = 0,                   //!< Never used.
     kEncodingX86Op,                      //!< X86 [OP].
     kEncodingX86Op_O,                    //!< X86 [OP] (opcode and /0-7).
-    kEncodingX86OpAx,                    //!< X86 [OP] (implicit or explicit '?AX' form).
-    kEncodingX86OpDxAx,                  //!< X86 [OP] (implicit or explicit '?DX, ?AX' form).
+    kEncodingX86Op_xAX,                  //!< X86 [OP] (implicit or explicit '?AX' form).
+    kEncodingX86Op_xDX_xAX,              //!< X86 [OP] (implicit or explicit '?DX, ?AX' form).
+    kEncodingX86Op_ZAX,                  //!< X86 [OP] (implicit or explicit '[EAX|RDX]' form).
+    kEncodingX86I_xAX,                   //!< X86 [I] (implicit or explicit '?AX' form).
     kEncodingX86M,                       //!< X86 [M] (handles 2|4|8-bytes size).
-    kEncodingX86M_Bx,                    //!< X86 [M] (handles single-byte size).
-    kEncodingX86M_Bx_MulDiv,             //!< X86 [M] (like Bx, handles implicit|explicit MUL|DIV|IDIV).
+    kEncodingX86M_GPB,                   //!< X86 [M] (handles single-byte size).
+    kEncodingX86M_GPB_MulDiv,            //!< X86 [M] (like GPB, handles implicit|explicit MUL|DIV|IDIV).
     kEncodingX86M_Only,                  //!< X86 [M] (restricted to memory operand of any size).
     kEncodingX86Rm,                      //!< X86 [RM] (doesn't handle single-byte size).
     kEncodingX86Arith,                   //!< X86 adc, add, and, cmp, or, sbb, sub, xor.
@@ -1537,23 +1557,27 @@ struct X86Inst {
     kEncodingX86Crc,                     //!< X86 crc32.
     kEncodingX86Enter,                   //!< X86 enter.
     kEncodingX86Imul,                    //!< X86 imul.
+    kEncodingX86In,                      //!< X86 in.
+    kEncodingX86Ins,                     //!< X86 ins[b|q|d].
     kEncodingX86IncDec,                  //!< X86 inc, dec.
     kEncodingX86Int,                     //!< X86 int (interrupt).
     kEncodingX86Jcc,                     //!< X86 jcc.
-    kEncodingX86Jecxz,                   //!< X86 jcxz, jecxz, jrcxz.
+    kEncodingX86JecxzLoop,               //!< X86 jcxz, jecxz, jrcxz, loop, loope, loopne.
     kEncodingX86Jmp,                     //!< X86 jmp.
     kEncodingX86Lea,                     //!< X86 lea.
     kEncodingX86Mov,                     //!< X86 mov (all possible cases).
     kEncodingX86MovsxMovzx,              //!< X86 movsx, movzx.
+    kEncodingX86Out,                     //!< X86 out.
+    kEncodingX86Outs,                    //!< X86 out[b|q|d].
     kEncodingX86Push,                    //!< X86 push.
     kEncodingX86Pop,                     //!< X86 pop.
     kEncodingX86Ret,                     //!< X86 ret.
     kEncodingX86Rot,                     //!< X86 rcl, rcr, rol, ror, sal, sar, shl, shr.
     kEncodingX86Set,                     //!< X86 setcc.
     kEncodingX86ShldShrd,                //!< X86 shld, shrd.
-    kEncodingX86StrRM,                   //!< X86 lods.
-    kEncodingX86StrMR,                   //!< X86 scas, stos.
-    kEncodingX86StrMM,                   //!< X86 cmps, movs.
+    kEncodingX86StrRm,                   //!< X86 lods.
+    kEncodingX86StrMr,                   //!< X86 scas, stos.
+    kEncodingX86StrMm,                   //!< X86 cmps, movs.
     kEncodingX86Test,                    //!< X86 test.
     kEncodingX86Xadd,                    //!< X86 xadd.
     kEncodingX86Xchg,                    //!< X86 xchg.
@@ -1568,8 +1592,8 @@ struct X86Inst {
     kEncodingFpuRDef,                    //!< FPU faddp, fdivp, fdivrp, fmulp, fsubp, fsubrp.
     kEncodingFpuStsw,                    //!< FPU fnstsw, Fstsw.
     kEncodingExtRm,                      //!< EXT [RM].
-    kEncodingExtRmXMM0,                  //!< EXT [RM<XMM0>].
-    kEncodingExtRmZDI,                   //!< EXT [RM<ZDI>].
+    kEncodingExtRm_XMM0,                 //!< EXT [RM<XMM0>].
+    kEncodingExtRm_ZDI,                  //!< EXT [RM<ZDI>].
     kEncodingExtRm_P,                    //!< EXT [RM] (propagates 66H if the instruction uses XMM register).
     kEncodingExtRm_Wx,                   //!< EXT [RM] (propagates REX.W if GPQ is used).
     kEncodingExtRmRi,                    //!< EXT [RM|RI].
@@ -1595,7 +1619,7 @@ struct X86Inst {
     kEncodingVexMri,                     //!< VEX|EVEX [MRI].
     kEncodingVexMri_Lx,                  //!< VEX|EVEX [MRI] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRm,                      //!< VEX|EVEX [RM].
-    kEncodingVexRmZDI,                   //!< VEX|EVEX [RM<ZDI>].
+    kEncodingVexRm_ZDI,                  //!< VEX|EVEX [RM<ZDI>].
     kEncodingVexRm_Lx,                   //!< VEX|EVEX [RM] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRm_VM,                   //!< VEX|EVEX [RM] (propagates VEX|EVEX.L, VSIB support).
     kEncodingVexRmi,                     //!< VEX|EVEX [RMI].
@@ -1603,7 +1627,7 @@ struct X86Inst {
     kEncodingVexRmi_Lx,                  //!< VEX|EVEX [RMI] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRvm,                     //!< VEX|EVEX [RVM].
     kEncodingVexRvm_Wx,                  //!< VEX|EVEX [RVM] (propagates VEX|EVEX.W if GPQ used).
-    kEncodingVexRvmZDX_Wx,               //!< VEX|EVEX [RVM<ZDX>] (propagates VEX|EVEX.W if GPQ used).
+    kEncodingVexRvm_ZDX_Wx,              //!< VEX|EVEX [RVM<ZDX>] (propagates VEX|EVEX.W if GPQ used).
     kEncodingVexRvm_Lx,                  //!< VEX|EVEX [RVM] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRvmr,                    //!< VEX|EVEX [RVMR].
     kEncodingVexRvmr_Lx,                 //!< VEX|EVEX [RVMR] (propagates VEX|EVEX.L if YMM used).
@@ -1633,8 +1657,8 @@ struct X86Inst {
     kEncodingVexRvrmRvmr,                //!< VEX|EVEX [RVRM|RVMR].
     kEncodingVexRvrmRvmr_Lx,             //!< VEX|EVEX [RVRM|RVMR] (propagates VEX|EVEX.L if YMM used).
     kEncodingVexRvrmiRvmri_Lx,           //!< VEX|EVEX [RVRMI|RVMRI] (propagates VEX|EVEX.L if YMM used).
-    kEncodingVexMovDQ,                   //!< VEX|EVEX vmovd, vmovq.
-    kEncodingVexMovSsSd,                 //!< VEX|EVEX vmovss, vmovsd.
+    kEncodingVexMovdMovq,                //!< VEX|EVEX vmovd, vmovq.
+    kEncodingVexMovssMovsd,              //!< VEX|EVEX vmovss, vmovsd.
     kEncodingFma4,                       //!< FMA4 [R, R, R/M, R/M].
     kEncodingFma4_Lx,                    //!< FMA4 [R, R, R/M, R/M] (propagates AVX.L if YMM used).
     _kEncodingCount                      //!< Count of instruction encodings.

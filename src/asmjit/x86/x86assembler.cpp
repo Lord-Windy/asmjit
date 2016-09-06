@@ -273,6 +273,10 @@ static ASMJIT_INLINE bool x86IsJmpOrCall(uint32_t instId) noexcept {
          instId == X86Inst::kIdCall;
 }
 
+static ASMJIT_INLINE bool x86IsImplicitMem(const Operand_& op, uint32_t base) noexcept {
+  return op.isMem() && op.as<X86Mem>().getBaseId() == base;
+}
+
 static ASMJIT_INLINE int64_t x86SignExtend32To64(int64_t imm) noexcept {
   return static_cast<int64_t>(static_cast<int32_t>(imm & 0xFFFFFFFF));
 }
@@ -765,7 +769,7 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
       rbReg = 0;
       goto EmitX86R;
 
-    case X86Inst::kEncodingX86OpAx:
+    case X86Inst::kEncodingX86Op_xAX:
       if (isign3 == 0)
         goto EmitX86Op;
 
@@ -773,13 +777,39 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
         goto EmitX86Op;
       break;
 
-    case X86Inst::kEncodingX86OpDxAx:
+    case X86Inst::kEncodingX86Op_xDX_xAX:
       if (isign3 == 0)
         goto EmitX86Op;
 
       if (isign3 == ENC_OPS2(Reg, Reg) && o0.getId() == X86Gp::kIdDx &&
                                           o1.getId() == X86Gp::kIdAx)
         goto EmitX86Op;
+      break;
+
+    case X86Inst::kEncodingX86Op_ZAX:
+      if (isign3 == 0)
+        goto EmitX86Op;
+
+      rmRel = &o0;
+      if (isign3 == ENC_OPS1(Mem) && x86IsImplicitMem(o0, X86Gp::kIdAx))
+        goto EmitX86OpImplicitMem;
+
+      break;
+
+    case X86Inst::kEncodingX86I_xAX:
+      // Implicit form.
+      if (isign3 == ENC_OPS1(Imm)) {
+        imVal = o0.as<Imm>().getUInt8();
+        imLen = 1;
+        goto EmitX86Op;
+      }
+
+      // Explicit form.
+      if (isign3 == ENC_OPS2(Reg, Imm) && o0.getId() == X86Gp::kIdAx) {
+        imVal = o1.as<Imm>().getUInt8();
+        imLen = 1;
+        goto EmitX86Op;
+      }
       break;
 
     case X86Inst::kEncodingX86M:
@@ -794,8 +824,8 @@ Error X86Assembler::_emit(uint32_t instId, const Operand_& o0, const Operand_& o
         goto EmitX86M;
       break;
 
-    case X86Inst::kEncodingX86M_Bx_MulDiv:
-CaseX86M_Bx_MulDiv:
+    case X86Inst::kEncodingX86M_GPB_MulDiv:
+CaseX86M_GPB_MulDiv:
       // Explicit form?
       if (isign3 > 0x7) {
         // [AX] <- [AX] div|mul r8.
@@ -844,7 +874,7 @@ CaseX86M_Bx_MulDiv:
 
       ASMJIT_FALLTHROUGH;
 
-    case X86Inst::kEncodingX86M_Bx:
+    case X86Inst::kEncodingX86M_GPB:
       if (isign3 == ENC_OPS1(Reg)) {
         rbReg = o0.getId();
         if (o0.getSize() == 1) {
@@ -1225,7 +1255,7 @@ CaseX86M_Bx_MulDiv:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         // Must be explicit 'ax, r8' form.
         if (o1.getSize() == 1)
-          goto CaseX86M_Bx_MulDiv;
+          goto CaseX86M_GPB_MulDiv;
 
         if (o0.getSize() != o1.getSize())
           goto OperandSizeMismatch;
@@ -1241,7 +1271,7 @@ CaseX86M_Bx_MulDiv:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
         // Must be explicit 'ax, m8' form.
         if (o1.getSize() == 1)
-          goto CaseX86M_Bx_MulDiv;
+          goto CaseX86M_GPB_MulDiv;
 
         opReg = o0.getId();
         rmRel = &o1;
@@ -1273,7 +1303,47 @@ CaseX86M_Bx_MulDiv:
       }
 
       // Try implicit form.
-      goto CaseX86M_Bx_MulDiv;
+      goto CaseX86M_GPB_MulDiv;
+
+    case X86Inst::kEncodingX86In:
+      if (isign3 == ENC_OPS2(Reg, Imm)) {
+        if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdAx))
+          goto InvalidInstruction;
+
+        imVal = o1.as<Imm>().getUInt8();
+        imLen = 1;
+
+        opCode = commonData->getAltOpCode() + (o0.getSize() != 1);
+        ADD_66H_P_BY_SIZE(o0.getSize());
+        goto EmitX86Op;
+      }
+
+      if (isign3 == ENC_OPS2(Reg, Reg)) {
+        if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdAx || o1.getId() != X86Gp::kIdDx))
+          goto InvalidInstruction;
+
+        opCode += o0.getSize() != 1;
+        ADD_66H_P_BY_SIZE(o0.getSize());
+        goto EmitX86Op;
+      }
+      break;
+
+    case X86Inst::kEncodingX86Ins:
+      if (isign3 == ENC_OPS2(Mem, Reg)) {
+        if (ASMJIT_UNLIKELY(!x86IsImplicitMem(o0, X86Gp::kIdDi) || o1.getId() != X86Gp::kIdDx))
+          goto InvalidInstruction;
+
+        uint32_t size = o0.getSize();
+        if (ASMJIT_UNLIKELY(size == 0))
+          goto AmbiguousOperandSize;
+
+        rmRel = &o0;
+        opCode += (size != 1);
+
+        ADD_66H_P_BY_SIZE(size);
+        goto EmitX86OpImplicitMem;
+      }
+      break;
 
     case X86Inst::kEncodingX86IncDec:
       if (isign3 == ENC_OPS1(Reg)) {
@@ -1325,9 +1395,9 @@ CaseX86M_Bx_MulDiv:
       rmRel = &o0;
       goto EmitJmpCall;
 
-    case X86Inst::kEncodingX86Jecxz:
+    case X86Inst::kEncodingX86JecxzLoop:
       rmRel = &o0;
-      // Explicit jecxz [r|e]cx, dst
+      // Explicit jecxz|loop [r|e]cx, dst
       if (o0.isReg()) {
         if (ASMJIT_UNLIKELY(!X86Reg::isGp(o0, X86Gp::kIdCx)))
           goto InvalidInstruction;
@@ -1621,6 +1691,46 @@ CaseX86M_Bx_MulDiv:
       }
       break;
 
+    case X86Inst::kEncodingX86Out:
+      if (isign3 == ENC_OPS2(Imm, Reg)) {
+        if (ASMJIT_UNLIKELY(o1.getId() != X86Gp::kIdAx))
+          goto InvalidInstruction;
+
+        imVal = o0.as<Imm>().getUInt8();
+        imLen = 1;
+
+        opCode = commonData->getAltOpCode() + (o1.getSize() != 1);
+        ADD_66H_P_BY_SIZE(o1.getSize());
+        goto EmitX86Op;
+      }
+
+      if (isign3 == ENC_OPS2(Reg, Reg)) {
+        if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdDx || o1.getId() != X86Gp::kIdAx))
+          goto InvalidInstruction;
+
+        opCode += o1.getSize() != 1;
+        ADD_66H_P_BY_SIZE(o1.getSize());
+        goto EmitX86Op;
+      }
+      break;
+
+    case X86Inst::kEncodingX86Outs:
+      if (isign3 == ENC_OPS2(Reg, Mem)) {
+        if (ASMJIT_UNLIKELY(o0.getId() != X86Gp::kIdDx), !x86IsImplicitMem(o1, X86Gp::kIdSi))
+          goto InvalidInstruction;
+
+        uint32_t size = o1.getSize();
+        if (ASMJIT_UNLIKELY(size == 0))
+          goto AmbiguousOperandSize;
+
+        rmRel = &o1;
+        opCode += (size != 1);
+
+        ADD_66H_P_BY_SIZE(size);
+        goto EmitX86OpImplicitMem;
+      }
+      break;
+
     case X86Inst::kEncodingX86Push:
       if (isign3 == ENC_OPS1(Reg)) {
         if (X86Reg::isSeg(o0)) {
@@ -1834,14 +1944,9 @@ CaseX86Pop_Gp:
       }
       break;
 
-    case X86Inst::kEncodingX86StrRM:
+    case X86Inst::kEncodingX86StrRm:
       if (isign3 == ENC_OPS2(Reg, Mem)) {
         rmRel = &o1;
-        rmInfo = x86MemInfo[rmRel->as<X86Mem>().getBaseIndexType()];
-
-        if (ASMJIT_UNLIKELY(rmInfo & kX86MemInfo_Index))
-          goto InvalidInstruction;
-
         if (ASMJIT_UNLIKELY(rmRel->as<X86Mem>().getOffsetLo32() || !X86Reg::isGp(o0.as<X86Reg>(), X86Gp::kIdAx)))
           goto InvalidInstruction;
 
@@ -1852,18 +1957,13 @@ CaseX86Pop_Gp:
         ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
 
-        goto EmitX86OpStr;
+        goto EmitX86OpImplicitMem;
       }
       break;
 
-    case X86Inst::kEncodingX86StrMR:
+    case X86Inst::kEncodingX86StrMr:
       if (isign3 == ENC_OPS2(Mem, Reg)) {
         rmRel = &o0;
-        rmInfo = x86MemInfo[rmRel->as<X86Mem>().getBaseIndexType()];
-
-        if (ASMJIT_UNLIKELY(rmInfo & kX86MemInfo_Index))
-          goto InvalidInstruction;
-
         if (ASMJIT_UNLIKELY(rmRel->as<X86Mem>().getOffsetLo32() || !X86Reg::isGp(o1.as<X86Reg>(), X86Gp::kIdAx)))
           goto InvalidInstruction;
 
@@ -1874,22 +1974,18 @@ CaseX86Pop_Gp:
         ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
 
-        goto EmitX86OpStr;
+        goto EmitX86OpImplicitMem;
       }
       break;
 
-    case X86Inst::kEncodingX86StrMM:
+    case X86Inst::kEncodingX86StrMm:
       if (isign3 == ENC_OPS2(Mem, Mem)) {
         if (ASMJIT_UNLIKELY(o0.as<X86Mem>().getBaseIndexType() !=
                             o1.as<X86Mem>().getBaseIndexType()))
           goto InvalidInstruction;
 
         rmRel = &o1;
-        rmInfo = x86MemInfo[o0.as<X86Mem>().getBaseIndexType()];
-        if (ASMJIT_UNLIKELY((rmInfo & kX86MemInfo_Index)))
-          goto InvalidInstruction;
-
-        if (ASMJIT_UNLIKELY(o0.as<X86Mem>().getOffsetLo32() || o1.as<X86Mem>().getOffsetLo32()))
+        if (ASMJIT_UNLIKELY(o0.as<X86Mem>().hasOffset()))
           goto InvalidInstruction;
 
         uint32_t size = o1.getSize();
@@ -1902,7 +1998,7 @@ CaseX86Pop_Gp:
         ADD_PREFIX_BY_SIZE(size);
         opCode += static_cast<uint32_t>(size != 1);
 
-        goto EmitX86OpStr;
+        goto EmitX86OpImplicitMem;
       }
       break;
 
@@ -2433,15 +2529,15 @@ CaseExtMovd:
       opCode |= X86Inst::kOpCode_W;
       goto CaseExtMovd;
 
-    case X86Inst::kEncodingExtRmXMM0:
+    case X86Inst::kEncodingExtRm_XMM0:
       if (ASMJIT_UNLIKELY(!o2.isNone() && !X86Reg::isXmm(o2, 0)))
         goto InvalidInstruction;
 
       isign3 &= 0x3F;
       goto CaseExtRm;
 
-    case X86Inst::kEncodingExtRmZDI:
-      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
+    case X86Inst::kEncodingExtRm_ZDI:
+      if (ASMJIT_UNLIKELY(!o2.isNone() && !x86IsImplicitMem(o2, X86Gp::kIdDi)))
         goto InvalidInstruction;
 
       isign3 &= 0x3F;
@@ -2759,8 +2855,8 @@ CaseExtRm:
       }
       break;
 
-    case X86Inst::kEncodingVexRmZDI:
-      if (ASMJIT_UNLIKELY(!o2.isNone() && !o2.isMem() && o2.as<X86Mem>().getBaseId() != X86Gp::kIdDi))
+    case X86Inst::kEncodingVexRm_ZDI:
+      if (ASMJIT_UNLIKELY(!o2.isNone() && !x86IsImplicitMem(o2, X86Gp::kIdDi)))
         goto InvalidInstruction;
 
       isign3 &= 0x3F;
@@ -2836,7 +2932,7 @@ CaseVexRvm_R:
       }
       break;
 
-    case X86Inst::kEncodingVexRvmZDX_Wx:
+    case X86Inst::kEncodingVexRvm_ZDX_Wx:
       if (ASMJIT_UNLIKELY(!o3.isNone() && !X86Reg::isGp(o3, X86Gp::kIdDx)))
         goto InvalidInstruction;
       ASMJIT_FALLTHROUGH;
@@ -2955,7 +3051,7 @@ CaseVexRvm_R:
       break;
     }
 
-    case X86Inst::kEncodingVexMovDQ:
+    case X86Inst::kEncodingVexMovdMovq:
       if (isign3 == ENC_OPS2(Reg, Reg)) {
         if (X86Reg::isGp(o0)) {
           opCode = commonData->getAltOpCode();
@@ -3339,7 +3435,7 @@ CaseVexRmMr_AfterRegReg:
       break;
     }
 
-    case X86Inst::kEncodingVexMovSsSd:
+    case X86Inst::kEncodingVexMovssMovsd:
       if (isign3 == ENC_OPS3(Reg, Reg, Reg)) {
         goto CaseVexRvm_R;
       }
@@ -3456,8 +3552,11 @@ EmitX86OpReg:
   else
     goto EmitDone;
 
-EmitX86OpStr:
+EmitX86OpImplicitMem:
   // NOTE: Don't change the emit order here, it's compatible with KeyStone/LLVM.
+  rmInfo = x86MemInfo[rmRel->as<X86Mem>().getBaseIndexType()];
+  if (ASMJIT_UNLIKELY(rmRel->as<X86Mem>().hasOffset() || (rmInfo & kX86MemInfo_Index)))
+    goto InvalidInstruction;
 
   // Emit mandatory instruction prefix.
   EMIT_PP(opCode);
@@ -3473,8 +3572,8 @@ EmitX86OpStr:
   }
 
   // Segment-override prefix.
-  if (o1.as<X86Mem>().hasSegment())
-    EMIT_BYTE(x86SegmentPrefix[o1.as<X86Mem>().getSegmentId()]);
+  if (rmRel->as<X86Mem>().hasSegment())
+    EMIT_BYTE(x86SegmentPrefix[rmRel->as<X86Mem>().getSegmentId()]);
 
   // Address-override prefix.
   if (rmInfo & _getAddressOverrideMask())

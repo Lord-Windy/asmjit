@@ -262,12 +262,13 @@ class X86Utils {
       // Remap / filter these instructions.
       case "cmpsd": names = ["cmpsd"]; rep = false; break;
       case "movsd": names = ["movsd"]; rep = false; break;
-
-      case "cmps": names = ["cmpsb", "cmpsw", "cmpsd", "cmpsq"]; rep = true; break;
-      case "movs": names = ["movsb", "movsw", "movsd", "movsq"]; rep = true; break;
-      case "lods": names = ["lodsb", "lodsw", "lodsd", "lodsq"]; break;
-      case "scas": names = ["scasb", "scasw", "scasd", "scasq"]; break;
-      case "stos": names = ["stosb", "stosw", "stosd", "stosq"]; break;
+      case "cmps" : names = ["cmpsb", "cmpsw", "cmpsd", "cmpsq"]; rep = true; break;
+      case "movs" : names = ["movsb", "movsw", "movsd", "movsq"]; rep = true; break;
+      case "lods" : names = ["lodsb", "lodsw", "lodsd", "lodsq"]; break;
+      case "scas" : names = ["scasb", "scasw", "scasd", "scasq"]; break;
+      case "stos" : names = ["stosb", "stosw", "stosd", "stosq"]; break;
+      case "ins"  : names = ["insb" , "insw" , "insd" ]; break;
+      case "outs" : names = ["outsb", "outsw", "outsd"]; break;
 
       default:
         return x86db.getGroup(name);
@@ -1535,6 +1536,117 @@ class X86Generator {
   // [Print]
   // --------------------------------------------------------------------------
 
+  newInstFromInsts(insts) {
+    function GetAccess(inst) {
+      var operands = inst.operands;
+      if (!operands.length) return "";
+
+      var op = operands[0];
+      if (op.read && op.write)
+        return "RW";
+      else if (op.read)
+        return "RO";
+      else
+        return "WO";
+    }
+
+    var inst = insts[0];
+
+    var id       = this.instArray.length;
+    var name     = inst.name;
+    var enum_    = kX86InstPrefix + name[0].toUpperCase() + name.substr(1);
+
+    var opcode   = inst.opcode;
+    var rm       = inst.rm;
+    var mm       = inst.mm;
+    var pp       = inst.pp;
+    var encoding = inst.encoding;
+    var prefix   = inst.prefix;
+
+    var access   = GetAccess(inst);
+
+    var eflags = ["_", "_", "_", "_", "_", "_", "_", "_"];
+
+    for (var flag in inst.eflags) {
+      var fOp = inst.eflags[flag];
+      var fIndex = flag === "OF" ? 0 :
+                   flag === "SF" ? 1 :
+                   flag === "ZF" ? 2 :
+                   flag === "AF" ? 3 :
+                   flag === "PF" ? 4 :
+                   flag === "CF" ? 5 :
+                   flag === "DF" ? 6 : 7;
+      var fChar = fOp === "W" ? "W" :
+                  fOp === "R" ? "R" :
+                  fOp === "X" ? "X" :
+                  fOp === "0" ? "W" :
+                  fOp === "1" ? "W" :
+                  fOp === "U" ? "U" : "#";
+      eflags[fIndex] = fChar;
+    }
+
+    var vexL     = undefined;
+    var vexW     = undefined;
+    var evexW    = undefined;
+
+    for (var i = 1; i < insts.length; i++) {
+      inst = insts[i];
+
+      if (opcode   !== inst.opcode    ) return null;
+      if (rm       !== inst.rm        ) return null;
+      if (mm       !== inst.mm        ) return null;
+      if (pp       !== inst.pp        ) return null;
+      if (encoding !== inst.encoding  ) return null;
+      if (prefix   !== inst.prefix    ) return null;
+      if (access   !== GetAccess(inst)) return null;
+    }
+
+    var obj = AVX512Flags(insts);
+    if (obj) {
+      vexL = obj.vexL;
+      vexW = obj.vexW;
+      evexW = obj.evexW;
+    }
+
+    var ppmm = Utils.padLeft(pp, 2).replace(/ /g, "0") +
+               Utils.padLeft(mm, 4).replace(/ /g, "0") ;
+
+    var composed = composeOpCode({
+      type  : prefix === "VEX" || prefix === "EVEX" ? "V" : "O",
+      prefix: ppmm,
+      opcode: opcode,
+      o     : rm === "r" ? "_" : (rm ? rm : "_"),
+      l     : vexL !== undefined ? vexL : "_",
+      w     : vexW !== undefined ? vexW : "_",
+      ew    : evexW !== undefined ? vexEW : "_",
+      en    : "_"
+    });
+
+    var iflags = [];
+
+    if (access)
+      iflags.push("F(" + access + ")");
+
+    if (insts[0].prefix === "VEX")
+      iflags.push("F(Vex)");
+
+    return {
+      id            : id,
+      name          : name,
+      enum          : enum_,
+      encoding      : "Enc(?" + encoding + "?)",
+      opcode0       : composed,
+      opcode1       : "0",
+      iflags        : iflags.join(""),
+      eflags        : eflags.join(""),
+      writeIndex    : "0",
+      writeSize     : "0",
+      signatures    : this.signaturesFromInsts(insts),
+      nameIndex     : -1,
+      commonIndex   : -1
+    };
+  }
+
   printMissing() {
     const instArray = this.instArray;
 
@@ -1554,25 +1666,24 @@ class X86Generator {
       var insts = x86db.getGroup(name);
       if (!this.instMap[name]) {
         console.log(`MISSING INSTRUCTION '${name}'`);
-        /*
         var inst = this.newInstFromInsts(insts);
         if (inst) {
-          // console.log(`MISSING INSTRUCTION '${name}'`);
           out += "  INST(" +
             Utils.padLeft(inst.enum.substr(kX86InstPrefix.length), 16) + ", " +
             Utils.padLeft(`"${inst.name}"`   , 18) + ", " +
             Utils.padLeft(inst.encoding      , 23) + ", " +
-            Utils.padLeft(inst.opcode0       , 22) + ", " +
-            Utils.padLeft(inst.opcode1       , 22) + ", " +
-            Utils.padLeft(inst.iflags        , 35) + ", " +
+            Utils.padLeft(inst.opcode0       , 26) + ", " +
+            Utils.padLeft(inst.opcode1       , 26) + ", " +
+            Utils.padLeft(inst.iflags        , 38) + ", " +
             "EF(" + inst.eflags + "), " +
             Utils.padLeft(inst.writeIndex    , 2) + ", " +
             Utils.padLeft(inst.writeSize     , 2) + ", " +
             Utils.padLeft(inst.signatureIndex, 3) + ", " +
             Utils.padLeft(inst.signatureCount, 2) + ", " +
+            Utils.padLeft("0", 3) + ", " +
+            Utils.padLeft("0", 3) + ", " +
             Utils.padLeft("0", 3) + "),\n";
         }
-        */
       }
     }, this);
     console.log(out);
@@ -1959,115 +2070,3 @@ function genOpcodeH() {
   console.log(out);
 }
 */
-
-  /*
-  newInstFromInsts(insts) {
-    function GetAccess(inst) {
-      var operands = inst.operands;
-      if (!operands.length) return "";
-
-      var op = operands[0];
-      if (op.read && op.write)
-        return "RW";
-      else if (op.read)
-        return "RO";
-      else
-        return "WO";
-    }
-
-    var inst = insts[0];
-
-    var id       = this.instArray.length;
-    var name     = inst.name;
-    var enum_    = kX86InstPrefix + name[0].toUpperCase() + name.substr(1);
-
-    var opcode   = inst.opcode;
-    var rm       = inst.rm;
-    var mm       = inst.mm;
-    var pp       = inst.pp;
-    var encoding = inst.encoding;
-    var prefix   = inst.prefix;
-
-    var access   = GetAccess(inst);
-
-    var eflags = ["_", "_", "_", "_", "_", "_", "_", "_"];
-
-    for (var flag in inst.eflags) {
-      var fOp = inst.eflags[flag];
-      var fIndex = flag === "OF" ? 0 :
-                   flag === "SF" ? 1 :
-                   flag === "ZF" ? 2 :
-                   flag === "AF" ? 3 :
-                   flag === "PF" ? 4 :
-                   flag === "CF" ? 5 :
-                   flag === "DF" ? 6 : 7;
-      var fChar = fOp === "W" ? "W" :
-                  fOp === "R" ? "R" :
-                  fOp === "X" ? "X" :
-                  fOp === "0" ? "W" :
-                  fOp === "1" ? "W" :
-                  fOp === "U" ? "U" : "#";
-      eflags[fIndex] = fChar;
-    }
-
-    var vexL     = undefined;
-    var vexW     = undefined;
-    var evexW    = undefined;
-
-    for (var i = 1; i < insts.length; i++) {
-      inst = insts[i];
-
-      if (opcode   !== inst.opcode    ) return null;
-      if (rm       !== inst.rm        ) return null;
-      if (mm       !== inst.mm        ) return null;
-      if (pp       !== inst.pp        ) return null;
-      if (encoding !== inst.encoding  ) return null;
-      if (prefix   !== inst.prefix    ) return null;
-      if (access   !== GetAccess(inst)) return null;
-    }
-
-    var obj = AVX512Flags(insts);
-    if (obj) {
-      vexL = obj.vexL;
-      vexW = obj.vexW;
-      evexW = obj.evexW;
-    }
-
-    var ppmm = Utils.padLeft(pp, 2).replace(/ /g, "0") +
-               Utils.padLeft(mm, 4).replace(/ /g, "0") ;
-
-    var composed = composeOpCode({
-      type  : prefix === "VEX" || prefix === "EVEX" ? "V" : "O",
-      prefix: ppmm,
-      opcode: opcode,
-      o     : rm === "r" ? "_" : (rm ? rm : "_"),
-      l     : vexL,
-      w     : vexW,
-      ew    : evexW
-    });
-
-    var iflags = [];
-
-    if (access)
-      iflags.push("F(" + access + ")");
-
-    if (insts[0].prefix === "VEX")
-      iflags.push("F(Vex)");
-
-    return {
-      id            : id,
-      name          : name,
-      enum          : enum_,
-      encoding      : "Enc(?" + encoding + "?)",
-      opcode0       : composed,
-      opcode1       : "U",
-      iflags        : iflags.join(""),
-      eflags        : eflags.join(""),
-      writeIndex    : "0",
-      writeSize     : "0",
-      signatures    : this.signaturesFromInsts(insts),
-      nameIndex     : -1,
-      commonIndex   : -1
-    };
-  }
-  */

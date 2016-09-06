@@ -189,8 +189,9 @@ struct X86EmitterExplicitT {
   typedef X86Gp ZCX;
   typedef X86Gp ZDX;
 
-  typedef X86Mem ES_ZDI; // es:[zdi]
+  typedef X86Mem DS_ZAX; // ds:[zax]
   typedef X86Mem DS_ZDI; // ds:[zdi]
+  typedef X86Mem ES_ZDI; // es:[zdi]
   typedef X86Mem DS_ZSI; // ds:[zsi]
 
   typedef X86Xmm XMM0;
@@ -486,6 +487,7 @@ struct X86EmitterExplicitT {
   INST_1x(clflush, Clflush, X86Mem)                                    // CLFLUSH
   INST_1x(clflushopt, Clflushopt, X86Mem)                              // CLFLUSH_OPT
   INST_1x(clwb, Clwb, X86Mem)                                          // CLWB
+  INST_1x(clzero, Clzero, DS_ZAX)                                      // CLZERO    [EXPLICIT]
   INST_0x(cmc, Cmc)                                                    // ANY
   INST_2c(cmov, Cmov, X86Inst::condToCmovcc, X86Gp, X86Gp)             // CMOV
   INST_2c(cmov, Cmov, X86Inst::condToCmovcc, X86Gp, X86Mem)            // CMOV
@@ -529,6 +531,9 @@ struct X86EmitterExplicitT {
   INST_3i(imul, Imul, X86Gp, X86Mem, Imm)                              // ANY
   INST_3x(imul, Imul, X86Gp, X86Gp, X86Gp)                             // ANY       [EXPLICIT] xDX:xAX <- xAX * r16|r32|r64
   INST_3x(imul, Imul, X86Gp, X86Gp, X86Mem)                            // ANY       [EXPLICIT] xDX:xAX <- xAX * m16|m32|m64
+  INST_2i(in, In, ZAX, Imm)                                            // ANY
+  INST_2x(in, In, ZAX, DX)                                             // ANY
+  INST_2x(ins, Ins, ES_ZDI, DX)                                        // ANY
   INST_1x(inc, Inc, X86Gp)                                             // ANY
   INST_1x(inc, Inc, X86Mem)                                            // ANY
   INST_1i(int_, Int, Imm)                                              // ANY
@@ -551,6 +556,15 @@ struct X86EmitterExplicitT {
   INST_0x(leave, Leave)                                                // ANY
   INST_0x(lfence, Lfence)                                              // SSE2
   INST_2x(lods, Lods, ZAX, DS_ZSI)                                     // ANY       [EXPLICIT]
+  INST_2x(loop, Loop, ZCX, Label)                                      // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_2x(loop, Loop, ZCX, Imm)                                        // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_2x(loop, Loop, ZCX, uint64_t)                                   // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_2x(loope, Loope, ZCX, Label)                                    // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_2x(loope, Loope, ZCX, Imm)                                      // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_2x(loope, Loope, ZCX, uint64_t)                                 // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_2x(loopne, Loopne, ZCX, Label)                                  // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
+  INST_2x(loopne, Loopne, ZCX, Imm)                                    // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
+  INST_2x(loopne, Loopne, ZCX, uint64_t)                               // ANY       [EXPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
   INST_2x(lzcnt, Lzcnt, X86Gp, X86Gp)                                  // LZCNT
   INST_2x(lzcnt, Lzcnt, X86Gp, X86Mem)                                 // LZCNT
   INST_0x(mfence, Mfence)                                              // SSE2
@@ -593,6 +607,9 @@ struct X86EmitterExplicitT {
   INST_2i(or_, Or, X86Gp, Imm)                                         // ANY
   INST_2x(or_, Or, X86Mem, X86Gp)                                      // ANY
   INST_2i(or_, Or, X86Mem, Imm)                                        // ANY
+  INST_2x(out, Out, Imm, ZAX)                                          // ANY
+  INST_2i(out, Out, DX, ZAX)                                           // ANY
+  INST_2i(outs, Outs, DX, DS_ZSI)                                      // ANY
   INST_0x(pause, Pause)                                                // SSE2
   INST_3x(pdep, Pdep, X86Gp, X86Gp, X86Gp)                             // BMI2
   INST_3x(pdep, Pdep, X86Gp, X86Gp, X86Mem)                            // BMI2
@@ -603,9 +620,12 @@ struct X86EmitterExplicitT {
   INST_1x(pop, Pop, X86Mem)                                            // ANY
   INST_1x(pop, Pop, X86Seg);                                           // ANY
   INST_0x(popa, Popa)                                                  // X86
+  INST_0x(popad, Popad)                                                // X86
   INST_2x(popcnt, Popcnt, X86Gp, X86Gp)                                // POPCNT
   INST_2x(popcnt, Popcnt, X86Gp, X86Mem)                               // POPCNT
   INST_0x(popf, Popf)                                                  // ANY
+  INST_0x(popfd, Popfd)                                                // X86
+  INST_0x(popfq, Popfq)                                                // X64
   INST_2i(prefetch, Prefetch, X86Mem, Imm)                             // SSE
   INST_1x(prefetchw, Prefetchw, X86Mem)                                // PREFETCHW
   INST_1x(prefetchwt1, Prefetchwt1, X86Mem)                            // PREFETCHW1
@@ -614,7 +634,10 @@ struct X86EmitterExplicitT {
   INST_1x(push, Push, X86Seg)                                          // ANY
   INST_1i(push, Push, Imm)                                             // ANY
   INST_0x(pusha, Pusha)                                                // X86
+  INST_0x(pushad, Pushad)                                              // X86
   INST_0x(pushf, Pushf)                                                // ANY
+  INST_0x(pushfd, Pushfd)                                              // X86
+  INST_0x(pushfq, Pushfq)                                              // X64
   INST_2x(rcl, Rcl, X86Gp, CL)                                         // ANY
   INST_2x(rcl, Rcl, X86Mem, CL)                                        // ANY
   INST_2i(rcl, Rcl, X86Gp, Imm)                                        // ANY
@@ -690,6 +713,7 @@ struct X86EmitterExplicitT {
   INST_2i(sub, Sub, X86Gp, Imm)                                        // ANY
   INST_2x(sub, Sub, X86Mem, X86Gp)                                     // ANY
   INST_2i(sub, Sub, X86Mem, Imm)                                       // ANY
+  INST_0x(swapgs, Swapgs)                                              // X64
   INST_2x(t1mskc, T1mskc, X86Gp, X86Gp)                                // TBM
   INST_2x(t1mskc, T1mskc, X86Gp, X86Mem)                               // TBM
   INST_2x(test, Test, X86Gp, X86Gp)                                    // ANY
@@ -4766,12 +4790,12 @@ struct X86EmitterImplicitT : public X86EmitterExplicitT<This> {
   // [General Purpose and Non-SIMD Instructions]
   // --------------------------------------------------------------------------
 
-  // TODO: clzero has no explicit variant yet.
   // TODO: xrstor and xsave don't have explicit variants yet.
 
   using X86EmitterExplicitT<This>::cbw;
   using X86EmitterExplicitT<This>::cdq;
   using X86EmitterExplicitT<This>::cdqe;
+  using X86EmitterExplicitT<This>::clzero;
   using X86EmitterExplicitT<This>::cqo;
   using X86EmitterExplicitT<This>::cwd;
   using X86EmitterExplicitT<This>::cwde;
@@ -4824,6 +4848,15 @@ struct X86EmitterImplicitT : public X86EmitterExplicitT<This> {
   INST_1x(jecxz, Jecxz, Imm)                                           // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
   INST_1x(jecxz, Jecxz, uint64_t)                                      // ANY       [IMPLICIT] Short jump if CX/ECX/RCX is zero.
   INST_0x(lahf, Lahf)                                                  // LAHF_SAHF [IMPLICIT] AH      <- EFL
+  INST_1x(loop, Loop, Label)                                           // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_1x(loop, Loop, Imm)                                             // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_1x(loop, Loop, uint64_t)                                        // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0.
+  INST_1x(loope, Loope, Label)                                         // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_1x(loope, Loope, Imm)                                           // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_1x(loope, Loope, uint64_t)                                      // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 1.
+  INST_1x(loopne, Loopne, Label)                                       // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
+  INST_1x(loopne, Loopne, Imm)                                         // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
+  INST_1x(loopne, Loopne, uint64_t)                                    // ANY       [IMPLICIT] Decrement xCX; short jump if xCX != 0 && ZF == 0.
   INST_1x(mul, Mul, X86Gp)                                             // ANY       [IMPLICIT] AX      <-  AL * r8
                                                                        // ANY       [IMPLICIT] xDX:xAX <- xAX * r16|r32|r64
   INST_1x(mul, Mul, X86Mem)                                            // ANY       [IMPLICIT] AX      <-  AL * m8

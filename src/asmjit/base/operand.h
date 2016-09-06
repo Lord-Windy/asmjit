@@ -862,6 +862,12 @@ public:
   //! Set memory operand size.
   ASMJIT_INLINE void setSize(uint32_t size) noexcept { _mem.size = static_cast<uint8_t>(size); }
 
+  ASMJIT_INLINE bool hasOffset() const noexcept {
+    int32_t lo = static_cast<int32_t>(_mem.offsetLo32);
+    int32_t hi = static_cast<int32_t>(_mem.base) & -static_cast<int32_t>(getBaseType() == 0);
+    return (lo | hi) != 0;
+  }
+
   //! Get if the memory operand has 64-bit offset or absolute address.
   //!
   //! If this is true then `hasBase()` must always report false.

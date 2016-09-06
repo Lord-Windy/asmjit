@@ -275,9 +275,19 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.or_(intptr_gpA, gzB);
   a.pop(gzA);
   a.pop(intptr_gpA);
+  if (!isX64) a.popa();
+  if (!isX64) a.popad();
+  a.popf();
+  if (!isX64) a.popfd();
+  if ( isX64) a.popfq();
   a.push(gzA);
   a.push(intptr_gpA);
   a.push(0);
+  if (!isX64) a.pusha();
+  if (!isX64) a.pushad();
+  a.pushf();
+  if (!isX64) a.pushfd();
+  if ( isX64) a.pushfq();
   a.rcl(gdA, 0);
   a.rcl(gzA, 0);
   a.rcl(gdA, 1);
@@ -401,6 +411,7 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
   a.sub(gzA, intptr_gpB);
   a.sub(intptr_gpA, 1);
   a.sub(intptr_gpA, gzB);
+  a.swapgs();
   a.test(gzA, 1);
   a.test(gzA, gzB);
   a.test(intptr_gpA, 1);
@@ -571,6 +582,26 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
 
   // Instructions using REP prefix.
   a.nop();
+
+  a.in(al, 0);
+  a.in(al, dx);
+  a.in(ax, 0);
+  a.in(ax, dx);
+  a.in(eax, 0);
+  a.in(eax, dx);
+  a.rep().ins(byte_ptr(a.zdi()), dx);
+  a.rep().ins(word_ptr(a.zdi()), dx);
+  a.rep().ins(dword_ptr(a.zdi()), dx);
+
+  a.out(imm(0), al);
+  a.out(dx, al);
+  a.out(imm(0), ax);
+  a.out(dx, ax);
+  a.out(imm(0), eax);
+  a.out(dx, eax);
+  a.rep().outs(dx, byte_ptr(a.zsi()));
+  a.rep().outs(dx, word_ptr(a.zsi()));
+  a.rep().outs(dx, dword_ptr(a.zsi()));
 
   a.lodsb();
   a.lodsd();
@@ -1014,7 +1045,8 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
 
   // CLZERO.
   a.nop();
-  a.clzero();                              // Implicit <EAX|RAX>
+  a.clzero();                              // Implicit <ds:[EAX|RAX]>
+  a.clzero(ptr(a.zax()));                  // Explicit <ds:[EAX|RAX]>
 
   // PCOMMIT.
   a.nop();
