@@ -4051,7 +4051,7 @@ EmitVexEvexR:
                                     X86Inst::kOptionSAE            |
                                     X86Inst::kOptionER             ;
     if (options & kAvx512Options) {
-      // Using memory broadcast without a memory operand is invalid.
+      // Memory broadcast without a memory operand is invalid.
       if (ASMJIT_UNLIKELY(options & X86Inst::kOption1ToX))
         goto InvalidBroadcast;
 
@@ -4162,9 +4162,9 @@ EmitVexEvexM:
                                     X86Inst::kOptionSAE            |
                                     X86Inst::kOptionER             ;
     if (options & kAvx512Options) {
-      // {sae} and {er} are both invalid if memory operand is used.
+      // {er} and {sae} are both invalid if memory operand is used.
       if (ASMJIT_UNLIKELY(options & (X86Inst::kOptionSAE | X86Inst::kOptionER)))
-        goto InvalidSAEOrER;
+        goto InvalidEROrSAE;
 
       // NOTE: We consider a valid construct internally even when {kz} was
       // specified without specifying the register. In that case it would be
@@ -4491,7 +4491,7 @@ ERROR_HANDLER(InvalidLabel)
 ERROR_HANDLER(InvalidInstruction)
 ERROR_HANDLER(InvalidRexPrefix)
 ERROR_HANDLER(InvalidBroadcast)
-ERROR_HANDLER(InvalidSAEOrER)
+ERROR_HANDLER(InvalidEROrSAE)
 ERROR_HANDLER(InvalidAddress)
 ERROR_HANDLER(InvalidAddressIndex)
 ERROR_HANDLER(InvalidAddress64Bit)

@@ -1725,6 +1725,7 @@ struct X86Inst {
     kInstFlagVex_VM       = 0x00030000U, //!< Combination of `kInstFlagVex` and `kInstFlagVM`.
 
     kInstFlagEvex         = 0x00040000U, //!< Instruction can be encoded by EVEX (AVX-512).
+    /*
     kInstFlagEvex0        = 0U,          //!< Used inside macros.
 
     kInstFlagEvexK_       = 0x00100000U, //!< Supports masking {k0..k7}.
@@ -1746,6 +1747,7 @@ struct X86Inst {
     kInstFlagEvexSet_BW   = 0x50000000U, //!< Supported by AVX512-BW.
     kInstFlagEvexSet_IFMA = 0x60000000U, //!< Supported by AVX512-IFMA.
     kInstFlagEvexSet_VBMI = 0x70000000U  //!< Supported by AVX512-VBMI.
+    */
   };
 
   //! Specifies meaning of all bits in an opcode (AsmJit specific).
@@ -2331,23 +2333,85 @@ struct X86Inst {
 
   //! Data specific to MMX+ and SSE+ family instructions.
   struct SseData {
-    //! SSE to AVX conversion mode.
-    enum AvxConvMode {
-      kAvxConvNone           = 0,        //!< No translation possible (SHA/SSE4A or MMX register used).
-      kAvxConvNonDestructive = 1,        //!< The first SSE operand becomes first and second AVX operand.
-      kAvxConvMove           = 2,        //!< No change (no operands changed).
-      kAvxConvMoveIfMem      = 3,        //!< No change if second operand is memory, otherwise NonDestructive.
-      kAvxConvBlend          = 4         //!< Special case for 'vblendvpd', 'vblendvps', and 'vpblendvb'.
+    enum Features {
+      kFeatureMMX             = 0x0001U, //!< Supported by MMX.
+      kFeatureMMX2            = 0x0002U, //!< Supported by MMX2 (MMX-Ext).
+      kFeature3DNOW           = 0x0004U, //!< Supported by 3DNOW.
+      kFeature3DNOW2          = 0x0008U, //!< Supported by 3DNOW2 (Enhanced).
+      kFeatureGEODE           = 0x0010U, //!< Supported by GEODE (deprecated).
+      kFeatureSSE             = 0x0020U, //!< Supported by SSE.
+      kFeatureSSE2            = 0x0040U, //!< Supported by SSE2.
+      kFeatureSSE3            = 0x0080U, //!< Supported by SSE3.
+      kFeatureSSSE3           = 0x0100U, //!< Supported by SSSE3.
+      kFeatureSSE4_1          = 0x0200U, //!< Supported by SSE4.1.
+      kFeatureSSE4_2          = 0x0400U, //!< Supported by SSE4.2.
+      kFeatureSSE4A           = 0x0800U, //!< Supported by SSE4A.
+      kFeaturePCLMULQDQ       = 0x1000U, //!< Supported by PCLMULQDQ.
+      kFeatureAES             = 0x2000U, //!< Supported by AES.
+      kFeatureSHA             = 0x4000U  //!< Supported by SHA.
     };
 
-    uint16_t unused : 13;
-    uint16_t avxConv : 3;                //!< SSE to AVX conversion mode, see \ref AvxConvMode.
-    int16_t avxDelta;                    //!< Delta to get a corresponding AVX instruction.
+    //! SSE to AVX conversion mode.
+    enum AvxConvMode {
+      kAvxConvNone            = 0,       //!< No translation possible (MMX/SSE4A/SHA instruction).
+      kAvxConvNonDestructive  = 1,       //!< The first SSE operand becomes first and second AVX operand.
+      kAvxConvMove            = 2,       //!< No change (no operands changed).
+      kAvxConvMoveIfMem       = 3,       //!< No change if second operand is a memory, otherwise NonDestructive.
+      kAvxConvBlend           = 4        //!< Special case for 'vblendvpd', 'vblendvps', and 'vpblendvb'.
+    };
+
+    uint32_t features         : 16;      //!< CPU features.
+    uint32_t avxConvMode      :  3;      //!< SSE to AVX conversion mode, see \ref AvxConvMode.
+    int32_t avxConvDelta      : 13;      //!< Delta to get a corresponding AVX instruction.
   };
 
   //! Data specific to AVX+ and FMA+ family instructions.
   struct AvxData {
+    //! AVX/AVX512 features.
+    enum Features {
+      kFeatureAVX         = 0x00000001U, //!< Supported by AVX.
+      kFeatureAVX2        = 0x00000002U, //!< Supported by AVX2.
+      kFeatureAES         = 0x00000004U, //!< Supported by AVX & AES.
+      kFeatureF16C        = 0x00000008U, //!< Supported by F16C.
+      kFeatureFMA         = 0x00000010U, //!< Supported by FMA.
+      kFeatureFMA4        = 0x00000020U, //!< Supported by FMA4.
+      kFeaturePCLMULQDQ   = 0x00000040U, //!< Supported by PCLMULQDQ & AVX.
+      kFeatureXOP         = 0x00000080U, //!< Supported by XOP.
+      kFeatureAVX512F     = 0x00001000U, //!< Supported by AVX512-F (foundation).
+      kFeatureAVX512VL    = 0x00002000U, //!< Supports access to XMM|YMM registers if AVX512VL is present.
+      kFeatureAVX512CDI   = 0x00004000U, //!< Supported by AVX512-CDI (conflict detection).
+      kFeatureAVX512PFI   = 0x00008000U, //!< Supported by AVX512-PFI (prefetch).
+      kFeatureAVX512ERI   = 0x00010000U, //!< Supported by AVX512-ERI (exponential and reciprocal).
+      kFeatureAVX512DQ    = 0x00020000U, //!< Supported by AVX512-DQ (dword/qword).
+      kFeatureAVX512BW    = 0x00040000U, //!< Supported by AVX512-BW (byte/word).
+      kFeatureAVX512IFMA  = 0x00080000U, //!< Supported by AVX512-IFMA (integer fused-multiply-add).
+      kFeatureAVX512VBMI  = 0x00100000U  //!< Supported by AVX512-VBMI (vector byte manipulation).
+    };
 
+    //!< Additional flags (AVX512).
+    enum Flags {
+      kFlagMasking            = 0x0010U, //!< Supports masking {k0..k7}.
+      kFlagZeroing            = 0x0020U, //!< Supports zeroing of elements {k0..k7}{z} (must be used together with 'K').
+      kFlagBroadcast32        = 0x0040U, //!< Supports 32-bit broadcast 'b32'.
+      kFlagBroadcast64        = 0x0080U, //!< Supports 64-bit broadcast 'b64'.
+      kFlagER                 = 0x0100U, //!< Supports 'embedded-rounding-control' {rc} with implicit {sae},
+      kFlagSAE                = 0x0200U, //!< Supports 'suppress-all-exceptions' {sae}.
+    };
+
+    ASMJIT_INLINE bool hasFlag(uint32_t flag) const noexcept { return (flags & flag) != 0; }
+    ASMJIT_INLINE bool hasMasking() const noexcept { return hasFlag(kFlagMasking); }
+    ASMJIT_INLINE bool hasZeroing() const noexcept { return hasFlag(kFlagZeroing); }
+
+    ASMJIT_INLINE bool hasER() const noexcept { return hasFlag(kFlagER); }
+    ASMJIT_INLINE bool hasSAE() const noexcept { return hasFlag(kFlagSAE); }
+    ASMJIT_INLINE bool hasEROrSAE() const noexcept { return hasFlag(kFlagER | kFlagSAE); }
+
+    ASMJIT_INLINE bool hasBroadcast32() const noexcept { return hasFlag(kFlagBroadcast32); }
+    ASMJIT_INLINE bool hasBroadcast64() const noexcept { return hasFlag(kFlagBroadcast64); }
+    ASMJIT_INLINE bool hasBroadcast() const noexcept { return hasFlag(kFlagBroadcast32 | kFlagBroadcast64); }
+
+    uint32_t features;                   //!< CPU features.
+    uint32_t flags;                      //!< Flags (AVX-512).
   };
 
   //! Instruction signature.
@@ -2355,9 +2419,9 @@ struct X86Inst {
   //! Contains a sequence of operands' combinations and other metadata that defines
   //! a single instruction. This data is used by instruction validator.
   struct ISignature {
-    uint8_t opCount : 3;                 //!< Count of operands in `opIndex` (0..6).
-    uint8_t archMask : 2;                //!< Architecture mask of this record.
-    uint8_t implicit : 3;                //!< Number of implicit operands.
+    uint8_t opCount           : 3;       //!< Count of operands in `opIndex` (0..6).
+    uint8_t archMask          : 2;       //!< Architecture mask of this record.
+    uint8_t implicit          : 3;       //!< Number of implicit operands.
     uint8_t reserved;                    //!< Reserved for future use.
     uint8_t operands[6];                 //!< Indexes to `OSignature` table.
   };
@@ -2408,10 +2472,15 @@ struct X86Inst {
   //! Get if the instruction's family is \ref kFamilyAvx.
   ASMJIT_INLINE bool isAvxFamily() const noexcept { return _familyType == kFamilyAvx; }
 
-  //! Get data specific to SSE instructions.
+  //! Get data specific to MMX/SSE instructions.
   //!
   //! NOTE: Always check the instruction family, it will assert if it's not an SSE instruction.
   ASMJIT_INLINE const SseData& getSseData() const noexcept;
+
+  //! Get data specific to AVX instructions.
+  //!
+  //! NOTE: Always check the instruction family, it will assert if it's not an AVX instruction.
+  ASMJIT_INLINE const AvxData& getAvxData() const noexcept;
 
   //! Get if the instruction has main opcode (rare, but it's possible it doesn't have).
   ASMJIT_INLINE bool hasMainOpCode() const noexcept { return _mainOpCode != 0; }
@@ -2531,9 +2600,11 @@ struct X86Inst {
 //! X86 instruction data under a single namespace.
 struct X86InstDB {
   ASMJIT_API static const X86Inst instData[];
-  ASMJIT_API static const uint32_t altOpCodeData[];
-  ASMJIT_API static const X86Inst::SseData sseData[];
   ASMJIT_API static const X86Inst::CommonData commonData[];
+  ASMJIT_API static const X86Inst::FpuData fpuData[];
+  ASMJIT_API static const X86Inst::SseData sseData[];
+  ASMJIT_API static const X86Inst::AvxData avxData[];
+  ASMJIT_API static const uint32_t altOpCodeData[];
   ASMJIT_API static const char nameData[];
 };
 
@@ -2553,6 +2624,11 @@ ASMJIT_INLINE const X86Inst::CommonData& X86Inst::getCommonData() const noexcept
 ASMJIT_INLINE const X86Inst::SseData& X86Inst::getSseData() const noexcept {
   ASMJIT_ASSERT(isSseFamily());
   return X86InstDB::sseData[_familyDataIndex];
+}
+
+ASMJIT_INLINE const X86Inst::AvxData& X86Inst::getAvxData() const noexcept {
+  ASMJIT_ASSERT(isAvxFamily());
+  return X86InstDB::avxData[_familyDataIndex];
 }
 
 ASMJIT_INLINE uint32_t X86Inst::CommonData::getAltOpCode() const noexcept {

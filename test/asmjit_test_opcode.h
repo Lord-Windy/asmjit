@@ -22,11 +22,11 @@ static void generateOpcodes(asmjit::X86Assembler& a, bool useRex1 = false, bool 
 
   /*
   // TODO: Finalize implicit vs explicit.
-  a.cmpxchg8b(                                        ptr_gpC);
-  a.cmpxchg8b(x86::edx, x86::eax, x86::ecx, x86::ebx, ptr_gpC);
+  a.cmpxchg8b(ptr_gpC);
+  a.cmpxchg8b(ptr_gpC, x86::edx, x86::eax, x86::ecx, x86::ebx);
 
-  if (isX64) a.cmpxchg16b(                                        ptr_gpC);
-  if (isX64) a.cmpxchg16b(x86::rdx, x86::rax, x86::rcx, x86::rbx, ptr_gpC);
+  if (isX64) a.cmpxchg16b(ptr_gpC);
+  if (isX64) a.cmpxchg16b(ptr_gpC, x86::rdx, x86::rax, x86::rcx, x86::rbx);
   */
 
   // Prevent crash when the generated function is called to see the disassembly.

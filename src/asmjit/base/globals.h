@@ -155,8 +155,8 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidKZeroUse,
   //! Invalid broadcast - Currently only related to invalid use of AVX-512 {1tox}.
   kErrorInvalidBroadcast,
-  //! Invalid 'suppress-all-exceptions' {sae} or 'rounding-control' {rc} (AVX-512).
-  kErrorInvalidSAEOrER,
+  //! Invalid 'embedded-rounding' {er} or 'suppress-all-exceptions' {sae} (AVX-512).
+  kErrorInvalidEROrSAE,
   //! Invalid address used (not encodable).
   kErrorInvalidAddress,
   //! Invalid index register used in memory address (not encodable).
