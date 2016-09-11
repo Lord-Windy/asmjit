@@ -23,7 +23,6 @@ const asmdb = (function() {
     };
   }
   catch (ex) {
-    console.log(ex);
     // Okay, so global then...
     return require("asmdb.js");
   }
