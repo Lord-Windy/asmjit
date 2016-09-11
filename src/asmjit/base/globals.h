@@ -161,7 +161,9 @@ ASMJIT_ENUM(ErrorCode) {
   kErrorInvalidAddress,
   //! Invalid index register used in memory address (not encodable).
   kErrorInvalidAddressIndex,
-  //! Invalid use of 64-bit address in 32-bit mode.
+  //! Invalid address scale (not encodable).
+  kErrorInvalidAddressScale,
+  //! Invalid use of 64-bit address.
   kErrorInvalidAddress64Bit,
   //! Invalid displacement (not encodable).
   kErrorInvalidDisplacement,

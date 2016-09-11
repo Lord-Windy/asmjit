@@ -100,8 +100,8 @@ Supported Environments
     * **MinGW** - tested by AppVeyor.
     * **MSVC** - tested by AppVeyor.
   * Maybe
-    * **CodeGear** - supported, but without maintainers.
-    * **Intel** - supported, but not regularly tested.
+    * **CodeGear** - no maintainers.
+    * **Intel** - no maintainers.
   * Other c++ compilers would require some testing and support in [asmjit_build.h](./src/asmjit/asmjit_build.h).
 
 ### Operating Systems:
@@ -111,7 +111,7 @@ Supported Environments
     * **Mac** - tested by Travis-CI.
     * **Windows** - tested by AppVeyor.
   * Maybe
-    * **BSDs** - supported, but without maintainers.
+    * **BSDs** - no maintainers.
   * Other operating systems would require some testing and support in [asmjit_build.h](./src/asmjit/asmjit_build.h) and [osutils.cpp](./src/asmjit/base/osutils.cpp).
 
 ### Backends:

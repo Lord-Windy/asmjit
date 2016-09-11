@@ -23,10 +23,10 @@ matrix:
 install:
   - |
     if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-      CMAKE_PACKAGE="https://cmake.org/files/v3.3/cmake-3.3.2-Linux-x86_64.tar.gz"
-      mkdir cmake
-      wget --no-check-certificate --quiet -O - ${CMAKE_PACKAGE} | tar --strip-components=1 -xz -C cmake
-      export PATH=${TRAVIS_BUILD_DIR}/cmake/bin:${PATH}
+      CMAKE_PACKAGE="https://cmake.org/files/v3.6/cmake-3.6.2-Linux-x86_64.tar.gz"
+      mkdir -p deps/cmake
+      wget --no-check-certificate --quiet -O - ${CMAKE_PACKAGE} | tar --strip-components=1 -xz -C deps/cmake
+      export PATH=${TRAVIS_BUILD_DIR}/deps/cmake/bin:${PATH}
     else
       brew update
       brew unlink cmake
