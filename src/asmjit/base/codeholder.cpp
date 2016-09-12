@@ -648,7 +648,8 @@ size_t CodeHolder::relocate(void* _dst, uint64_t baseAddress) const noexcept {
     }
   }
 
-  return minCodeSize + trampOffset;
+  // If there are no trampolines this is the same as `minCodeSize`.
+  return trampOffset;
 }
 
 } // asmjit namespace

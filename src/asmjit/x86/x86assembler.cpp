@@ -4353,17 +4353,15 @@ EmitJmpCall:
         }
 
         // Emit [PREFIX] OPCODE + DISP32.
-        if (opCode & X86Inst::kOpCode_MM_Mask) {
-          re.from++;
+        if (opCode & X86Inst::kOpCode_MM_Mask)
           EMIT_BYTE(0x0F);
-        }
 
         EMIT_BYTE(opCode);
         EMIT_DWORD(0);
       }
       else {
         re.size = 1;
-        re.from = ip + 1;
+        re.from = ip + inst8Size - 1;
 
         // Emit OPCODE + DISP8.
         EMIT_BYTE(opCode8);

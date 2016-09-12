@@ -404,6 +404,56 @@ public:
   //! \overload
   ASMJIT_API Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3, const Operand_& o4, int64_t o5);
 
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, unsigned int o0) {
+    return emit(instId, static_cast<int64_t>(o0));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, unsigned int o1) {
+    return emit(instId, o0, static_cast<int64_t>(o1));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, unsigned int o2) {
+    return emit(instId, o0, o1, static_cast<int64_t>(o2));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, unsigned int o3) {
+    return emit(instId, o0, o1, o2, static_cast<int64_t>(o3));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3, unsigned int o4) {
+    return emit(instId, o0, o1, o2, o3, static_cast<int64_t>(o4));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3, const Operand_& o4, unsigned int o5) {
+    return emit(instId, o0, o1, o2, o3, o4, static_cast<int64_t>(o5));
+  }
+
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, uint64_t o0) {
+    return emit(instId, static_cast<int64_t>(o0));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, uint64_t o1) {
+    return emit(instId, o0, static_cast<int64_t>(o1));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, uint64_t o2) {
+    return emit(instId, o0, o1, static_cast<int64_t>(o2));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, uint64_t o3) {
+    return emit(instId, o0, o1, o2, static_cast<int64_t>(o3));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3, uint64_t o4) {
+    return emit(instId, o0, o1, o2, o3, static_cast<int64_t>(o4));
+  }
+  //! \overload
+  ASMJIT_INLINE Error emit(uint32_t instId, const Operand_& o0, const Operand_& o1, const Operand_& o2, const Operand_& o3, const Operand_& o4, uint64_t o5) {
+    return emit(instId, o0, o1, o2, o3, o4, static_cast<int64_t>(o5));
+  }
+
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
